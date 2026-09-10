@@ -42,7 +42,8 @@ export default function App() {
             <Route path="fichas/:id/editar" element={<FichaFormPage />} />
             <Route path="fichas/:id" element={<FichaDetailPage />} />
             <Route path="ocurrencias/:id" element={<OcurrenciaDetailPage />} />
-            <Route path="maestros" element={<MaestrosPage />} />
+            <Route path="bloques" element={<MaestrosPage />} />
+            <Route path="maestros" element={<Navigate to="/bloques" replace />} />
             <Route path="ajustes" element={<AjustesPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

@@ -6,8 +6,8 @@ import type {
   Ajustes,
   Encargado,
   Ejecucion,
+  Bloque,
   Ficha,
-  Grupo,
   Ocurrencia,
 } from './types'
 import { todayISO } from '../lib/dates'
@@ -18,7 +18,8 @@ export interface BackupPayload {
   version: 1
   exportedAt: string
   encargados: Encargado[]
-  grupos: Grupo[]
+  grupos: Bloque[]
+  bloques?: Bloque[]
   fichas: Ficha[]
   ocurrencias: Ocurrencia[]
   ejecuciones: Ejecucion[]
@@ -35,6 +36,7 @@ export async function exportBackup(): Promise<{ blob: Blob; filename: string }> 
     exportedAt: new Date().toISOString(),
     encargados: await db.encargados.toArray(),
     grupos: await db.grupos.toArray(),
+    bloques: await db.grupos.toArray(),
     fichas: await db.fichas.toArray(),
     ocurrencias: await db.ocurrencias.toArray(),
     ejecuciones: await db.ejecuciones.toArray(),
@@ -75,8 +77,16 @@ export async function importBackup(file: Blob, mode: 'replace' | 'merge'): Promi
       await Promise.all(db.tables.map((table) => table.clear()))
     }
     if (payload.encargados?.length) await db.encargados.bulkPut(payload.encargados)
-    if (payload.grupos?.length) await db.grupos.bulkPut(payload.grupos)
-    if (payload.fichas?.length) await db.fichas.bulkPut(payload.fichas)
+    const bloques = payload.bloques?.length ? payload.bloques : payload.grupos
+    if (bloques?.length) await db.grupos.bulkPut(bloques)
+    if (payload.fichas?.length) {
+      await db.fichas.bulkPut(
+        payload.fichas.map((ficha) => ({
+          ...ficha,
+          numero: ficha.numero?.trim() ? ficha.numero : '',
+        })),
+      )
+    }
     if (payload.ocurrencias?.length) await db.ocurrencias.bulkPut(payload.ocurrencias)
     if (payload.ejecuciones?.length) await db.ejecuciones.bulkPut(payload.ejecuciones)
     if (payload.accionesCorrectivas?.length) {

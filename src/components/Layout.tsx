@@ -3,8 +3,8 @@ import {
   CalendarDays,
   ClipboardList,
   LayoutDashboard,
+  Layers,
   Settings,
-  Users,
 } from 'lucide-react'
 import { ThemeQuickToggle } from './ThemeQuickToggle'
 
@@ -12,7 +12,7 @@ const LINKS = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, end: true },
   { to: '/cronograma', label: 'Cronograma', icon: CalendarDays, end: false },
   { to: '/fichas', label: 'Fichas', icon: ClipboardList, end: false },
-  { to: '/maestros', label: 'Maestros', icon: Users, end: false },
+  { to: '/bloques', label: 'Bloques', icon: Layers, end: false },
   { to: '/ajustes', label: 'Ajustes', icon: Settings, end: false },
 ]
 
@@ -20,7 +20,7 @@ const TITLES: Record<string, string> = {
   '/': 'Dashboard',
   '/cronograma': 'Cronograma',
   '/fichas': 'Fichas',
-  '/maestros': 'Maestros',
+  '/bloques': 'Bloques',
   '/ajustes': 'Ajustes',
 }
 

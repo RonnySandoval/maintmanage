@@ -2,8 +2,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Pencil, Trash2 } from 'lucide-react'
 import { db } from '../db'
-import { FRECUENCIAS } from '../db/types'
-import { formatDate } from '../lib/dates'
+import { frecuenciaLabel } from '../db/types'
+import { formatFechaProgramada } from '../lib/dates'
+import { fichaTitulo } from '../lib/fichas'
 import { saveAdjuntos } from '../lib/files'
 import { blobToFile } from '../lib/share'
 import { deleteFichaCascade } from '../db/occurrences'
@@ -12,8 +13,6 @@ import { FilePicker } from '../components/FilePicker'
 import { ShareMenu } from '../components/ShareMenu'
 import { StatusBadge } from '../components/ui'
 
-const freqLabel = Object.fromEntries(FRECUENCIAS.map((f) => [f.id, f.label]))
-
 export function FichaDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -21,7 +20,7 @@ export function FichaDetailPage() {
     if (!id) return null
     return (await db.fichas.get(id)) ?? null
   }, [id])
-  const grupo = useLiveQuery(
+  const bloque = useLiveQuery(
     () => (ficha?.grupoId ? db.grupos.get(ficha.grupoId) : undefined),
     [ficha?.grupoId],
   )
@@ -59,10 +58,16 @@ export function FichaDetailPage() {
   const current = ficha
   const plantilla = adjuntos.filter((a) => a.tipo === 'ficha')
   const shareText = [
-    `Ficha: ${current.nombre}`,
-    grupo ? `Grupo: ${grupo.nombre}` : '',
+    `Ficha: ${fichaTitulo(current)}`,
+    bloque ? `Bloque: ${bloque.nombre}` : '',
     encargado ? `Encargado: ${encargado.nombre}` : '',
-    `Frecuencia: ${freqLabel[ficha.frecuencia]}`,
+    (ficha.telefonos || encargado?.telefonos || encargado?.contacto)
+      ? `Teléfono(s): ${ficha.telefonos || encargado?.telefonos || encargado?.contacto}`
+      : '',
+    (ficha.congregacion || encargado?.congregacion)
+      ? `Congregación: ${ficha.congregacion || encargado?.congregacion}`
+      : '',
+    `Periodo: ${frecuenciaLabel(ficha.frecuencia)}`,
     ficha.notas ? `Notas: ${ficha.notas}` : '',
   ]
     .filter(Boolean)
@@ -83,7 +88,7 @@ export function FichaDetailPage() {
       <div className="card">
         <div className="row-spread" style={{ marginBottom: '0.6rem', flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ marginBottom: 4 }}>{ficha.nombre}</h2>
+            <h2 style={{ marginBottom: 4 }}>{fichaTitulo(ficha)}</h2>
             <p className="muted" style={{ margin: 0 }}>
               <span
                 className="color-dot"
@@ -91,10 +96,12 @@ export function FichaDetailPage() {
                   display: 'inline-block',
                   margin: '0 6px 0 0',
                   verticalAlign: 'middle',
-                  background: grupo?.color ?? 'var(--accent)',
+                  background: bloque?.color ?? 'var(--accent)',
                 }}
               />
-              {grupo?.nombre} · {encargado?.nombre} · {freqLabel[ficha.frecuencia]}
+              {bloque?.nombre}
+              {encargado ? ` · ${encargado.nombre}` : ''}
+              {` · ${frecuenciaLabel(ficha.frecuencia)}`}
             </p>
           </div>
           <div className="row" style={{ flexWrap: 'wrap' }}>
@@ -108,8 +115,21 @@ export function FichaDetailPage() {
             </button>
           </div>
         </div>
+        {ficha.telefonos || ficha.congregacion || encargado?.telefonos || encargado?.congregacion ? (
+          <p className="muted">
+            {ficha.telefonos || encargado?.telefonos || encargado?.contacto
+              ? `Tel. ${ficha.telefonos || encargado?.telefonos || encargado?.contacto}`
+              : ''}
+            {(ficha.congregacion || encargado?.congregacion) && (ficha.telefonos || encargado?.telefonos || encargado?.contacto)
+              ? ' · '
+              : ''}
+            {ficha.congregacion || encargado?.congregacion
+              ? `Congregación: ${ficha.congregacion || encargado?.congregacion}`
+              : ''}
+          </p>
+        ) : null}
         {ficha.notas ? <p>{ficha.notas}</p> : null}
-        <ShareMenu title={ficha.nombre} text={shareText} files={shareFiles} />
+        <ShareMenu title={fichaTitulo(ficha)} text={shareText} files={shareFiles} />
       </div>
 
       <div className="card">
@@ -137,7 +157,7 @@ export function FichaDetailPage() {
             <Link key={o.id} className="card-click item" to={`/ocurrencias/${o.id}`}>
               <div className="grow">
                 <div className="row-spread">
-                  <span>{formatDate(o.fechaProgramada)}</span>
+                  <span>{formatFechaProgramada(o.fechaProgramada, ficha.fechaPrecision ?? 'mes')}</span>
                   <StatusBadge estado={o.estado} />
                 </div>
               </div>

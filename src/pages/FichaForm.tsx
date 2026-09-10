@@ -2,11 +2,13 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
-import { FRECUENCIAS, GRUPO_COLORS, type Frecuencia } from '../db/types'
-import { createId } from '../lib/ids'
-import { todayISO } from '../lib/dates'
+import { FRECUENCIAS, normalizeFrecuencia, type FechaPrecision, type Frecuencia } from '../db/types'
+import { currentMonthPrefix, monthValue } from '../lib/dates'
+import { siguienteNumero } from '../lib/fichas'
 import { saveAdjuntos } from '../lib/files'
 import { refreshEstados, syncOcurrenciasForFicha } from '../db/occurrences'
+import { createId } from '../lib/ids'
+import { CrearBloqueForm } from '../components/CrearBloqueForm'
 import { FilePicker } from '../components/FilePicker'
 
 export function FichaFormPage() {
@@ -18,48 +20,52 @@ export function FichaFormPage() {
     if (!id) return null
     return (await db.fichas.get(id)) ?? null
   }, [id])
-  const grupos = useLiveQuery(() => db.grupos.orderBy('nombre').toArray()) ?? []
+  const bloques = useLiveQuery(() => db.grupos.orderBy('nombre').toArray()) ?? []
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
+  const todasFichas = useLiveQuery(() => db.fichas.toArray()) ?? []
 
+  const [numero, setNumero] = useState('')
   const [nombre, setNombre] = useState('')
   const [grupoId, setGrupoId] = useState('')
   const [encargadoId, setEncargadoId] = useState('')
-  const [frecuencia, setFrecuencia] = useState<Frecuencia>('mensual')
-  const [fechaInicio, setFechaInicio] = useState(todayISO())
+  const [telefonos, setTelefonos] = useState('')
+  const [congregacion, setCongregacion] = useState('')
+  const [frecuencia, setFrecuencia] = useState<Frecuencia>('cada_1')
+  const [fechaPrecision, setFechaPrecision] = useState<FechaPrecision>('mes')
+  const [fechaInicio, setFechaInicio] = useState(`${currentMonthPrefix()}-01`)
   const [notas, setNotas] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
-
-  const [newGrupo, setNewGrupo] = useState('')
   const [newEncargado, setNewEncargado] = useState('')
+  const [newEncTel, setNewEncTel] = useState('')
+  const [newEncCong, setNewEncCong] = useState('')
+  const [showCrearBloque, setShowCrearBloque] = useState(false)
+  const [numeroTouched, setNumeroTouched] = useState(false)
 
   useEffect(() => {
     if (ficha) {
+      setNumero(ficha.numero ?? '')
       setNombre(ficha.nombre)
       setGrupoId(ficha.grupoId)
-      setEncargadoId(ficha.encargadoId)
-      setFrecuencia(ficha.frecuencia)
-      setFechaInicio(ficha.fechaInicio)
+      setEncargadoId(ficha.encargadoId ?? '')
+      setTelefonos(ficha.telefonos ?? '')
+      setCongregacion(ficha.congregacion ?? '')
+      setFrecuencia(normalizeFrecuencia(ficha.frecuencia))
+      setFechaPrecision(ficha.fechaPrecision === 'dia' ? 'dia' : 'mes')
+      setFechaInicio(ficha.fechaInicio || `${currentMonthPrefix()}-01`)
       setNotas(ficha.notas ?? '')
     }
   }, [ficha])
 
-  async function addGrupo() {
-    const name = newGrupo.trim()
-    if (!name) return
-    const now = Date.now()
-    const created = {
-      id: createId(),
-      nombre: name,
-      color: GRUPO_COLORS[grupos.length % GRUPO_COLORS.length],
-      createdAt: now,
-      updatedAt: now,
-    }
-    await db.grupos.add(created)
-    setGrupoId(created.id)
-    setNewGrupo('')
-  }
+  useEffect(() => {
+    if (editing || numeroTouched) return
+    setNumero(siguienteNumero(todasFichas))
+  }, [editing, todasFichas, numeroTouched])
+
+  useEffect(() => {
+    if (!editing && bloques.length === 0) setShowCrearBloque(true)
+  }, [editing, bloques.length])
 
   async function addEncargado() {
     const name = newEncargado.trim()
@@ -68,27 +74,37 @@ export function FichaFormPage() {
     const created = {
       id: createId(),
       nombre: name,
+      telefonos: newEncTel.trim() || undefined,
+      congregacion: newEncCong.trim() || undefined,
       createdAt: now,
       updatedAt: now,
     }
     await db.encargados.add(created)
     setEncargadoId(created.id)
     setNewEncargado('')
+    setNewEncTel('')
+    setNewEncCong('')
   }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
+    if (!numero.trim()) {
+      setError('El número de ficha es obligatorio.')
+      return
+    }
     if (!nombre.trim()) {
       setError('El nombre es obligatorio.')
       return
     }
     if (!grupoId) {
-      setError('Elige o crea un grupo.')
+      setError('Elige o crea un bloque.')
       return
     }
-    if (!encargadoId) {
-      setError('Elige o crea un encargado.')
+    const inicio =
+      fechaPrecision === 'mes' ? `${monthValue(fechaInicio)}-01` : fechaInicio
+    if (!inicio || inicio.length < 7) {
+      setError('Indica la fecha o el mes de inicio.')
       return
     }
     setSaving(true)
@@ -97,11 +113,15 @@ export function FichaFormPage() {
       const fichaId = id ?? createId()
       const record = {
         id: fichaId,
+        numero: numero.trim(),
         nombre: nombre.trim(),
         grupoId,
-        encargadoId,
+        encargadoId: encargadoId || undefined,
+        telefonos: telefonos.trim() || undefined,
+        congregacion: congregacion.trim() || undefined,
         frecuencia,
-        fechaInicio,
+        fechaInicio: inicio,
+        fechaPrecision,
         notas: notas.trim() || undefined,
         createdAt: ficha?.createdAt ?? now,
         updatedAt: now,
@@ -130,99 +150,195 @@ export function FichaFormPage() {
 
   return (
     <form className="card" onSubmit={(e) => void onSubmit(e)}>
-      <div className="field">
-        <label htmlFor="nombre">Nombre</label>
-        <input
-          id="nombre"
-          className="input"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          placeholder="p. ej. Revisión mensual del ascensor"
-        />
-      </div>
-
-      <div className="field">
-        <label htmlFor="grupo">Grupo</label>
-        <select
-          id="grupo"
-          className="select"
-          value={grupoId}
-          onChange={(e) => setGrupoId(e.target.value)}
-        >
-          <option value="">Seleccionar…</option>
-          {grupos.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.nombre}
-            </option>
-          ))}
-        </select>
-        <div className="row" style={{ marginTop: 6 }}>
+      <div className="split split-2">
+        <div className="field">
+          <label htmlFor="numero">Número</label>
           <input
+            id="numero"
             className="input"
-            placeholder="Nuevo grupo"
-            value={newGrupo}
-            onChange={(e) => setNewGrupo(e.target.value)}
+            value={numero}
+            onChange={(e) => {
+              setNumeroTouched(true)
+              setNumero(e.target.value)
+            }}
+            placeholder="p. ej. 12"
+            inputMode="numeric"
           />
-          <button type="button" className="btn" onClick={() => void addGrupo()}>
-            Añadir
-          </button>
+        </div>
+        <div className="field">
+          <label htmlFor="nombre">Nombre</label>
+          <input
+            id="nombre"
+            className="input"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="p. ej. Revisión mensual del ascensor"
+          />
         </div>
       </div>
 
       <div className="field">
-        <label htmlFor="encargado">Encargado</label>
+        <div className="row-spread" style={{ marginBottom: 6 }}>
+          <label htmlFor="bloque" style={{ margin: 0 }}>
+            Bloque
+          </label>
+          <Link to="/bloques" className="muted">
+            Ver todos los bloques
+          </Link>
+        </div>
+        {bloques.length === 0 ? (
+          <p className="muted">Todavía no hay bloques. Crea el primero aquí mismo.</p>
+        ) : (
+          <select
+            id="bloque"
+            className="select"
+            value={grupoId}
+            onChange={(e) => setGrupoId(e.target.value)}
+          >
+            <option value="">Seleccionar bloque…</option>
+            {bloques.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.nombre}
+              </option>
+            ))}
+          </select>
+        )}
+        {showCrearBloque || bloques.length === 0 ? (
+          <CrearBloqueForm
+            onCreated={(createdId) => {
+              setGrupoId(createdId)
+              setShowCrearBloque(false)
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{ marginTop: 8 }}
+            onClick={() => setShowCrearBloque(true)}
+          >
+            Crear otro bloque
+          </button>
+        )}
+      </div>
+
+      <div className="field">
+        <label htmlFor="encargado">Encargado (opcional)</label>
         <select
           id="encargado"
           className="select"
           value={encargadoId}
           onChange={(e) => setEncargadoId(e.target.value)}
         >
-          <option value="">Seleccionar…</option>
+          <option value="">Sin encargado</option>
           {encargados.map((p) => (
             <option key={p.id} value={p.id}>
               {p.nombre}
             </option>
           ))}
         </select>
-        <div className="row" style={{ marginTop: 6 }}>
+        <div className="create-panel" style={{ marginTop: 8 }}>
+          <p className="muted">Añadir un encargado nuevo, si hace falta</p>
           <input
             className="input"
-            placeholder="Nuevo encargado"
+            placeholder="Nombre"
             value={newEncargado}
             onChange={(e) => setNewEncargado(e.target.value)}
           />
-          <button type="button" className="btn" onClick={() => void addEncargado()}>
-            Añadir
+          <div className="split split-2" style={{ marginTop: 8 }}>
+            <input
+              className="input"
+              placeholder="Teléfono(s)"
+              value={newEncTel}
+              onChange={(e) => setNewEncTel(e.target.value)}
+            />
+            <input
+              className="input"
+              placeholder="Congregación"
+              value={newEncCong}
+              onChange={(e) => setNewEncCong(e.target.value)}
+            />
+          </div>
+          <button type="button" className="btn" style={{ marginTop: 8 }} onClick={() => void addEncargado()}>
+            Añadir encargado
           </button>
         </div>
       </div>
 
       <div className="split split-2">
         <div className="field">
-          <label htmlFor="frecuencia">Frecuencia</label>
-          <select
-            id="frecuencia"
-            className="select"
-            value={frecuencia}
-            onChange={(e) => setFrecuencia(e.target.value as Frecuencia)}
-          >
-            {FRECUENCIAS.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.label}
-              </option>
-            ))}
-          </select>
+          <label htmlFor="telefonos">Teléfono(s) (opcional)</label>
+          <input
+            id="telefonos"
+            className="input"
+            value={telefonos}
+            onChange={(e) => setTelefonos(e.target.value)}
+            placeholder="Varios, separados por coma"
+          />
         </div>
         <div className="field">
-          <label htmlFor="inicio">Fecha de inicio</label>
+          <label htmlFor="congregacion">Congregación (opcional)</label>
           <input
-            id="inicio"
+            id="congregacion"
+            className="input"
+            value={congregacion}
+            onChange={(e) => setCongregacion(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="field">
+        <label htmlFor="frecuencia">Periodo</label>
+        <select
+          id="frecuencia"
+          className="select"
+          value={frecuencia}
+          onChange={(e) => setFrecuencia(e.target.value as Frecuencia)}
+        >
+          {FRECUENCIAS.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="field">
+        <label>Inicio de la programación</label>
+        <div className="chip-row">
+          <button
+            type="button"
+            className={`chip${fechaPrecision === 'mes' ? ' active' : ''}`}
+            onClick={() => setFechaPrecision('mes')}
+          >
+            Solo mes
+          </button>
+          <button
+            type="button"
+            className={`chip${fechaPrecision === 'dia' ? ' active' : ''}`}
+            onClick={() => setFechaPrecision('dia')}
+          >
+            Fecha exacta
+          </button>
+        </div>
+        {fechaPrecision === 'mes' ? (
+          <input
+            className="input"
+            type="month"
+            value={monthValue(fechaInicio)}
+            onChange={(e) => setFechaInicio(`${e.target.value}-01`)}
+          />
+        ) : (
+          <input
             className="input"
             type="date"
             value={fechaInicio}
             onChange={(e) => setFechaInicio(e.target.value)}
           />
-        </div>
+        )}
+        <p className="muted">
+          Por defecto basta el mes. Las reparaciones pendientes sí pedirán día exacto.
+        </p>
       </div>
 
       <div className="field">

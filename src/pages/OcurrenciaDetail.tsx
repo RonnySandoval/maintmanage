@@ -4,7 +4,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { ESTADOS_CORRECTIVA, type EstadoCorrectiva } from '../db/types'
 import { createId } from '../lib/ids'
-import { formatDateLong, todayISO } from '../lib/dates'
+import { formatFechaProgramada, todayISO } from '../lib/dates'
+import { fichaTitulo } from '../lib/fichas'
 import { saveAdjuntos } from '../lib/files'
 import { blobToFile } from '../lib/share'
 import { refreshEstados } from '../db/occurrences'
@@ -23,7 +24,7 @@ export function OcurrenciaDetailPage() {
     if (!occ?.fichaId) return null
     return (await db.fichas.get(occ.fichaId)) ?? null
   }, [occ?.fichaId])
-  const grupo = useLiveQuery(
+  const bloque = useLiveQuery(
     () => (ficha?.grupoId ? db.grupos.get(ficha.grupoId) : undefined),
     [ficha?.grupoId],
   )
@@ -61,7 +62,8 @@ export function OcurrenciaDetailPage() {
   const [saving, setSaving] = useState(false)
   const [correctiva, setCorrectiva] = useState('')
   const [correctivaEstado, setCorrectivaEstado] = useState<EstadoCorrectiva>('pendiente')
-  const [correctivaFecha, setCorrectivaFecha] = useState('')
+  const [correctivaFecha, setCorrectivaFecha] = useState(todayISO())
+  const [corrError, setCorrError] = useState('')
 
   if (!id) return null
   if (occ === undefined) return <p className="muted">Cargando…</p>
@@ -85,10 +87,10 @@ export function OcurrenciaDetailPage() {
   const currentFicha = ficha
 
   const shareText = [
-    `Ficha: ${currentFicha.nombre}`,
+    `Ficha: ${fichaTitulo(currentFicha)}`,
     `Programada: ${ocurrencia.fechaProgramada}`,
     `Estado: ${ocurrencia.estado}`,
-    grupo ? `Grupo: ${grupo.nombre}` : '',
+    bloque ? `Bloque: ${bloque.nombre}` : '',
     encargado ? `Encargado: ${encargado.nombre}` : '',
     ejecucion?.observaciones ? `Observaciones: ${ejecucion.observaciones}` : '',
   ]
@@ -124,7 +126,12 @@ export function OcurrenciaDetailPage() {
 
   async function addCorrectiva(e: FormEvent) {
     e.preventDefault()
+    setCorrError('')
     if (!correctiva.trim()) return
+    if (!correctivaFecha) {
+      setCorrError('Las reparaciones pendientes necesitan una fecha exacta.')
+      return
+    }
     const now = Date.now()
     await db.accionesCorrectivas.add({
       id: createId(),
@@ -132,12 +139,12 @@ export function OcurrenciaDetailPage() {
       ocurrenciaId: ocurrencia.id,
       texto: correctiva.trim(),
       estado: correctivaEstado,
-      fechaObjetivo: correctivaFecha || undefined,
+      fechaObjetivo: correctivaFecha,
       createdAt: now,
       updatedAt: now,
     })
     setCorrectiva('')
-    setCorrectivaFecha('')
+    setCorrectivaFecha(todayISO())
     setCorrectivaEstado('pendiente')
   }
 
@@ -151,18 +158,21 @@ export function OcurrenciaDetailPage() {
         <div className="row-spread" style={{ marginBottom: 8, flexWrap: 'wrap' }}>
           <div>
             <p className="muted" style={{ margin: 0, textTransform: 'capitalize' }}>
-              {formatDateLong(ocurrencia.fechaProgramada)}
+              {formatFechaProgramada(
+                ocurrencia.fechaProgramada,
+                currentFicha.fechaPrecision === 'dia' ? 'dia' : 'mes',
+              )}
             </p>
             <h2>
-              <Link to={`/fichas/${currentFicha.id}`}>{currentFicha.nombre}</Link>
+              <Link to={`/fichas/${currentFicha.id}`}>{fichaTitulo(currentFicha)}</Link>
             </h2>
             <p className="muted">
-              {grupo?.nombre} · {encargado?.nombre}
+              {bloque?.nombre} · {encargado?.nombre}
             </p>
           </div>
           <StatusBadge estado={ocurrencia.estado} />
         </div>
-        <ShareMenu title={currentFicha.nombre} text={shareText} files={shareFiles} />
+        <ShareMenu title={fichaTitulo(currentFicha)} text={shareText} files={shareFiles} />
       </div>
 
       <div className="card">
@@ -253,7 +263,7 @@ export function OcurrenciaDetailPage() {
               </select>
             </div>
             <div className="field">
-              <label htmlFor="corrFecha">Fecha objetivo</label>
+              <label htmlFor="corrFecha">Fecha (obligatoria)</label>
               <input
                 id="corrFecha"
                 className="input"
@@ -263,6 +273,7 @@ export function OcurrenciaDetailPage() {
               />
             </div>
           </div>
+          {corrError ? <p className="danger-text">{corrError}</p> : null}
           <button className="btn" type="submit">
             Añadir acción
           </button>

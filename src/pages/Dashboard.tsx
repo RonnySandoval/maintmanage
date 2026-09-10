@@ -4,13 +4,14 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { CalendarDays, ClipboardList } from 'lucide-react'
 import { db } from '../db'
 import { addDays, currentMonthPrefix, formatDate, todayISO, weekdayShort } from '../lib/dates'
+import { fichaTitulo } from '../lib/fichas'
 import { EmptyState, StatusBadge } from '../components/ui'
 
 export function DashboardPage() {
   const navigate = useNavigate()
   const ocurrencias = useLiveQuery(() => db.ocurrencias.toArray()) ?? []
   const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
-  const grupos = useLiveQuery(() => db.grupos.toArray()) ?? []
+  const bloques = useLiveQuery(() => db.grupos.toArray()) ?? []
   const acciones =
     useLiveQuery(() =>
       db.accionesCorrectivas.where('estado').anyOf(['pendiente', 'programada']).toArray(),
@@ -20,9 +21,9 @@ export function DashboardPage() {
     () => Object.fromEntries(fichas.map((f) => [f.id, f])),
     [fichas],
   )
-  const grupoMap = useMemo(
-    () => Object.fromEntries(grupos.map((g) => [g.id, g])),
-    [grupos],
+  const bloqueMap = useMemo(
+    () => Object.fromEntries(bloques.map((b) => [b.id, b])),
+    [bloques],
   )
 
   const today = todayISO()
@@ -52,11 +53,16 @@ export function DashboardPage() {
       <EmptyState
         icon={<ClipboardList size={36} />}
         title="Aún no hay fichas"
-        text="Crea grupos, encargados y fichas de mantenimiento para ver el cronograma aquí."
+        text="Crea bloques, encargados y fichas de mantenimiento para ver el cronograma aquí."
         action={
-          <Link className="btn btn-primary" to="/fichas/nueva">
-            Crear primera ficha
-          </Link>
+          <div className="row" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link className="btn" to="/bloques">
+              Crear bloque
+            </Link>
+            <Link className="btn btn-primary" to="/fichas/nueva">
+              Crear primera ficha
+            </Link>
+          </div>
         }
       />
     )
@@ -127,18 +133,18 @@ export function DashboardPage() {
         <div className="list">
           {agenda.map((o) => {
             const ficha = fichaMap[o.fichaId]
-            const grupo = ficha ? grupoMap[ficha.grupoId] : undefined
+            const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
             return (
               <Link key={o.id} className="card card-click item" to={`/ocurrencias/${o.id}`}>
-                <span className="bar" style={{ background: grupo?.color ?? 'var(--accent)' }} />
+                <span className="bar" style={{ background: bloque?.color ?? 'var(--accent)' }} />
                 <div className="grow">
                   <div className="row-spread">
-                    <strong>{ficha?.nombre ?? 'Ficha'}</strong>
+                    <strong>{ficha ? fichaTitulo(ficha) : 'Ficha'}</strong>
                     <StatusBadge estado={o.estado} />
                   </div>
                   <div className="muted">
                     {formatDate(o.fechaProgramada)}
-                    {grupo ? ` · ${grupo.nombre}` : ''}
+                    {bloque ? ` · ${bloque.nombre}` : ''}
                   </div>
                 </div>
               </Link>
@@ -157,7 +163,7 @@ export function DashboardPage() {
                   <strong>{a.texto}</strong>
                   <span className="badge badge-pendiente">{a.estado}</span>
                 </div>
-                <div className="muted">{fichaMap[a.fichaId]?.nombre}</div>
+                <div className="muted">{fichaMap[a.fichaId] ? fichaTitulo(fichaMap[a.fichaId]) : ''}</div>
               </div>
             ))}
           </div>

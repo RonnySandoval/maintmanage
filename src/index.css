@@ -420,6 +420,9 @@ p {
 }
 
 .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   border: 1px solid var(--border);
   background: var(--bg-elev);
   color: var(--text-muted);
@@ -654,6 +657,21 @@ p {
   padding: 0.75rem 0.85rem;
 }
 
+.create-panel {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem;
+  background: var(--bg);
+  margin-top: 0.65rem;
+}
+
+.ficha-num {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  font-weight: 750;
+  margin-right: 0.35rem;
+}
+
 .danger-text {
   color: var(--danger);
   font-size: 0.88rem;
@@ -740,6 +758,100 @@ p {
   .topbar {
     padding-inline: 1.4rem;
   }
+}
+
+.color-native {
+  width: 48px;
+  height: 44px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.year-grid-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+}
+
+.year-grid {
+  border-collapse: collapse;
+  min-width: 920px;
+  width: 100%;
+  font-size: 0.78rem;
+}
+
+.year-grid th,
+.year-grid td {
+  border: 1px solid var(--border);
+  padding: 0.3rem 0.28rem;
+  text-align: center;
+}
+
+.year-grid .ficha-col {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: var(--bg-elev);
+  min-width: 168px;
+  z-index: 1;
+  font-weight: 650;
+}
+
+.year-grid .q-head {
+  background: var(--bg-muted);
+  font-weight: 700;
+}
+
+.year-grid .bloque-row td {
+  background: var(--bg-muted);
+  text-align: left;
+  font-weight: 700;
+}
+
+.grid-cell {
+  display: block;
+  border-radius: 6px;
+  min-height: 28px;
+  line-height: 28px;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.grid-cell:hover {
+  text-decoration: none;
+  filter: brightness(0.96);
+}
+
+.grid-cell.vencida {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.grid-cell.proxima {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.grid-cell.pendiente {
+  background: var(--bg-muted);
+  color: var(--text-muted);
+}
+
+.grid-cell.ejecutada {
+  background: var(--ok-soft);
+  color: var(--ok);
 }
 
 @media (prefers-reduced-motion: reduce) {

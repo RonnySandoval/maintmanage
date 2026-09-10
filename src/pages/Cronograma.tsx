@@ -1,33 +1,37 @@
 import { useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays, LayoutGrid, List } from 'lucide-react'
 import { db } from '../db'
 import { ESTADOS, type EstadoOcurrencia } from '../db/types'
-import { formatDateLong } from '../lib/dates'
+import { formatFechaProgramada, formatDateLong } from '../lib/dates'
+import { fichaTitulo } from '../lib/fichas'
 import { EmptyState, StatusBadge } from '../components/ui'
+import { GrillaAnual } from '../components/GrillaAnual'
 
 export function CronogramaPage() {
   const [params, setParams] = useSearchParams()
   const estado = (params.get('estado') ?? '') as EstadoOcurrencia | ''
-  const grupoId = params.get('grupo') ?? ''
+  const bloqueId = params.get('bloque') ?? params.get('grupo') ?? ''
   const encargadoId = params.get('encargado') ?? ''
   const fichaId = params.get('ficha') ?? ''
   const fecha = params.get('fecha') ?? ''
   const q = params.get('q') ?? ''
+  const vista = params.get('vista') === 'lista' ? 'lista' : 'grilla'
+  const year = Number(params.get('anio')) || new Date().getFullYear()
 
   const ocurrencias = useLiveQuery(() => db.ocurrencias.orderBy('fechaProgramada').toArray()) ?? []
   const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
-  const grupos = useLiveQuery(() => db.grupos.orderBy('nombre').toArray()) ?? []
+  const bloques = useLiveQuery(() => db.grupos.orderBy('nombre').toArray()) ?? []
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
 
   const fichaMap = useMemo(
     () => Object.fromEntries(fichas.map((f) => [f.id, f])),
     [fichas],
   )
-  const grupoMap = useMemo(
-    () => Object.fromEntries(grupos.map((g) => [g.id, g])),
-    [grupos],
+  const bloqueMap = useMemo(
+    () => Object.fromEntries(bloques.map((b) => [b.id, b])),
+    [bloques],
   )
   const encargadoMap = useMemo(
     () => Object.fromEntries(encargados.map((e) => [e.id, e])),
@@ -38,18 +42,26 @@ export function CronogramaPage() {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
     else next.delete(key)
+    if (key === 'bloque') next.delete('grupo')
     setParams(next)
   }
+
+  const fichasFiltradas = fichas.filter((ficha) => {
+    if (bloqueId && ficha.grupoId !== bloqueId) return false
+    if (encargadoId && ficha.encargadoId !== encargadoId) return false
+    if (fichaId && ficha.id !== fichaId) return false
+    if (q && !`${ficha.numero} ${ficha.nombre}`.toLowerCase().includes(q.toLowerCase())) {
+      return false
+    }
+    return true
+  })
 
   const filtered = ocurrencias.filter((o) => {
     const ficha = fichaMap[o.fichaId]
     if (!ficha) return false
+    if (!fichasFiltradas.some((f) => f.id === ficha.id)) return false
     if (estado && o.estado !== estado) return false
-    if (grupoId && ficha.grupoId !== grupoId) return false
-    if (encargadoId && ficha.encargadoId !== encargadoId) return false
-    if (fichaId && ficha.id !== fichaId) return false
     if (fecha && o.fechaProgramada !== fecha) return false
-    if (q && !ficha.nombre.toLowerCase().includes(q.toLowerCase())) return false
     return true
   })
 
@@ -65,7 +77,7 @@ export function CronogramaPage() {
       <EmptyState
         icon={<CalendarDays size={36} />}
         title="Sin cronograma"
-        text="Cuando existan fichas con frecuencia, aquí verás las fechas programadas."
+        text="Cuando existan fichas con periodo, aquí verás las fechas programadas."
         action={
           <Link className="btn btn-primary" to="/fichas/nueva">
             Nueva ficha
@@ -77,6 +89,38 @@ export function CronogramaPage() {
 
   return (
     <div>
+      <div className="row-spread" style={{ marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="chip-row" style={{ margin: 0 }}>
+          <button
+            type="button"
+            className={`chip${vista === 'grilla' ? ' active' : ''}`}
+            onClick={() => set('vista', '')}
+          >
+            <LayoutGrid size={14} />
+            Grilla anual
+          </button>
+          <button
+            type="button"
+            className={`chip${vista === 'lista' ? ' active' : ''}`}
+            onClick={() => set('vista', 'lista')}
+          >
+            <List size={14} />
+            Lista
+          </button>
+        </div>
+        {vista === 'grilla' ? (
+          <div className="row">
+            <button type="button" className="btn" onClick={() => set('anio', String(year - 1))}>
+              ←
+            </button>
+            <strong>{year}</strong>
+            <button type="button" className="btn" onClick={() => set('anio', String(year + 1))}>
+              →
+            </button>
+          </div>
+        ) : null}
+      </div>
+
       <div className="chip-row">
         <button
           type="button"
@@ -104,11 +148,11 @@ export function CronogramaPage() {
           value={q}
           onChange={(e) => set('q', e.target.value)}
         />
-        <select className="select" value={grupoId} onChange={(e) => set('grupo', e.target.value)}>
-          <option value="">Grupo</option>
-          {grupos.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.nombre}
+        <select className="select" value={bloqueId} onChange={(e) => set('bloque', e.target.value)}>
+          <option value="">Bloque</option>
+          {bloques.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.nombre}
             </option>
           ))}
         </select>
@@ -128,51 +172,69 @@ export function CronogramaPage() {
           <option value="">Ficha</option>
           {fichas.map((f) => (
             <option key={f.id} value={f.id}>
-              {f.nombre}
+              {fichaTitulo(f)}
             </option>
           ))}
         </select>
       </div>
 
-      {fecha ? (
-        <p className="muted">
-          Filtrando {formatDateLong(fecha)}.{' '}
-          <button type="button" className="btn btn-ghost" onClick={() => set('fecha', '')}>
-            Quitar fecha
-          </button>
-        </p>
-      ) : null}
-
-      {filtered.length === 0 ? (
-        <div className="card muted">No hay ocurrencias con esos filtros.</div>
+      {vista === 'grilla' ? (
+        <GrillaAnual
+          year={year}
+          fichas={fichasFiltradas}
+          bloques={bloques}
+          ocurrencias={estado || fecha ? filtered : ocurrencias.filter((o) =>
+            fichasFiltradas.some((f) => f.id === o.fichaId),
+          )}
+        />
       ) : (
-        [...grouped.entries()].map(([day, items]) => (
-          <section key={day}>
-            <div className="date-group">{formatDateLong(day)}</div>
-            <div className="list">
-              {items.map((o) => {
-                const ficha = fichaMap[o.fichaId]
-                const grupo = ficha ? grupoMap[ficha.grupoId] : undefined
-                const encargado = ficha ? encargadoMap[ficha.encargadoId] : undefined
-                return (
-                  <Link key={o.id} className="card card-click item" to={`/ocurrencias/${o.id}`}>
-                    <span className="bar" style={{ background: grupo?.color ?? 'var(--accent)' }} />
-                    <div className="grow">
-                      <div className="row-spread">
-                        <strong>{ficha?.nombre ?? 'Ficha'}</strong>
-                        <StatusBadge estado={o.estado} />
-                      </div>
-                      <div className="muted">
-                        {grupo?.nombre}
-                        {encargado ? ` · ${encargado.nombre}` : ''}
-                      </div>
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
-          </section>
-        ))
+        <>
+          {fecha ? (
+            <p className="muted">
+              Filtrando {formatDateLong(fecha)}.{' '}
+              <button type="button" className="btn btn-ghost" onClick={() => set('fecha', '')}>
+                Quitar fecha
+              </button>
+            </p>
+          ) : null}
+
+          {filtered.length === 0 ? (
+            <div className="card muted">No hay ocurrencias con esos filtros.</div>
+          ) : (
+            [...grouped.entries()].map(([day, items]) => (
+              <section key={day}>
+                <div className="date-group">
+                  {formatFechaProgramada(
+                    day,
+                    fichaMap[items[0]?.fichaId ?? '']?.fechaPrecision === 'dia' ? 'dia' : 'mes',
+                  )}
+                </div>
+                <div className="list">
+                  {items.map((o) => {
+                    const ficha = fichaMap[o.fichaId]
+                    const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
+                    const encargado = ficha ? encargadoMap[ficha.encargadoId ?? ''] : undefined
+                    return (
+                      <Link key={o.id} className="card card-click item" to={`/ocurrencias/${o.id}`}>
+                        <span className="bar" style={{ background: bloque?.color ?? 'var(--accent)' }} />
+                        <div className="grow">
+                          <div className="row-spread">
+                            <strong>{ficha ? fichaTitulo(ficha) : 'Ficha'}</strong>
+                            <StatusBadge estado={o.estado} />
+                          </div>
+                          <div className="muted">
+                            {bloque?.nombre}
+                            {encargado ? ` · ${encargado.nombre}` : ''}
+                          </div>
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </section>
+            ))
+          )}
+        </>
       )}
     </div>
   )

@@ -1,4 +1,19 @@
-export type Frecuencia = 'semanal' | 'mensual' | 'trimestral' | 'anual' | 'unica'
+export type Frecuencia =
+  | 'unica'
+  | 'cada_1'
+  | 'cada_2'
+  | 'cada_3'
+  | 'cada_4'
+  | 'cada_5'
+  | 'cada_6'
+  | 'cada_7'
+  | 'cada_8'
+  | 'cada_9'
+  | 'cada_10'
+  | 'cada_11'
+  | 'cada_12'
+
+export type FechaPrecision = 'mes' | 'dia'
 
 export type EstadoOcurrencia = 'pendiente' | 'proxima' | 'vencida' | 'ejecutada'
 
@@ -12,11 +27,13 @@ export interface Encargado {
   id: string
   nombre: string
   contacto?: string
+  telefonos?: string
+  congregacion?: string
   createdAt: number
   updatedAt: number
 }
 
-export interface Grupo {
+export interface Bloque {
   id: string
   nombre: string
   color: string
@@ -24,13 +41,20 @@ export interface Grupo {
   updatedAt: number
 }
 
+/** @deprecated Usar Bloque. Se mantiene el alias por copias de seguridad antiguas. */
+export type Grupo = Bloque
+
 export interface Ficha {
   id: string
+  numero: string
   nombre: string
   grupoId: string
-  encargadoId: string
+  encargadoId?: string
+  telefonos?: string
+  congregacion?: string
   frecuencia: Frecuencia
   fechaInicio: string
+  fechaPrecision: FechaPrecision
   notas?: string
   createdAt: number
   updatedAt: number
@@ -83,13 +107,42 @@ export interface Ajustes {
   lastNotifiedDate?: string
 }
 
-export const FRECUENCIAS: { id: Frecuencia; label: string }[] = [
-  { id: 'semanal', label: 'Semanal' },
-  { id: 'mensual', label: 'Mensual' },
-  { id: 'trimestral', label: 'Trimestral' },
-  { id: 'anual', label: 'Anual' },
-  { id: 'unica', label: 'Única' },
+export const FRECUENCIAS: { id: Frecuencia; label: string; meses: number }[] = [
+  { id: 'unica', label: 'Única', meses: 0 },
+  { id: 'cada_1', label: 'Cada 1 mes', meses: 1 },
+  { id: 'cada_2', label: 'Cada 2 meses', meses: 2 },
+  { id: 'cada_3', label: 'Cada 3 meses', meses: 3 },
+  { id: 'cada_4', label: 'Cada 4 meses', meses: 4 },
+  { id: 'cada_5', label: 'Cada 5 meses', meses: 5 },
+  { id: 'cada_6', label: 'Cada 6 meses', meses: 6 },
+  { id: 'cada_7', label: 'Cada 7 meses', meses: 7 },
+  { id: 'cada_8', label: 'Cada 8 meses', meses: 8 },
+  { id: 'cada_9', label: 'Cada 9 meses', meses: 9 },
+  { id: 'cada_10', label: 'Cada 10 meses', meses: 10 },
+  { id: 'cada_11', label: 'Cada 11 meses', meses: 11 },
+  { id: 'cada_12', label: 'Cada 12 meses', meses: 12 },
 ]
+
+export function frecuenciaLabel(id: string): string {
+  return FRECUENCIAS.find((f) => f.id === id)?.label ?? id
+}
+
+export function mesesDeFrecuencia(freq: string): number {
+  const found = FRECUENCIAS.find((f) => f.id === freq)
+  if (found) return found.meses
+  if (freq === 'semanal' || freq === 'mensual') return 1
+  if (freq === 'trimestral') return 3
+  if (freq === 'anual') return 12
+  return 1
+}
+
+export function normalizeFrecuencia(freq: string): Frecuencia {
+  if (FRECUENCIAS.some((f) => f.id === freq)) return freq as Frecuencia
+  if (freq === 'trimestral') return 'cada_3'
+  if (freq === 'anual') return 'cada_12'
+  if (freq === 'unica') return 'unica'
+  return 'cada_1'
+}
 
 export const ESTADOS: { id: EstadoOcurrencia; label: string }[] = [
   { id: 'vencida', label: 'Vencida' },
@@ -104,7 +157,7 @@ export const ESTADOS_CORRECTIVA: { id: EstadoCorrectiva; label: string }[] = [
   { id: 'ejecutada', label: 'Ejecutada' },
 ]
 
-export const GRUPO_COLORS = [
+export const BLOQUE_COLORS = [
   '#0f766e',
   '#0369a1',
   '#7c3aed',
@@ -114,3 +167,5 @@ export const GRUPO_COLORS = [
   '#b91c1c',
   '#4338ca',
 ]
+
+export const GRUPO_COLORS = BLOQUE_COLORS

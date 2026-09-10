@@ -1,5 +1,5 @@
 import { db } from './index'
-import type { Ficha, Ocurrencia } from './types'
+import type { FechaPrecision, Ficha, Ocurrencia } from './types'
 import { computeEstado, generateDates, todayISO } from '../lib/dates'
 import { createId } from '../lib/ids'
 
@@ -38,11 +38,22 @@ export async function refreshEstados(): Promise<void> {
   const umbral = ajustes?.umbralProximaDias ?? 7
   const today = todayISO()
   const occs = await db.ocurrencias.toArray()
+  const fichas = await db.fichas.toArray()
+  const precisionByFicha: Record<string, FechaPrecision> = {}
+  for (const f of fichas) {
+    precisionByFicha[f.id] = f.fechaPrecision === 'dia' ? 'dia' : 'mes'
+  }
   const ejecuciones = await db.ejecuciones.toArray()
   const executed = new Set(ejecuciones.map((e) => e.ocurrenciaId))
   const updates: Ocurrencia[] = []
   for (const o of occs) {
-    const estado = computeEstado(o.fechaProgramada, umbral, today, executed.has(o.id))
+    const estado = computeEstado(
+      o.fechaProgramada,
+      umbral,
+      today,
+      executed.has(o.id),
+      precisionByFicha[o.fichaId] ?? 'mes',
+    )
     if (estado !== o.estado) {
       updates.push({ ...o, estado, updatedAt: Date.now() })
     }

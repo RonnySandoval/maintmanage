@@ -1,20 +1,30 @@
-import type { EstadoOcurrencia, Frecuencia } from '../db/types'
+import type { EstadoOcurrencia, FechaPrecision, Frecuencia } from '../db/types'
+import { mesesDeFrecuencia } from '../db/types'
 
 function pad(n: number): string {
   return String(n).padStart(2, '0')
 }
 
 export function todayISO(): string {
-  const n = new Date()
-  return toISODate(n)
+  return toISODate(new Date())
 }
 
 export function toISODate(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
+export function normalizeISODate(value: string): string {
+  if (/^\d{4}-\d{2}$/.test(value)) return `${value}-01`
+  return value
+}
+
+export function monthValue(iso: string): string {
+  return normalizeISODate(iso).slice(0, 7)
+}
+
 export function parseISODate(iso: string): Date {
-  const [y, m, d] = iso.split('-').map(Number)
+  const normalized = normalizeISODate(iso)
+  const [y, m, d] = normalized.split('-').map(Number)
   return new Date(y, (m ?? 1) - 1, d ?? 1)
 }
 
@@ -25,11 +35,24 @@ export function addDays(iso: string, days: number): string {
 }
 
 export function addMonths(iso: string, months: number): string {
-  const [y, m, d] = iso.split('-').map(Number)
+  const normalized = normalizeISODate(iso)
+  const [y, m, d] = normalized.split('-').map(Number)
   const date = new Date(y, (m ?? 1) - 1 + months, 1)
   const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
   date.setDate(Math.min(d ?? 1, lastDay))
   return toISODate(date)
+}
+
+export function lastDayOfMonth(iso: string): string {
+  const normalized = normalizeISODate(iso)
+  const [y, m] = normalized.split('-').map(Number)
+  const last = new Date(y, m, 0).getDate()
+  return `${y}-${pad(m)}-${pad(last)}`
+}
+
+export function dueDate(iso: string, precision: FechaPrecision = 'dia'): string {
+  const normalized = normalizeISODate(iso)
+  return precision === 'mes' ? lastDayOfMonth(normalized) : normalized
 }
 
 export function maxISO(a: string, b: string): string {
@@ -37,8 +60,7 @@ export function maxISO(a: string, b: string): string {
 }
 
 export function formatDate(iso: string): string {
-  const d = parseISODate(iso)
-  return d.toLocaleDateString('es', {
+  return parseISODate(iso).toLocaleDateString('es', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -46,8 +68,7 @@ export function formatDate(iso: string): string {
 }
 
 export function formatDateLong(iso: string): string {
-  const d = parseISODate(iso)
-  return d.toLocaleDateString('es', {
+  return parseISODate(iso).toLocaleDateString('es', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -55,43 +76,46 @@ export function formatDateLong(iso: string): string {
   })
 }
 
+export function formatFechaProgramada(iso: string, precision: FechaPrecision = 'dia'): string {
+  if (precision === 'mes') return monthLabel(iso)
+  return formatDate(iso)
+}
+
 export function weekdayShort(iso: string): string {
   return parseISODate(iso).toLocaleDateString('es', { weekday: 'short' })
 }
 
 export function monthLabel(iso: string): string {
-  const d = parseISODate(`${iso.slice(0, 7)}-01`)
+  const d = parseISODate(`${monthValue(iso)}-01`)
   return d.toLocaleDateString('es', { month: 'long', year: 'numeric' })
+}
+
+export function monthShort(iso: string): string {
+  return parseISODate(`${monthValue(iso)}-01`).toLocaleDateString('es', { month: 'short' })
 }
 
 export function currentMonthPrefix(): string {
   return todayISO().slice(0, 7)
 }
 
-export function nextDate(iso: string, freq: Frecuencia): string {
-  switch (freq) {
-    case 'semanal':
-      return addDays(iso, 7)
-    case 'mensual':
-      return addMonths(iso, 1)
-    case 'trimestral':
-      return addMonths(iso, 3)
-    case 'anual':
-      return addMonths(iso, 12)
-    default:
-      return iso
-  }
+export function nextDate(iso: string, freq: Frecuencia | string): string {
+  const meses = mesesDeFrecuencia(freq)
+  if (freq === 'unica') return iso
+  if (freq === 'semanal') return addDays(iso, 7)
+  if (meses <= 0) return iso
+  return addMonths(iso, meses)
 }
 
 export function generateDates(
   start: string,
-  freq: Frecuencia,
+  freq: Frecuencia | string,
   horizonMonths = 12,
 ): string[] {
-  if (freq === 'unica') return [start]
-  const until = addMonths(maxISO(start, todayISO()), horizonMonths)
+  const origin = normalizeISODate(start)
+  if (freq === 'unica') return [origin]
+  const until = addMonths(maxISO(origin, todayISO()), horizonMonths)
   const dates: string[] = []
-  let cursor = start
+  let cursor = origin
   while (cursor <= until) {
     dates.push(cursor)
     const next = nextDate(cursor, freq)
@@ -107,11 +131,14 @@ export function computeEstado(
   umbralDias: number,
   today: string,
   ejecutada: boolean,
+  precision: FechaPrecision = 'dia',
 ): EstadoOcurrencia {
   if (ejecutada) return 'ejecutada'
-  if (fechaProgramada < today) return 'vencida'
+  const due = dueDate(fechaProgramada, precision)
+  if (due < today) return 'vencida'
+  if (precision === 'mes' && monthValue(today) === monthValue(fechaProgramada)) return 'proxima'
   const limite = addDays(today, umbralDias)
-  if (fechaProgramada <= limite) return 'proxima'
+  if (due <= limite) return 'proxima'
   return 'pendiente'
 }
 
