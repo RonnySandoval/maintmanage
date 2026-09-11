@@ -16,9 +16,11 @@ import { formatDate, todayISO } from '../lib/dates'
 export function AccionesPanel({
   fichaId,
   ocurrenciaId,
+  onlyCorrectiva = false,
 }: {
   fichaId: string
   ocurrenciaId?: string
+  onlyCorrectiva?: boolean
 }) {
   const acciones =
     useLiveQuery(async () => {
@@ -26,8 +28,11 @@ export function AccionesPanel({
       const scoped = ocurrenciaId
         ? rows.filter((a) => a.ocurrenciaId === ocurrenciaId)
         : rows
-      return scoped.sort((a, b) => b.createdAt - a.createdAt)
-    }, [fichaId, ocurrenciaId]) ?? []
+      const typed = onlyCorrectiva
+        ? scoped.filter((a) => tipoAccionOf(a) === 'correctiva')
+        : scoped
+      return typed.sort((a, b) => b.createdAt - a.createdAt)
+    }, [fichaId, ocurrenciaId, onlyCorrectiva]) ?? []
 
   const [tipo, setTipo] = useState<TipoAccion>('correctiva')
   const [texto, setTexto] = useState('')
@@ -43,7 +48,8 @@ export function AccionesPanel({
       setError('Escribe el texto.')
       return
     }
-    if (tipo === 'correctiva' && !fecha) {
+    const nextTipo = onlyCorrectiva ? 'correctiva' : tipo
+    if (nextTipo === 'correctiva' && !fecha) {
       setError('La acción correctiva necesita una fecha.')
       return
     }
@@ -52,10 +58,10 @@ export function AccionesPanel({
       id: createId(),
       fichaId,
       ocurrenciaId,
-      tipo,
+      tipo: nextTipo,
       texto: texto.trim(),
       estado,
-      fechaObjetivo: tipo === 'correctiva' ? fecha : undefined,
+      fechaObjetivo: nextTipo === 'correctiva' ? fecha : undefined,
       createdAt: now,
       updatedAt: now,
     })
@@ -73,8 +79,9 @@ export function AccionesPanel({
 
   return (
     <div className="card">
-      <h3 className="title-sm">Acciones y recomendaciones</h3>
+      <h3 className="title-sm">{onlyCorrectiva ? 'Acciones correctivas' : 'Acciones y recomendaciones'}</h3>
       <form onSubmit={(e) => void add(e)}>
+        {onlyCorrectiva ? null : (
         <div className="chip-row tight" role="tablist" aria-label="Tipo">
           <button
             type="button"
@@ -91,6 +98,7 @@ export function AccionesPanel({
             Recomendación
           </button>
         </div>
+        )}
         <div className="field">
           <label htmlFor="accion-texto">
             {tipo === 'recomendacion' ? 'Recomendación' : 'Acción correctiva'}
@@ -163,7 +171,7 @@ export function AccionesPanel({
             {acciones.map((a) =>
             editId === a.id ? (
               <div key={a.id} className="table-row is-editing">
-                <AccionEditor accion={a} onDone={() => setEditId(null)} />
+                <AccionEditor accion={a} onDone={() => setEditId(null)} onlyCorrectiva={onlyCorrectiva} />
               </div>
             ) : (
               <div key={a.id} className="table-row table-cols-accion">
@@ -212,9 +220,11 @@ export function AccionesPanel({
 function AccionEditor({
   accion,
   onDone,
+  onlyCorrectiva = false,
 }: {
   accion: AccionCorrectiva
   onDone: () => void
+  onlyCorrectiva?: boolean
 }) {
   const [tipo, setTipo] = useState<TipoAccion>(tipoAccionOf(accion))
   const [texto, setTexto] = useState(accion.texto)
@@ -228,18 +238,19 @@ function AccionEditor({
       setError('Escribe el texto.')
       return
     }
-    if (tipo === 'correctiva' && !fecha) {
+    const nextTipo = onlyCorrectiva ? 'correctiva' : tipo
+    if (nextTipo === 'correctiva' && !fecha) {
       setError('La acción correctiva necesita una fecha.')
       return
     }
     const next: AccionCorrectiva = {
       ...accion,
-      tipo,
+      tipo: nextTipo,
       texto: texto.trim(),
       estado,
       updatedAt: Date.now(),
     }
-    if (tipo === 'correctiva') next.fechaObjetivo = fecha
+    if (nextTipo === 'correctiva') next.fechaObjetivo = fecha
     else delete next.fechaObjetivo
     await db.accionesCorrectivas.put(next)
     onDone()
@@ -247,6 +258,7 @@ function AccionEditor({
 
   return (
     <div>
+      {onlyCorrectiva ? null : (
       <div className="chip-row tight">
         <button
           type="button"
@@ -263,6 +275,7 @@ function AccionEditor({
           Recomendación
         </button>
       </div>
+      )}
       <div className="field">
         <label>Texto</label>
         <input className="input" value={texto} onChange={(e) => setTexto(e.target.value)} />

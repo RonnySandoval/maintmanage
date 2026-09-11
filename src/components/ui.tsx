@@ -1,13 +1,38 @@
 import type { ReactNode } from 'react'
-import { ESTADOS, type EstadoOcurrencia } from '../db/types'
-
-const labels = Object.fromEntries(ESTADOS.map((e) => [e.id, e.label])) as Record<
-  EstadoOcurrencia,
-  string
->
+import type { EstadoOcurrencia } from '../db/types'
+import { SIMBOLOS_ESTADO, SIMBOLO_CORRECTIVA } from '../lib/simbolos'
 
 export function StatusBadge({ estado }: { estado: EstadoOcurrencia }) {
-  return <span className={`badge badge-${estado}`}>{labels[estado]}</span>
+  const meta = SIMBOLOS_ESTADO[estado]
+  return (
+    <span className={`badge badge-${estado}`}>
+      <span className="sym" aria-hidden>
+        {meta.glyph}
+      </span>
+      {meta.label}
+    </span>
+  )
+}
+
+export function LeyendaSimbolos() {
+  return (
+    <div className="sym-legend" aria-label="Código de símbolos">
+      {(Object.values(SIMBOLOS_ESTADO) as { glyph: string; label: string }[]).map((item) => (
+        <span key={item.label} className="sym-legend-item">
+          <span className="sym" aria-hidden>
+            {item.glyph}
+          </span>
+          {item.label}
+        </span>
+      ))}
+      <span className="sym-legend-item">
+        <span className="sym" aria-hidden>
+          {SIMBOLO_CORRECTIVA}
+        </span>
+        Con acción correctiva
+      </span>
+    </div>
+  )
 }
 
 export function EmptyState({

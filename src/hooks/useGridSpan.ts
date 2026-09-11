@@ -14,6 +14,20 @@ export function monthsVisible(span: GridSpan): number {
   return 3
 }
 
+export type ZoomLevel = 0 | 1 | 2
+
+export function spanFromZoom(zoom: ZoomLevel): GridSpan {
+  if (zoom === 0) return 'year'
+  if (zoom === 1) return 'semester'
+  return 'quarter'
+}
+
+export function zoomFromSpan(span: GridSpan): ZoomLevel {
+  if (span === 'year') return 0
+  if (span === 'semester') return 1
+  return 2
+}
+
 export function windowStartForMonth(monthIndex: number, visible: number): number {
   const maxStart = Math.max(0, 12 - visible)
   return Math.min(Math.floor(monthIndex / 3) * 3, maxStart)

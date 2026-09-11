@@ -198,7 +198,7 @@ export function OcurrenciaDetailPage() {
         )}
       </div>
 
-      <AccionesPanel fichaId={currentFicha.id} ocurrenciaId={ocurrencia.id} />
+      <AccionesPanel fichaId={currentFicha.id} ocurrenciaId={ocurrencia.id} onlyCorrectiva />
     </div>
   )
 }

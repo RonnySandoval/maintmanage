@@ -79,7 +79,7 @@ export function DashboardPage() {
           </div>
         </Link>
         <Link className="card kpi card-click" to="/cronograma?estado=proxima">
-          <div className="label">Próximas</div>
+          <div className="label">Programadas</div>
           <div className="value" style={{ color: 'var(--warning)' }}>
             {proximas.length}
           </div>

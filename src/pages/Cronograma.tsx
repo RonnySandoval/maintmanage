@@ -6,7 +6,8 @@ import { db } from '../db'
 import { ESTADOS, type EstadoOcurrencia } from '../db/types'
 import { formatFechaProgramada, formatDateLong } from '../lib/dates'
 import { fichaTitulo } from '../lib/fichas'
-import { EmptyState, StatusBadge } from '../components/ui'
+import { EmptyState, LeyendaSimbolos, StatusBadge } from '../components/ui'
+import { SIMBOLOS_ESTADO } from '../lib/simbolos'
 import { GrillaAnual } from '../components/GrillaAnual'
 import { FichaTitle } from '../components/FichaTitle'
 
@@ -25,6 +26,7 @@ export function CronogramaPage() {
   const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
   const bloques = useLiveQuery(() => db.grupos.orderBy('nombre').toArray()) ?? []
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
+  const acciones = useLiveQuery(() => db.accionesCorrectivas.toArray()) ?? []
 
   const fichaMap = useMemo(
     () => Object.fromEntries(fichas.map((f) => [f.id, f])),
@@ -151,6 +153,9 @@ export function CronogramaPage() {
             className={`chip compact${estado === e.id ? ' active' : ''}`}
             onClick={() => set('estado', e.id)}
           >
+            <span className="sym" aria-hidden>
+              {SIMBOLOS_ESTADO[e.id].glyph}
+            </span>
             {e.label}
           </button>
         ))}
@@ -202,6 +207,7 @@ export function CronogramaPage() {
           ocurrencias={estado || fecha ? filtered : ocurrencias.filter((o) =>
             fichasFiltradas.some((f) => f.id === o.fichaId),
           )}
+          acciones={acciones}
         />
       ) : (
         <>
@@ -268,6 +274,7 @@ export function CronogramaPage() {
               ))}
             </div>
           )}
+          <LeyendaSimbolos />
         </>
       )}
     </div>

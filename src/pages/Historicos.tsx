@@ -5,10 +5,8 @@ import { History } from 'lucide-react'
 import { db } from '../db'
 import {
   ESTADOS_CORRECTIVA,
-  tipoAccionLabel,
   tipoAccionOf,
   type EstadoCorrectiva,
-  type TipoAccion,
 } from '../db/types'
 import { formatDate, formatFechaProgramada } from '../lib/dates'
 import { fichaTitulo } from '../lib/fichas'
@@ -19,12 +17,19 @@ export function HistoricosPage() {
   const [tab, setTab] = useState<'ocurrencias' | 'acciones'>('ocurrencias')
   const [groupBy, setGroupBy] = useState<'ficha' | 'fecha'>('ficha')
   const [estadoAcc, setEstadoAcc] = useState<EstadoCorrectiva | ''>('')
-  const [tipoAcc, setTipoAcc] = useState<TipoAccion | ''>('')
 
-  const ocurrencias = useLiveQuery(() => db.ocurrencias.orderBy('fechaProgramada').reverse().toArray()) ?? []
+  const ocurrencias =
+    useLiveQuery(async () => {
+      const rows = await db.ocurrencias.where('estado').equals('ejecutada').toArray()
+      return rows.sort((a, b) => b.fechaProgramada.localeCompare(a.fechaProgramada))
+    }) ?? []
   const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
   const bloques = useLiveQuery(() => db.grupos.toArray()) ?? []
-  const acciones = useLiveQuery(() => db.accionesCorrectivas.toArray()) ?? []
+  const acciones =
+    useLiveQuery(async () => {
+      const rows = await db.accionesCorrectivas.toArray()
+      return rows.filter((a) => tipoAccionOf(a) === 'correctiva')
+    }) ?? []
 
   const fichaMap = useMemo(() => Object.fromEntries(fichas.map((f) => [f.id, f])), [fichas])
   const bloqueMap = useMemo(() => Object.fromEntries(bloques.map((b) => [b.id, b])), [bloques])
@@ -53,11 +58,7 @@ export function HistoricosPage() {
   const fechasOrdenadas = [...byFecha.keys()].sort((a, b) => b.localeCompare(a))
 
   const accionesFiltradas = acciones
-    .filter((a) => {
-      if (estadoAcc && a.estado !== estadoAcc) return false
-      if (tipoAcc && tipoAccionOf(a) !== tipoAcc) return false
-      return true
-    })
+    .filter((a) => !estadoAcc || a.estado === estadoAcc)
     .sort((a, b) => b.updatedAt - a.updatedAt)
 
   if (!ocurrencias.length && !acciones.length) {
@@ -65,7 +66,7 @@ export function HistoricosPage() {
       <EmptyState
         icon={<History size={36} />}
         title="Sin histórico"
-        text="Cuando ejecutes mantenimientos o añadas acciones y recomendaciones, aparecerán aquí."
+        text="Cuando ejecutes fichas o registres acciones correctivas, aparecerán aquí."
       />
     )
   }
@@ -80,7 +81,7 @@ export function HistoricosPage() {
           className={tab === 'ocurrencias' ? 'active' : ''}
           onClick={() => setTab('ocurrencias')}
         >
-          Ocurrencias
+          Ejecutadas
         </button>
         <button
           type="button"
@@ -89,7 +90,7 @@ export function HistoricosPage() {
           className={tab === 'acciones' ? 'active' : ''}
           onClick={() => setTab('acciones')}
         >
-          Acciones
+          Correctivas
         </button>
       </div>
 
@@ -114,7 +115,7 @@ export function HistoricosPage() {
 
           {ocurrencias.length === 0 ? (
             <div className="table-card">
-              <p className="table-empty">Aún no hay ocurrencias.</p>
+              <p className="table-empty">Aún no hay fichas ejecutadas.</p>
             </div>
           ) : groupBy === 'ficha' ? (
             <div className="table-card">
@@ -205,29 +206,6 @@ export function HistoricosPage() {
           <div className="chip-row compact">
             <button
               type="button"
-              className={`chip compact${!tipoAcc ? ' active' : ''}`}
-              onClick={() => setTipoAcc('')}
-            >
-              Todas
-            </button>
-            <button
-              type="button"
-              className={`chip compact${tipoAcc === 'correctiva' ? ' active' : ''}`}
-              onClick={() => setTipoAcc('correctiva')}
-            >
-              Correctivas
-            </button>
-            <button
-              type="button"
-              className={`chip compact${tipoAcc === 'recomendacion' ? ' active' : ''}`}
-              onClick={() => setTipoAcc('recomendacion')}
-            >
-              Recomendaciones
-            </button>
-          </div>
-          <div className="chip-row compact">
-            <button
-              type="button"
               className={`chip compact${!estadoAcc ? ' active' : ''}`}
               onClick={() => setEstadoAcc('')}
             >
@@ -265,12 +243,9 @@ export function HistoricosPage() {
                   <Link key={a.id} className="table-row table-cols-hist-acc" to={to}>
                     <span className="table-cell">
                       <strong>{a.texto}</strong>
-                      <span className="muted">
-                        {tipoAccionLabel(tipoAccionOf(a))}
-                        <span className="col-sm-only">
-                          {ficha ? ` · ${fichaTitulo(ficha)}` : ''}
-                          {a.fechaObjetivo ? ` · ${formatDate(a.fechaObjetivo)}` : ''}
-                        </span>
+                      <span className="muted col-sm-only">
+                        {ficha ? fichaTitulo(ficha) : ''}
+                        {a.fechaObjetivo ? `${ficha ? ' · ' : ''}${formatDate(a.fechaObjetivo)}` : ''}
                       </span>
                     </span>
                     <span className="col-md">

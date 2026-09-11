@@ -148,7 +148,7 @@ export function normalizeFrecuencia(freq: string): Frecuencia {
 
 export const ESTADOS: { id: EstadoOcurrencia; label: string }[] = [
   { id: 'vencida', label: 'Vencida' },
-  { id: 'proxima', label: 'Próxima' },
+  { id: 'proxima', label: 'Programada' },
   { id: 'pendiente', label: 'Pendiente' },
   { id: 'ejecutada', label: 'Ejecutada' },
 ]

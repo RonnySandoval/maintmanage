@@ -1,16 +1,21 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import type { Bloque, Encargado, EstadoOcurrencia, Ficha, Ocurrencia } from '../db/types'
-import { frecuenciaLabel } from '../db/types'
+import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react'
+import type { AccionCorrectiva, Bloque, Encargado, EstadoOcurrencia, Ficha, Ocurrencia } from '../db/types'
+import { frecuenciaLabel, tipoAccionOf } from '../db/types'
 import { fichaTitulo } from '../lib/fichas'
+import { labelEstado, SIMBOLO_CORRECTIVA, simboloEstado } from '../lib/simbolos'
 import {
   monthsVisible,
   spanFromWidth,
+  spanFromZoom,
   useGridSpan,
   windowStartForMonth,
+  zoomFromSpan,
+  type ZoomLevel,
 } from '../hooks/useGridSpan'
 import { FichaTitle } from './FichaTitle'
+import { LeyendaSimbolos } from './ui'
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const TRIMESTRES = [
@@ -38,20 +43,31 @@ function monthClass(month: number, start: number, currentMonth: number): string 
   return parts.join(' ')
 }
 
+function pinchDistance(touches: TouchList): number {
+  const a = touches[0]
+  const b = touches[1]
+  return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+}
+
 export function GrillaAnual({
   year,
   fichas,
   bloques,
   encargados,
   ocurrencias,
+  acciones,
 }: {
   year: number
   fichas: Ficha[]
   bloques: Bloque[]
   encargados: Encargado[]
   ocurrencias: Ocurrencia[]
+  acciones: AccionCorrectiva[]
 }) {
-  const span = useGridSpan()
+  const autoSpan = useGridSpan()
+  const [manualZoom, setManualZoom] = useState<ZoomLevel | null>(null)
+  const zoom = manualZoom ?? zoomFromSpan(autoSpan)
+  const span = spanFromZoom(zoom)
   const visible = monthsVisible(span)
   const maxStart = 12 - visible
   const today = new Date()
@@ -62,10 +78,78 @@ export function GrillaAnual({
       monthsVisible(typeof window === 'undefined' ? 'quarter' : spanFromWidth(window.innerWidth)),
     ),
   )
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const pinchRef = useRef({ dist: 0, locked: false })
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
 
   useEffect(() => {
     setStart((current) => Math.min(Math.max(0, Math.floor(current / 3) * 3), maxStart))
   }, [maxStart])
+
+  function setZoom(next: ZoomLevel) {
+    setManualZoom(next)
+  }
+
+  function zoomIn() {
+    setManualZoom((current) => {
+      const z = current ?? zoomFromSpan(autoSpan)
+      return (Math.min(2, z + 1) as ZoomLevel)
+    })
+  }
+
+  function zoomOut() {
+    setManualZoom((current) => {
+      const z = current ?? zoomFromSpan(autoSpan)
+      return (Math.max(0, z - 1) as ZoomLevel)
+    })
+  }
+
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        pinchRef.current = { dist: pinchDistance(e.touches), locked: false }
+      }
+    }
+
+    const onMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return
+      e.preventDefault()
+      const dist = pinchDistance(e.touches)
+      const prev = pinchRef.current.dist
+      if (!prev) {
+        pinchRef.current.dist = dist
+        return
+      }
+      const ratio = dist / prev
+      if (pinchRef.current.locked) return
+      if (ratio > 1.18 && zoomRef.current < 2) {
+        pinchRef.current.locked = true
+        setZoom((Math.min(2, zoomRef.current + 1) as ZoomLevel))
+      } else if (ratio < 0.85 && zoomRef.current > 0) {
+        pinchRef.current.locked = true
+        setZoom((Math.max(0, zoomRef.current - 1) as ZoomLevel))
+      }
+    }
+
+    const onEnd = () => {
+      pinchRef.current = { dist: 0, locked: false }
+    }
+
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: false })
+    el.addEventListener('touchend', onEnd)
+    el.addEventListener('touchcancel', onEnd)
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove', onMove)
+      el.removeEventListener('touchend', onEnd)
+      el.removeEventListener('touchcancel', onEnd)
+    }
+  }, [])
 
   const monthIndexes = useMemo(
     () => Array.from({ length: visible }, (_, i) => start + i),
@@ -81,6 +165,15 @@ export function GrillaAnual({
     list.push(o)
     byFichaMonth.set(key, list)
   }
+
+  const correctivaOcc = new Set(
+    acciones
+      .filter((a) => tipoAccionOf(a) === 'correctiva' && a.ocurrenciaId)
+      .map((a) => a.ocurrenciaId as string),
+  )
+  const correctivaFicha = new Set(
+    acciones.filter((a) => tipoAccionOf(a) === 'correctiva' && !a.ocurrenciaId).map((a) => a.fichaId),
+  )
 
   const encargadoMap = Object.fromEntries(encargados.map((e) => [e.id, e]))
   const bloqueMap = Object.fromEntries(bloques.map((b) => [b.id, b]))
@@ -123,30 +216,54 @@ export function GrillaAnual({
 
   return (
     <div>
-      {span !== 'year' ? (
-        <div className="row-spread grid-window" style={{ marginBottom: '0.55rem' }}>
+      <div className="grid-toolbar">
+        {span !== 'year' ? (
+          <div className="row-spread grid-window">
+            <button
+              type="button"
+              className="btn"
+              disabled={!canPrev}
+              onClick={() => step(-3)}
+              aria-label="Periodo anterior"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <strong>{rangeLabel}</strong>
+            <button
+              type="button"
+              className="btn"
+              disabled={!canNext}
+              onClick={() => step(3)}
+              aria-label="Periodo siguiente"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        ) : (
+          <strong className="grid-year-label">{year}</strong>
+        )}
+        <div className="zoom-controls" role="group" aria-label="Zoom del cronograma">
           <button
             type="button"
             className="btn"
-            disabled={!canPrev}
-            onClick={() => step(-3)}
-            aria-label="Periodo anterior"
+            disabled={zoom === 0}
+            onClick={zoomOut}
+            aria-label="Alejar"
           >
-            <ChevronLeft size={18} />
+            <Minus size={16} />
           </button>
-          <strong>{rangeLabel}</strong>
           <button
             type="button"
             className="btn"
-            disabled={!canNext}
-            onClick={() => step(3)}
-            aria-label="Periodo siguiente"
+            disabled={zoom === 2}
+            onClick={zoomIn}
+            aria-label="Acercar"
           >
-            <ChevronRight size={18} />
+            <Plus size={16} />
           </button>
         </div>
-      ) : null}
-      <div className="year-grid-wrap">
+      </div>
+      <div className="year-grid-wrap" ref={wrapRef}>
         <table className={`year-grid mode-${span}`}>
           <thead>
             <tr>
@@ -195,12 +312,15 @@ export function GrillaAnual({
                   byFichaMonth={byFichaMonth}
                   encargadoMap={encargadoMap}
                   showFrecuencia={span === 'year'}
+                  correctivaOcc={correctivaOcc}
+                  correctivaFicha={correctivaFicha}
                 />
               )
             })}
           </tbody>
         </table>
       </div>
+      <LeyendaSimbolos />
     </div>
   )
 }
@@ -214,6 +334,8 @@ function BloqueRows({
   byFichaMonth,
   encargadoMap,
   showFrecuencia,
+  correctivaOcc,
+  correctivaFicha,
 }: {
   bloque: Bloque
   fichas: Ficha[]
@@ -223,6 +345,8 @@ function BloqueRows({
   byFichaMonth: Map<string, Ocurrencia[]>
   encargadoMap: Record<string, Encargado>
   showFrecuencia: boolean
+  correctivaOcc: Set<string>
+  correctivaFicha: Set<string>
 }) {
   return (
     <>
@@ -249,20 +373,26 @@ function BloqueRows({
               const occ = pickOcc(byFichaMonth.get(`${ficha.id}:${month}`) ?? [])
               const cls = monthClass(month, start, currentMonth)
               if (!occ) return <td key={month} className={cls || undefined} />
+              const hasCorrectiva = correctivaOcc.has(occ.id) || correctivaFicha.has(ficha.id)
+              const title = hasCorrectiva
+                ? `${labelEstado(occ.estado)} · Con acción correctiva`
+                : labelEstado(occ.estado)
               return (
                 <td key={month} className={cls || undefined}>
                   <Link
-                    className={`grid-cell ${occ.estado}`}
+                    className={`grid-cell ${occ.estado}${hasCorrectiva ? ' has-correctiva' : ''}`}
                     to={`/ocurrencias/${occ.id}`}
-                    title={occ.estado}
+                    title={title}
+                    aria-label={title}
                   >
-                    {occ.estado === 'ejecutada'
-                      ? 'OK'
-                      : occ.estado === 'vencida'
-                        ? 'Ven'
-                        : occ.estado === 'proxima'
-                          ? 'Próx'
-                          : '•'}
+                    <span className="cell-syms">
+                      <span aria-hidden>{simboloEstado(occ.estado)}</span>
+                      {hasCorrectiva ? (
+                        <span className="cell-correctiva" aria-hidden>
+                          {SIMBOLO_CORRECTIVA}
+                        </span>
+                      ) : null}
+                    </span>
                   </Link>
                 </td>
               )
