@@ -433,7 +433,7 @@ function BloqueRows({
                 ? `${labelEstado(occ.estado)} · Con acción correctiva`
                 : labelEstado(occ.estado)
               return (
-                <td key={month} className={`${cls} occ-${occ.estado}`}>
+                <td key={month} className={cls}>
                   <Link
                     className={`grid-cell ${occ.estado}${hasCorrectiva ? ' has-correctiva' : ''}`}
                     to={`/ocurrencias/${occ.id}`}
