@@ -12,7 +12,7 @@ export function CrearBloqueForm({
   compact?: boolean
 }) {
   const [nombre, setNombre] = useState('')
-  const [color, setColor] = useState('#0f766e')
+  const [color, setColor] = useState('teal')
   const [error, setError] = useState('')
 
   async function submit() {
@@ -31,7 +31,7 @@ export function CrearBloqueForm({
     }
     await db.grupos.add(created)
     setNombre('')
-    setColor('#0f766e')
+    setColor('teal')
     setError('')
     onCreated?.(created.id)
   }

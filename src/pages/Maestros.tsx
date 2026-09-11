@@ -6,6 +6,7 @@ import { db } from '../db'
 import type { Encargado } from '../db/types'
 import { createId } from '../lib/ids'
 import { ColorPicker } from '../components/ColorPicker'
+import { bloqueColorVar } from '../lib/colors'
 import { CopyText } from '../components/CopyText'
 import { CrearBloqueForm } from '../components/CrearBloqueForm'
 
@@ -112,7 +113,7 @@ export function MaestrosPage() {
       <section className="card">
         <h2 className="title-sm">Bloques</h2>
         <p className="muted">
-          Los bloques agrupan fichas. Elige cualquier color con la paleta.
+          Los bloques agrupan fichas. Elige un color; se ajusta solo en modo claro y oscuro.
         </p>
         <CrearBloqueForm compact />
         {bloques.length === 0 ? (
@@ -153,8 +154,8 @@ export function MaestrosPage() {
                 ) : (
                   <>
                     <span className="table-cell row" style={{ gap: '0.5rem' }}>
-                      <span className="color-dot" style={{ background: b.color, marginTop: 0 }} />
-                      <strong style={{ color: b.color }}>{b.nombre}</strong>
+                      <span className="color-dot" style={{ background: bloqueColorVar(b.color), marginTop: 0 }} />
+                      <strong style={{ color: bloqueColorVar(b.color) }}>{b.nombre}</strong>
                     </span>
                     <span className="muted table-nowrap">
                       {fichas.filter((f) => f.grupoId === b.id).length}

@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react'
 import { db } from '../db'
 import { ESTADOS, type EstadoOcurrencia } from '../db/types'
+import { bloqueColorVar } from '../lib/colors'
 import { formatFechaProgramada, formatDateLong } from '../lib/dates'
 import { fichaTitulo } from '../lib/fichas'
 import { EmptyState, LeyendaSimbolos, StatusBadge } from '../components/ui'
@@ -253,7 +254,7 @@ export function CronogramaPage() {
                       >
                         <span
                           className="table-bar"
-                          style={{ background: bloque?.color ?? 'var(--accent)' }}
+                          style={{ background: bloqueColorVar(bloque?.color) }}
                         />
                         <span className="table-cell">
                           <FichaTitle ficha={ficha} color={bloque?.color} />

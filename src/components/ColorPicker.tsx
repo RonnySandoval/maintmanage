@@ -1,3 +1,7 @@
+import { useState } from 'react'
+import { BLOQUE_PALETTE, bloqueColorId, bloqueColorVar } from '../lib/colors'
+import { Modal } from './ui'
+
 export function ColorPicker({
   id,
   value,
@@ -11,39 +15,44 @@ export function ColorPicker({
   label?: string
   compact?: boolean
 }) {
-  const hex = /^#[0-9A-Fa-f]{6}$/.test(value) ? value : '#0f766e'
+  const [open, setOpen] = useState(false)
+  const current = bloqueColorId(value)
+  const currentLabel = BLOQUE_PALETTE.find((swatch) => swatch.id === current)?.label ?? label
 
   return (
-    <div className="field">
+    <div className={`field color-field${compact ? ' is-compact' : ''}`}>
       <label htmlFor={id}>{label}</label>
-      <div className="row" style={{ flexWrap: 'wrap' }}>
-        <input
-          id={id}
-          className="color-native"
-          type="color"
-          value={hex}
-          onChange={(e) => onChange(e.target.value)}
-          title="Abrir paleta de colores"
-          aria-label="Paleta de colores"
-        />
-        <input
-          className="input"
-          style={{ maxWidth: 110 }}
-          value={hex}
-          onChange={(e) => {
-            const next = e.target.value.startsWith('#') ? e.target.value : `#${e.target.value}`
-            onChange(next)
-          }}
-          spellCheck={false}
-          aria-label="Código de color"
-        />
-        <span className="color-swatch" style={{ background: hex }} aria-hidden />
-      </div>
-      {compact ? null : (
-        <p className="muted" style={{ margin: 0 }}>
-          Pulsa el recuadro para abrir la paleta completa del sistema.
-        </p>
-      )}
+      <button
+        id={id}
+        type="button"
+        className="color-btn"
+        style={{ background: bloqueColorVar(value) }}
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={`${label}: ${currentLabel}`}
+        title={currentLabel}
+      />
+      <Modal open={open} title="Elegir color" onClose={() => setOpen(false)}>
+        <div className="color-pick" role="listbox" aria-label="Colores del bloque">
+          {BLOQUE_PALETTE.map((swatch) => (
+            <button
+              key={swatch.id}
+              type="button"
+              role="option"
+              aria-selected={current === swatch.id}
+              aria-label={swatch.label}
+              title={swatch.label}
+              className={current === swatch.id ? 'active' : ''}
+              style={{ background: `var(--bloque-${swatch.id})` }}
+              onClick={() => {
+                onChange(swatch.id)
+                setOpen(false)
+              }}
+            />
+          ))}
+        </div>
+      </Modal>
     </div>
   )
 }

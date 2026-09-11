@@ -8,6 +8,7 @@ import {
   tipoAccionOf,
   type EstadoCorrectiva,
 } from '../db/types'
+import { bloqueColorVar } from '../lib/colors'
 import { formatDate, formatFechaProgramada } from '../lib/dates'
 import { fichaTitulo } from '../lib/fichas'
 import { FichaTitle } from '../components/FichaTitle'
@@ -143,7 +144,7 @@ export function HistoricosPage() {
                       >
                         <span
                           className="table-bar"
-                          style={{ background: bloque?.color ?? 'var(--accent)' }}
+                          style={{ background: bloqueColorVar(bloque?.color) }}
                         />
                         <span className="table-cell">
                           {formatFechaProgramada(
@@ -184,7 +185,7 @@ export function HistoricosPage() {
                         >
                           <span
                             className="table-bar"
-                            style={{ background: bloque?.color ?? 'var(--accent)' }}
+                            style={{ background: bloqueColorVar(bloque?.color) }}
                           />
                           <span className="table-cell">
                             <FichaTitle ficha={ficha} color={bloque?.color} />

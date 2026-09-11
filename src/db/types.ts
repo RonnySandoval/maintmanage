@@ -108,6 +108,13 @@ export interface Ajustes {
   umbralProximaDias: number
   notificaciones: boolean
   lastNotifiedDate?: string
+  /** Copia automática al abrir la app (máximo 2 veces al día si hay cambios). */
+  autoBackup?: boolean
+  /** Última mutación de datos de usuario (fichas, fotos, etc.). */
+  lastChangedAt?: number
+  lastBackupAt?: number
+  lastBackupKind?: 'folder' | 'download'
+  backupFolderName?: string
 }
 
 export const FRECUENCIAS: { id: Frecuencia; label: string; meses: number }[] = [
@@ -172,15 +179,4 @@ export function tipoAccionLabel(tipo: TipoAccion): string {
   return tipo === 'recomendacion' ? 'Recomendación' : 'Acción correctiva'
 }
 
-export const BLOQUE_COLORS = [
-  '#0f766e',
-  '#0369a1',
-  '#7c3aed',
-  '#be185d',
-  '#b45309',
-  '#15803d',
-  '#b91c1c',
-  '#4338ca',
-]
-
-export const GRUPO_COLORS = BLOQUE_COLORS
+export { BLOQUE_COLORS, GRUPO_COLORS } from '../lib/colors'

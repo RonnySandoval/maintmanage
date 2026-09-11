@@ -15,6 +15,7 @@ import {
   ZOOM_IN_MAX,
   type ZoomLevel,
 } from '../hooks/useGridSpan'
+import { bloqueColorVar } from '../lib/colors'
 import { FichaTitle } from './FichaTitle'
 import { LeyendaSimbolos } from './ui'
 
@@ -217,7 +218,7 @@ export function GrillaAnual({
       .map((id) => ({
         id,
         nombre: 'Sin bloque',
-        color: 'var(--accent)',
+        color: 'teal',
         createdAt: 0,
         updatedAt: 0,
       })),
@@ -242,79 +243,80 @@ export function GrillaAnual({
 
   return (
     <div>
-      <div className="grid-toolbar">
-        {span !== 'year' ? (
-          <div className="row-spread grid-window">
-            <button
-              type="button"
-              className="btn"
-              disabled={!canPrev}
-              onClick={() => step(-3)}
-              aria-label="Periodo anterior"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <strong>{rangeLabel}</strong>
-            <button
-              type="button"
-              className="btn"
-              disabled={!canNext}
-              onClick={() => step(3)}
-              aria-label="Periodo siguiente"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        ) : (
-          <strong className="grid-year-label">{year}</strong>
-        )}
-        <div className="zoom-stack">
-          <div className="zoom-controls" role="group" aria-label="Meses visibles">
-            <span className="zoom-label">Meses</span>
-            <button
-              type="button"
-              className="btn"
-              disabled={zoom === 0}
-              onClick={zoomOut}
-              aria-label="Ver más meses"
-            >
-              <Minus size={16} />
-            </button>
-            <button
-              type="button"
-              className="btn"
-              disabled={zoom === ZOOM_IN_MAX}
-              onClick={zoomIn}
-              aria-label="Ver menos meses"
-            >
-              <Plus size={16} />
-            </button>
-          </div>
-          <div className="zoom-controls" role="group" aria-label="Detalle de ficha">
-            <span className="zoom-label">Ficha</span>
-            <button
-              type="button"
-              className="btn"
-              disabled={detail === 0}
-              onClick={detailOut}
-              aria-label="Menos detalle de ficha"
-            >
-              <Minus size={16} />
-            </button>
-            <button
-              type="button"
-              className="btn"
-              disabled={detail === DETAIL_MAX}
-              onClick={detailIn}
-              aria-label="Más detalle de ficha"
-            >
-              <Plus size={16} />
-            </button>
+      <div className="year-grid-shell">
+        <div className="year-grid-chrome">
+          {span !== 'year' ? (
+            <div className="row-spread grid-window">
+              <button
+                type="button"
+                className="btn"
+                disabled={!canPrev}
+                onClick={() => step(-3)}
+                aria-label="Periodo anterior"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <strong>{rangeLabel}</strong>
+              <button
+                type="button"
+                className="btn"
+                disabled={!canNext}
+                onClick={() => step(3)}
+                aria-label="Periodo siguiente"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          ) : (
+            <strong className="grid-year-label">{year}</strong>
+          )}
+          <div className="zoom-stack">
+            <div className="zoom-controls" role="group" aria-label="Meses visibles">
+              <span className="zoom-label">Meses</span>
+              <button
+                type="button"
+                className="btn"
+                disabled={zoom === 0}
+                onClick={zoomOut}
+                aria-label="Ver más meses"
+              >
+                <Minus size={16} />
+              </button>
+              <button
+                type="button"
+                className="btn"
+                disabled={zoom === ZOOM_IN_MAX}
+                onClick={zoomIn}
+                aria-label="Ver menos meses"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+            <div className="zoom-controls" role="group" aria-label="Detalle de ficha">
+              <span className="zoom-label">Ficha</span>
+              <button
+                type="button"
+                className="btn"
+                disabled={detail === 0}
+                onClick={detailOut}
+                aria-label="Menos detalle de ficha"
+              >
+                <Minus size={16} />
+              </button>
+              <button
+                type="button"
+                className="btn"
+                disabled={detail === DETAIL_MAX}
+                onClick={detailIn}
+                aria-label="Más detalle de ficha"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-      <div className="year-grid-wrap" ref={wrapRef}>
-        <table className={`year-grid mode-${span} detail-${detail}`}>
+        <div className="year-grid-wrap" ref={wrapRef}>
+          <table className={`year-grid mode-${span} detail-${detail}`}>
           <thead>
             <tr>
               <th className="ficha-col" rowSpan={2}>
@@ -370,6 +372,7 @@ export function GrillaAnual({
             })}
           </tbody>
         </table>
+        </div>
       </div>
       <LeyendaSimbolos />
     </div>
@@ -404,8 +407,8 @@ function BloqueRows({
   return (
     <>
       <tr className="bloque-row">
-        <td colSpan={1 + monthIndexes.length} style={{ color: bloque.color }}>
-          <span className="color-dot" style={{ background: bloque.color, margin: '0 8px 0 0' }} />
+        <td colSpan={1 + monthIndexes.length} style={{ color: bloqueColorVar(bloque.color) }}>
+          <span className="color-dot" style={{ background: bloqueColorVar(bloque.color), margin: '0 8px 0 0' }} />
           {bloque.nombre}
         </td>
       </tr>

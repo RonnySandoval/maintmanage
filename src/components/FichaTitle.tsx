@@ -1,4 +1,5 @@
 import type { Ficha } from '../db/types'
+import { bloqueColorVar } from '../lib/colors'
 import { fichaTitulo } from '../lib/fichas'
 
 export function FichaTitle({
@@ -14,7 +15,7 @@ export function FichaTitle({
   return (
     <span
       className={`ficha-title${className ? ` ${className}` : ''}`}
-      style={color ? { color } : undefined}
+      style={color ? { color: bloqueColorVar(color) } : undefined}
     >
       {text}
     </span>

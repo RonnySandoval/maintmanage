@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { ClipboardList, Layers, Plus } from 'lucide-react'
 import { db } from '../db'
 import { frecuenciaLabel } from '../db/types'
+import { bloqueColorVar } from '../lib/colors'
 import { fichaTitulo } from '../lib/fichas'
 import { FichaTitle } from '../components/FichaTitle'
 import { EmptyState } from '../components/ui'
@@ -126,7 +127,7 @@ export function FichasPage() {
               <Link key={f.id} className="table-row table-cols-fichas" to={`/fichas/${f.id}`}>
                 <span
                   className="table-bar"
-                  style={{ background: bloque?.color ?? 'var(--accent)' }}
+                  style={{ background: bloqueColorVar(bloque?.color) }}
                 />
                 <span className="table-cell">
                   <FichaTitle ficha={f} color={bloque?.color} />

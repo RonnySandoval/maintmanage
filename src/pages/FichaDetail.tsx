@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Pencil, Trash2 } from 'lucide-react'
 import { db } from '../db'
 import { frecuenciaLabel } from '../db/types'
+import { bloqueColorVar } from '../lib/colors'
 import { formatFechaProgramada } from '../lib/dates'
 import { fichaTitulo } from '../lib/fichas'
 import { saveAdjuntos } from '../lib/files'
@@ -93,7 +94,7 @@ export function FichaDetailPage() {
                   display: 'inline-block',
                   margin: '0 6px 0 0',
                   verticalAlign: 'middle',
-                  background: bloque?.color ?? 'var(--accent)',
+                  background: bloqueColorVar(bloque?.color),
                 }}
               />
               {bloque?.nombre}
