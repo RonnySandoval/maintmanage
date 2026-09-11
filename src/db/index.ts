@@ -89,6 +89,59 @@ export class MaintDB extends Dexie {
             if (!enc.telefonos && enc.contacto) enc.telefonos = enc.contacto
           })
       })
+    this.version(4)
+      .stores({
+        encargados: 'id, nombre',
+        grupos: 'id, nombre',
+        fichas: 'id, grupoId, encargadoId, nombre, numero',
+        ocurrencias: 'id, fichaId, fechaProgramada, estado, [fichaId+fechaProgramada]',
+        ejecuciones: 'id, ocurrenciaId',
+        accionesCorrectivas: 'id, fichaId, ocurrenciaId, estado',
+        adjuntos: 'id, fichaId, ejecucionId, tipo',
+        ajustes: 'id',
+      })
+      .upgrade(async (tx) => {
+        const encargados = tx.table('encargados')
+        const fichas = tx.table('fichas')
+        const fichaRows = (await fichas.toArray()) as {
+          id: string
+          encargadoId?: string
+          congregacion?: string
+        }[]
+        for (const ficha of fichaRows) {
+          const cong = ficha.congregacion?.trim()
+          if (!cong || !ficha.encargadoId) continue
+          const enc = (await encargados.get(ficha.encargadoId)) as
+            | { congregacion?: string }
+            | undefined
+          if (enc && !enc.congregacion) {
+            await encargados.update(ficha.encargadoId, { congregacion: cong })
+          }
+        }
+        await fichas.toCollection().modify((ficha: { congregacion?: string }) => {
+          delete ficha.congregacion
+        })
+      })
+    this.version(5)
+      .stores({
+        encargados: 'id, nombre',
+        grupos: 'id, nombre',
+        fichas: 'id, grupoId, encargadoId, nombre, numero',
+        ocurrencias: 'id, fichaId, fechaProgramada, estado, [fichaId+fechaProgramada]',
+        ejecuciones: 'id, ocurrenciaId',
+        accionesCorrectivas: 'id, fichaId, ocurrenciaId, estado, tipo',
+        adjuntos: 'id, fichaId, ejecucionId, tipo',
+        ajustes: 'id',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('accionesCorrectivas')
+          .toCollection()
+          .modify((accion: { tipo?: string; fechaObjetivo?: string }) => {
+            if (accion.tipo === 'recomendacion' || accion.tipo === 'correctiva') return
+            accion.tipo = accion.fechaObjetivo ? 'correctiva' : 'recomendacion'
+          })
+      })
   }
 }
 

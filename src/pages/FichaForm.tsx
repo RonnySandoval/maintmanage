@@ -1,15 +1,18 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Plus, X } from 'lucide-react'
 import { db } from '../db'
 import { FRECUENCIAS, normalizeFrecuencia, type FechaPrecision, type Frecuencia } from '../db/types'
 import { currentMonthPrefix, monthValue } from '../lib/dates'
+import { createId } from '../lib/ids'
 import { siguienteNumero } from '../lib/fichas'
 import { saveAdjuntos } from '../lib/files'
 import { refreshEstados, syncOcurrenciasForFicha } from '../db/occurrences'
-import { createId } from '../lib/ids'
 import { CrearBloqueForm } from '../components/CrearBloqueForm'
+import { CrearEncargadoForm } from '../components/CrearEncargadoForm'
 import { FilePicker } from '../components/FilePicker'
+import { goBackOrFallback } from '../lib/nav'
 
 export function FichaFormPage() {
   const { id } = useParams()
@@ -29,7 +32,6 @@ export function FichaFormPage() {
   const [grupoId, setGrupoId] = useState('')
   const [encargadoId, setEncargadoId] = useState('')
   const [telefonos, setTelefonos] = useState('')
-  const [congregacion, setCongregacion] = useState('')
   const [frecuencia, setFrecuencia] = useState<Frecuencia>('cada_1')
   const [fechaPrecision, setFechaPrecision] = useState<FechaPrecision>('mes')
   const [fechaInicio, setFechaInicio] = useState(`${currentMonthPrefix()}-01`)
@@ -37,10 +39,8 @@ export function FichaFormPage() {
   const [files, setFiles] = useState<File[]>([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
-  const [newEncargado, setNewEncargado] = useState('')
-  const [newEncTel, setNewEncTel] = useState('')
-  const [newEncCong, setNewEncCong] = useState('')
   const [showCrearBloque, setShowCrearBloque] = useState(false)
+  const [showCrearEncargado, setShowCrearEncargado] = useState(false)
   const [numeroTouched, setNumeroTouched] = useState(false)
 
   useEffect(() => {
@@ -50,7 +50,6 @@ export function FichaFormPage() {
       setGrupoId(ficha.grupoId)
       setEncargadoId(ficha.encargadoId ?? '')
       setTelefonos(ficha.telefonos ?? '')
-      setCongregacion(ficha.congregacion ?? '')
       setFrecuencia(normalizeFrecuencia(ficha.frecuencia))
       setFechaPrecision(ficha.fechaPrecision === 'dia' ? 'dia' : 'mes')
       setFechaInicio(ficha.fechaInicio || `${currentMonthPrefix()}-01`)
@@ -67,25 +66,6 @@ export function FichaFormPage() {
     if (!editing && bloques.length === 0) setShowCrearBloque(true)
   }, [editing, bloques.length])
 
-  async function addEncargado() {
-    const name = newEncargado.trim()
-    if (!name) return
-    const now = Date.now()
-    const created = {
-      id: createId(),
-      nombre: name,
-      telefonos: newEncTel.trim() || undefined,
-      congregacion: newEncCong.trim() || undefined,
-      createdAt: now,
-      updatedAt: now,
-    }
-    await db.encargados.add(created)
-    setEncargadoId(created.id)
-    setNewEncargado('')
-    setNewEncTel('')
-    setNewEncCong('')
-  }
-
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
@@ -101,8 +81,7 @@ export function FichaFormPage() {
       setError('Elige o crea un bloque.')
       return
     }
-    const inicio =
-      fechaPrecision === 'mes' ? `${monthValue(fechaInicio)}-01` : fechaInicio
+    const inicio = fechaPrecision === 'mes' ? `${monthValue(fechaInicio)}-01` : fechaInicio
     if (!inicio || inicio.length < 7) {
       setError('Indica la fecha o el mes de inicio.')
       return
@@ -118,7 +97,6 @@ export function FichaFormPage() {
         grupoId,
         encargadoId: encargadoId || undefined,
         telefonos: telefonos.trim() || undefined,
-        congregacion: congregacion.trim() || undefined,
         frecuencia,
         fechaInicio: inicio,
         fechaPrecision,
@@ -130,7 +108,7 @@ export function FichaFormPage() {
       if (files.length) await saveAdjuntos(files, { tipo: 'ficha', fichaId })
       await syncOcurrenciasForFicha(record)
       await refreshEstados()
-      navigate(`/fichas/${fichaId}`)
+      navigate(`/fichas/${fichaId}`, { replace: true })
     } finally {
       setSaving(false)
     }
@@ -149,8 +127,8 @@ export function FichaFormPage() {
   }
 
   return (
-    <form className="card" onSubmit={(e) => void onSubmit(e)}>
-      <div className="split split-2">
+    <form className="card ficha-form" onSubmit={(e) => void onSubmit(e)}>
+      <div className="ficha-form-grid">
         <div className="field">
           <label htmlFor="numero">Número</label>
           <input
@@ -161,7 +139,7 @@ export function FichaFormPage() {
               setNumeroTouched(true)
               setNumero(e.target.value)
             }}
-            placeholder="p. ej. 12"
+            placeholder="12"
             inputMode="numeric"
           />
         </div>
@@ -172,203 +150,190 @@ export function FichaFormPage() {
             className="input"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            placeholder="p. ej. Revisión mensual del ascensor"
+            placeholder="Revisión ascensor"
           />
         </div>
-      </div>
 
-      <div className="field">
-        <div className="row-spread" style={{ marginBottom: 6 }}>
-          <label htmlFor="bloque" style={{ margin: 0 }}>
-            Bloque
-          </label>
-          <Link to="/bloques" className="muted">
-            Ver todos los bloques
-          </Link>
+        <div className="field">
+          <label htmlFor="bloque">Bloque</label>
+          <div className="combo-row">
+            <select
+              id="bloque"
+              className="select"
+              value={grupoId}
+              onChange={(e) => setGrupoId(e.target.value)}
+            >
+              <option value="">Seleccionar…</option>
+              {bloques.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.nombre}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className={`btn btn-icon${showCrearBloque ? ' btn-primary' : ''}`}
+              aria-label={showCrearBloque ? 'Cerrar crear bloque' : 'Crear bloque'}
+              title="Crear bloque"
+              onClick={() => {
+                setShowCrearBloque((open) => !open)
+                setShowCrearEncargado(false)
+              }}
+            >
+              {showCrearBloque ? <X size={18} /> : <Plus size={18} />}
+            </button>
+          </div>
         </div>
-        {bloques.length === 0 ? (
-          <p className="muted">Todavía no hay bloques. Crea el primero aquí mismo.</p>
-        ) : (
-          <select
-            id="bloque"
-            className="select"
-            value={grupoId}
-            onChange={(e) => setGrupoId(e.target.value)}
-          >
-            <option value="">Seleccionar bloque…</option>
-            {bloques.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.nombre}
-              </option>
-            ))}
-          </select>
-        )}
-        {showCrearBloque || bloques.length === 0 ? (
-          <CrearBloqueForm
-            onCreated={(createdId) => {
-              setGrupoId(createdId)
-              setShowCrearBloque(false)
-            }}
-          />
-        ) : (
-          <button
-            type="button"
-            className="btn btn-ghost"
-            style={{ marginTop: 8 }}
-            onClick={() => setShowCrearBloque(true)}
-          >
-            Crear otro bloque
-          </button>
-        )}
-      </div>
 
-      <div className="field">
-        <label htmlFor="encargado">Encargado (opcional)</label>
-        <select
-          id="encargado"
-          className="select"
-          value={encargadoId}
-          onChange={(e) => setEncargadoId(e.target.value)}
-        >
-          <option value="">Sin encargado</option>
-          {encargados.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nombre}
-            </option>
-          ))}
-        </select>
-        <div className="create-panel" style={{ marginTop: 8 }}>
-          <p className="muted">Añadir un encargado nuevo, si hace falta</p>
-          <input
-            className="input"
-            placeholder="Nombre"
-            value={newEncargado}
-            onChange={(e) => setNewEncargado(e.target.value)}
-          />
-          <div className="split split-2" style={{ marginTop: 8 }}>
-            <input
-              className="input"
-              placeholder="Teléfono(s)"
-              value={newEncTel}
-              onChange={(e) => setNewEncTel(e.target.value)}
-            />
-            <input
-              className="input"
-              placeholder="Congregación"
-              value={newEncCong}
-              onChange={(e) => setNewEncCong(e.target.value)}
+        <div className="field">
+          <label htmlFor="encargado">Encargado</label>
+          <div className="combo-row">
+            <select
+              id="encargado"
+              className="select"
+              value={encargadoId}
+              onChange={(e) => setEncargadoId(e.target.value)}
+            >
+              <option value="">Sin encargado</option>
+              {encargados.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className={`btn btn-icon${showCrearEncargado ? ' btn-primary' : ''}`}
+              aria-label={showCrearEncargado ? 'Cerrar crear encargado' : 'Crear encargado'}
+              title="Crear encargado"
+              onClick={() => {
+                setShowCrearEncargado((open) => !open)
+                setShowCrearBloque(false)
+              }}
+            >
+              {showCrearEncargado ? <X size={18} /> : <Plus size={18} />}
+            </button>
+          </div>
+        </div>
+
+        {showCrearBloque ? (
+          <div className="span-2">
+            <CrearBloqueForm
+              compact
+              onCreated={(createdId) => {
+                setGrupoId(createdId)
+                setShowCrearBloque(false)
+              }}
             />
           </div>
-          <button type="button" className="btn" style={{ marginTop: 8 }} onClick={() => void addEncargado()}>
-            Añadir encargado
-          </button>
-        </div>
-      </div>
+        ) : null}
 
-      <div className="split split-2">
-        <div className="field">
-          <label htmlFor="telefonos">Teléfono(s) (opcional)</label>
+        {showCrearEncargado ? (
+          <div className="span-2">
+            <CrearEncargadoForm
+              onCreated={(createdId) => {
+                setEncargadoId(createdId)
+                setShowCrearEncargado(false)
+              }}
+            />
+          </div>
+        ) : null}
+
+        <div className="field span-2">
+          <label htmlFor="telefonos">Teléfono(s)</label>
           <input
             id="telefonos"
             className="input"
             value={telefonos}
             onChange={(e) => setTelefonos(e.target.value)}
-            placeholder="Varios, separados por coma"
+            placeholder="Opcional"
           />
         </div>
+
         <div className="field">
-          <label htmlFor="congregacion">Congregación (opcional)</label>
-          <input
-            id="congregacion"
-            className="input"
-            value={congregacion}
-            onChange={(e) => setCongregacion(e.target.value)}
+          <label htmlFor="frecuencia">Periodo</label>
+          <select
+            id="frecuencia"
+            className="select"
+            value={frecuencia}
+            onChange={(e) => setFrecuencia(e.target.value as Frecuencia)}
+          >
+            {FRECUENCIAS.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field">
+          <label htmlFor="inicio">Inicio</label>
+          <div className="chip-row tight">
+            <button
+              type="button"
+              className={`chip${fechaPrecision === 'mes' ? ' active' : ''}`}
+              onClick={() => setFechaPrecision('mes')}
+            >
+              Mes
+            </button>
+            <button
+              type="button"
+              className={`chip${fechaPrecision === 'dia' ? ' active' : ''}`}
+              onClick={() => setFechaPrecision('dia')}
+            >
+              Día
+            </button>
+          </div>
+          {fechaPrecision === 'mes' ? (
+            <input
+              id="inicio"
+              className="input"
+              type="month"
+              value={monthValue(fechaInicio)}
+              onChange={(e) => setFechaInicio(`${e.target.value}-01`)}
+            />
+          ) : (
+            <input
+              id="inicio"
+              className="input"
+              type="date"
+              value={fechaInicio}
+              onChange={(e) => setFechaInicio(e.target.value)}
+            />
+          )}
+        </div>
+
+        <div className="field span-2">
+          <label htmlFor="notas">Notas</label>
+          <textarea
+            id="notas"
+            className="textarea compact"
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+            placeholder="Ubicación, instrucciones…"
           />
         </div>
-      </div>
 
-      <div className="field">
-        <label htmlFor="frecuencia">Periodo</label>
-        <select
-          id="frecuencia"
-          className="select"
-          value={frecuencia}
-          onChange={(e) => setFrecuencia(e.target.value as Frecuencia)}
-        >
-          {FRECUENCIAS.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="field">
-        <label>Inicio de la programación</label>
-        <div className="chip-row">
-          <button
-            type="button"
-            className={`chip${fechaPrecision === 'mes' ? ' active' : ''}`}
-            onClick={() => setFechaPrecision('mes')}
-          >
-            Solo mes
-          </button>
-          <button
-            type="button"
-            className={`chip${fechaPrecision === 'dia' ? ' active' : ''}`}
-            onClick={() => setFechaPrecision('dia')}
-          >
-            Fecha exacta
-          </button>
+        <div className="field span-2">
+          <label>Adjuntos</label>
+          <FilePicker onFiles={(list) => setFiles((prev) => [...prev, ...list])} />
+          {files.length ? <p className="muted">{files.length} archivo(s)</p> : null}
         </div>
-        {fechaPrecision === 'mes' ? (
-          <input
-            className="input"
-            type="month"
-            value={monthValue(fechaInicio)}
-            onChange={(e) => setFechaInicio(`${e.target.value}-01`)}
-          />
-        ) : (
-          <input
-            className="input"
-            type="date"
-            value={fechaInicio}
-            onChange={(e) => setFechaInicio(e.target.value)}
-          />
-        )}
-        <p className="muted">
-          Por defecto basta el mes. Las reparaciones pendientes sí pedirán día exacto.
-        </p>
-      </div>
-
-      <div className="field">
-        <label htmlFor="notas">Notas</label>
-        <textarea
-          id="notas"
-          className="textarea"
-          value={notas}
-          onChange={(e) => setNotas(e.target.value)}
-          placeholder="Instrucciones breves, ubicación, etc."
-        />
-      </div>
-
-      <div className="field">
-        <label>Plantilla o evidencia (foto, PDF, Word)</label>
-        <FilePicker onFiles={(list) => setFiles((prev) => [...prev, ...list])} />
-        {files.length ? (
-          <p className="muted">{files.length} archivo(s) listos para guardar.</p>
-        ) : null}
       </div>
 
       {error ? <p className="danger-text">{error}</p> : null}
 
-      <div className="row" style={{ flexWrap: 'wrap' }}>
+      <div className="row" style={{ flexWrap: 'wrap', marginTop: '0.65rem' }}>
         <button className="btn btn-primary" type="submit" disabled={saving}>
-          {saving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear ficha'}
+          {saving ? 'Guardando…' : editing ? 'Guardar' : 'Crear ficha'}
         </button>
-        <Link className="btn" to={id ? `/fichas/${id}` : '/fichas'}>
+        <button
+          className="btn"
+          type="button"
+          onClick={() => goBackOrFallback(navigate, id ? `/fichas/${id}` : '/fichas')}
+        >
           Cancelar
-        </Link>
+        </button>
       </div>
     </form>
   )

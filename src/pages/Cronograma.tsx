@@ -1,13 +1,14 @@
 import { useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CalendarDays, LayoutGrid, List } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react'
 import { db } from '../db'
 import { ESTADOS, type EstadoOcurrencia } from '../db/types'
 import { formatFechaProgramada, formatDateLong } from '../lib/dates'
 import { fichaTitulo } from '../lib/fichas'
 import { EmptyState, StatusBadge } from '../components/ui'
 import { GrillaAnual } from '../components/GrillaAnual'
+import { FichaTitle } from '../components/FichaTitle'
 
 export function CronogramaPage() {
   const [params, setParams] = useSearchParams()
@@ -43,7 +44,7 @@ export function CronogramaPage() {
     if (value) next.set(key, value)
     else next.delete(key)
     if (key === 'bloque') next.delete('grupo')
-    setParams(next)
+    setParams(next, { replace: true })
   }
 
   const fichasFiltradas = fichas.filter((ficha) => {
@@ -89,19 +90,23 @@ export function CronogramaPage() {
 
   return (
     <div>
-      <div className="row-spread" style={{ marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-        <div className="chip-row" style={{ margin: 0 }}>
+      <div className="crono-toolbar">
+        <div className="seg-toggle compact" role="tablist" aria-label="Vista del cronograma">
           <button
             type="button"
-            className={`chip${vista === 'grilla' ? ' active' : ''}`}
+            role="tab"
+            aria-selected={vista === 'grilla'}
+            className={vista === 'grilla' ? 'active' : ''}
             onClick={() => set('vista', '')}
           >
             <LayoutGrid size={14} />
-            Grilla anual
+            Grilla
           </button>
           <button
             type="button"
-            className={`chip${vista === 'lista' ? ' active' : ''}`}
+            role="tab"
+            aria-selected={vista === 'lista'}
+            className={vista === 'lista' ? 'active' : ''}
             onClick={() => set('vista', 'lista')}
           >
             <List size={14} />
@@ -109,22 +114,32 @@ export function CronogramaPage() {
           </button>
         </div>
         {vista === 'grilla' ? (
-          <div className="row">
-            <button type="button" className="btn" onClick={() => set('anio', String(year - 1))}>
-              ←
+          <div className="year-stepper">
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Año anterior"
+              onClick={() => set('anio', String(year - 1))}
+            >
+              <ChevronLeft size={18} />
             </button>
             <strong>{year}</strong>
-            <button type="button" className="btn" onClick={() => set('anio', String(year + 1))}>
-              →
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Año siguiente"
+              onClick={() => set('anio', String(year + 1))}
+            >
+              <ChevronRight size={18} />
             </button>
           </div>
         ) : null}
       </div>
 
-      <div className="chip-row">
+      <div className="chip-row compact">
         <button
           type="button"
-          className={`chip${!estado ? ' active' : ''}`}
+          className={`chip compact${!estado ? ' active' : ''}`}
           onClick={() => set('estado', '')}
         >
           Todas
@@ -133,7 +148,7 @@ export function CronogramaPage() {
           <button
             key={e.id}
             type="button"
-            className={`chip${estado === e.id ? ' active' : ''}`}
+            className={`chip compact${estado === e.id ? ' active' : ''}`}
             onClick={() => set('estado', e.id)}
           >
             {e.label}
@@ -141,10 +156,10 @@ export function CronogramaPage() {
         ))}
       </div>
 
-      <div className="filters">
+      <div className="filters compact">
         <input
           className="input"
-          placeholder="Buscar ficha"
+          placeholder="Buscar"
           value={q}
           onChange={(e) => set('q', e.target.value)}
         />
@@ -183,6 +198,7 @@ export function CronogramaPage() {
           year={year}
           fichas={fichasFiltradas}
           bloques={bloques}
+          encargados={encargados}
           ocurrencias={estado || fecha ? filtered : ocurrencias.filter((o) =>
             fichasFiltradas.some((f) => f.id === o.fichaId),
           )}
@@ -199,40 +215,58 @@ export function CronogramaPage() {
           ) : null}
 
           {filtered.length === 0 ? (
-            <div className="card muted">No hay ocurrencias con esos filtros.</div>
+            <div className="table-card">
+              <p className="table-empty">No hay ocurrencias con esos filtros.</p>
+            </div>
           ) : (
-            [...grouped.entries()].map(([day, items]) => (
-              <section key={day}>
-                <div className="date-group">
-                  {formatFechaProgramada(
-                    day,
-                    fichaMap[items[0]?.fichaId ?? '']?.fechaPrecision === 'dia' ? 'dia' : 'mes',
-                  )}
-                </div>
-                <div className="list">
+            <div className="table-card">
+              <div className="table-head table-cols-crono">
+                <span className="table-bar" aria-hidden />
+                <span>Ficha</span>
+                <span className="col-md">Bloque</span>
+                <span className="col-md">Encargado</span>
+                <span>Estado</span>
+              </div>
+              {[...grouped.entries()].map(([day, items]) => (
+                <section key={day}>
+                  <div className="table-section">
+                    {formatFechaProgramada(
+                      day,
+                      fichaMap[items[0]?.fichaId ?? '']?.fechaPrecision === 'dia' ? 'dia' : 'mes',
+                    )}
+                  </div>
                   {items.map((o) => {
                     const ficha = fichaMap[o.fichaId]
                     const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
                     const encargado = ficha ? encargadoMap[ficha.encargadoId ?? ''] : undefined
                     return (
-                      <Link key={o.id} className="card card-click item" to={`/ocurrencias/${o.id}`}>
-                        <span className="bar" style={{ background: bloque?.color ?? 'var(--accent)' }} />
-                        <div className="grow">
-                          <div className="row-spread">
-                            <strong>{ficha ? fichaTitulo(ficha) : 'Ficha'}</strong>
-                            <StatusBadge estado={o.estado} />
-                          </div>
-                          <div className="muted">
+                      <Link
+                        key={o.id}
+                        className="table-row table-cols-crono"
+                        to={`/ocurrencias/${o.id}`}
+                      >
+                        <span
+                          className="table-bar"
+                          style={{ background: bloque?.color ?? 'var(--accent)' }}
+                        />
+                        <span className="table-cell">
+                          <FichaTitle ficha={ficha} color={bloque?.color} />
+                          <span className="muted col-sm-only">
                             {bloque?.nombre}
                             {encargado ? ` · ${encargado.nombre}` : ''}
-                          </div>
-                        </div>
+                          </span>
+                        </span>
+                        <span className="col-md muted">{bloque?.nombre ?? '—'}</span>
+                        <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
+                        <span className="table-nowrap">
+                          <StatusBadge estado={o.estado} />
+                        </span>
                       </Link>
                     )
                   })}
-                </div>
-              </section>
-            ))
+                </section>
+              ))}
+            </div>
           )}
         </>
       )}

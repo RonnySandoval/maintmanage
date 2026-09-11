@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
-import { ESTADOS_CORRECTIVA, type EstadoCorrectiva } from '../db/types'
 import { createId } from '../lib/ids'
 import { formatFechaProgramada, todayISO } from '../lib/dates'
 import { fichaTitulo } from '../lib/fichas'
@@ -13,6 +12,8 @@ import { AttachmentList, removeAdjunto } from '../components/AttachmentList'
 import { FilePicker } from '../components/FilePicker'
 import { ShareMenu } from '../components/ShareMenu'
 import { StatusBadge } from '../components/ui'
+import { FichaTitle } from '../components/FichaTitle'
+import { AccionesPanel } from '../components/AccionesPanel'
 
 export function OcurrenciaDetailPage() {
   const { id } = useParams()
@@ -49,21 +50,11 @@ export function OcurrenciaDetailPage() {
           : [],
       [occ?.fichaId],
     ) ?? []
-  const acciones =
-    useLiveQuery(async () => {
-      if (!occ?.fichaId) return []
-      const rows = await db.accionesCorrectivas.where('fichaId').equals(occ.fichaId).toArray()
-      return rows.sort((a, b) => b.createdAt - a.createdAt)
-    }, [occ?.fichaId]) ?? []
 
   const [fechaReal, setFechaReal] = useState(todayISO())
   const [observaciones, setObservaciones] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
-  const [correctiva, setCorrectiva] = useState('')
-  const [correctivaEstado, setCorrectivaEstado] = useState<EstadoCorrectiva>('pendiente')
-  const [correctivaFecha, setCorrectivaFecha] = useState(todayISO())
-  const [corrError, setCorrError] = useState('')
 
   if (!id) return null
   if (occ === undefined) return <p className="muted">Cargando…</p>
@@ -124,34 +115,6 @@ export function OcurrenciaDetailPage() {
     }
   }
 
-  async function addCorrectiva(e: FormEvent) {
-    e.preventDefault()
-    setCorrError('')
-    if (!correctiva.trim()) return
-    if (!correctivaFecha) {
-      setCorrError('Las reparaciones pendientes necesitan una fecha exacta.')
-      return
-    }
-    const now = Date.now()
-    await db.accionesCorrectivas.add({
-      id: createId(),
-      fichaId: currentFicha.id,
-      ocurrenciaId: ocurrencia.id,
-      texto: correctiva.trim(),
-      estado: correctivaEstado,
-      fechaObjetivo: correctivaFecha,
-      createdAt: now,
-      updatedAt: now,
-    })
-    setCorrectiva('')
-    setCorrectivaFecha(todayISO())
-    setCorrectivaEstado('pendiente')
-  }
-
-  async function setCorrectivaState(accionId: string, estado: EstadoCorrectiva) {
-    await db.accionesCorrectivas.update(accionId, { estado, updatedAt: Date.now() })
-  }
-
   return (
     <div className="stack">
       <div className="card">
@@ -164,7 +127,9 @@ export function OcurrenciaDetailPage() {
               )}
             </p>
             <h2>
-              <Link to={`/fichas/${currentFicha.id}`}>{fichaTitulo(currentFicha)}</Link>
+              <Link to={`/fichas/${currentFicha.id}`}>
+                <FichaTitle ficha={currentFicha} color={bloque?.color} />
+              </Link>
             </h2>
             <p className="muted">
               {bloque?.nombre} · {encargado?.nombre}
@@ -233,84 +198,7 @@ export function OcurrenciaDetailPage() {
         )}
       </div>
 
-      <div className="card">
-        <h3 className="title-sm">Acciones correctivas</h3>
-        <form onSubmit={(e) => void addCorrectiva(e)}>
-          <div className="field">
-            <label htmlFor="corr">Nueva acción</label>
-            <input
-              id="corr"
-              className="input"
-              value={correctiva}
-              onChange={(e) => setCorrectiva(e.target.value)}
-              placeholder="p. ej. Sustituir junta del tanque"
-            />
-          </div>
-          <div className="split split-2">
-            <div className="field">
-              <label htmlFor="corrEstado">Estado</label>
-              <select
-                id="corrEstado"
-                className="select"
-                value={correctivaEstado}
-                onChange={(e) => setCorrectivaEstado(e.target.value as EstadoCorrectiva)}
-              >
-                {ESTADOS_CORRECTIVA.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="corrFecha">Fecha (obligatoria)</label>
-              <input
-                id="corrFecha"
-                className="input"
-                type="date"
-                value={correctivaFecha}
-                onChange={(e) => setCorrectivaFecha(e.target.value)}
-              />
-            </div>
-          </div>
-          {corrError ? <p className="danger-text">{corrError}</p> : null}
-          <button className="btn" type="submit">
-            Añadir acción
-          </button>
-        </form>
-        <div className="list" style={{ marginTop: '0.9rem' }}>
-          {acciones.length === 0 ? (
-            <p className="muted">Ninguna acción correctiva aún.</p>
-          ) : (
-            acciones.map((a) => (
-              <div key={a.id} className="card">
-                <div className="row-spread" style={{ flexWrap: 'wrap' }}>
-                  <strong>{a.texto}</strong>
-                  <select
-                    className="select"
-                    style={{ maxWidth: 180 }}
-                    value={a.estado}
-                    onChange={(e) =>
-                      void setCorrectivaState(a.id, e.target.value as EstadoCorrectiva)
-                    }
-                  >
-                    {ESTADOS_CORRECTIVA.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {a.fechaObjetivo ? (
-                  <p className="muted" style={{ margin: '0.3rem 0 0' }}>
-                    Objetivo: {a.fechaObjetivo}
-                  </p>
-                ) : null}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      <AccionesPanel fichaId={currentFicha.id} ocurrenciaId={ocurrencia.id} />
     </div>
   )
 }

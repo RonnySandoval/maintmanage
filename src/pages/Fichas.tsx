@@ -5,6 +5,7 @@ import { ClipboardList, Layers, Plus } from 'lucide-react'
 import { db } from '../db'
 import { frecuenciaLabel } from '../db/types'
 import { fichaTitulo } from '../lib/fichas'
+import { FichaTitle } from '../components/FichaTitle'
 import { EmptyState } from '../components/ui'
 
 export function FichasPage() {
@@ -105,25 +106,38 @@ export function FichasPage() {
             </div>
           }
         />
+      ) : filtered.length === 0 ? (
+        <div className="table-card">
+          <p className="table-empty">No hay fichas con esos filtros.</p>
+        </div>
       ) : (
-        <div className="list">
+        <div className="table-card">
+          <div className="table-head table-cols-fichas">
+            <span className="table-bar" aria-hidden />
+            <span>Ficha</span>
+            <span className="col-md">Bloque</span>
+            <span className="col-md">Encargado</span>
+            <span>Periodo</span>
+          </div>
           {filtered.map((f) => {
             const bloque = bloqueMap[f.grupoId]
             const encargado = f.encargadoId ? encargadoMap[f.encargadoId] : undefined
             return (
-              <Link key={f.id} className="card card-click item" to={`/fichas/${f.id}`}>
-                <span className="bar" style={{ background: bloque?.color ?? 'var(--accent)' }} />
-                <div className="grow">
-                  <strong>
-                    {f.numero ? <span className="ficha-num">N.º {f.numero}</span> : null}
-                    {f.nombre}
-                  </strong>
-                  <div className="muted">
+              <Link key={f.id} className="table-row table-cols-fichas" to={`/fichas/${f.id}`}>
+                <span
+                  className="table-bar"
+                  style={{ background: bloque?.color ?? 'var(--accent)' }}
+                />
+                <span className="table-cell">
+                  <FichaTitle ficha={f} color={bloque?.color} />
+                  <span className="muted col-sm-only">
                     {bloque?.nombre ?? 'Sin bloque'}
                     {encargado ? ` · ${encargado.nombre}` : ''}
-                    {` · ${frecuenciaLabel(f.frecuencia)}`}
-                  </div>
-                </div>
+                  </span>
+                </span>
+                <span className="col-md muted">{bloque?.nombre ?? 'Sin bloque'}</span>
+                <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
+                <span className="muted table-nowrap">{frecuenciaLabel(f.frecuencia)}</span>
               </Link>
             )
           })}

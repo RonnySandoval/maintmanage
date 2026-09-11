@@ -4,8 +4,9 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { CalendarDays, ClipboardList } from 'lucide-react'
 import { db } from '../db'
 import { addDays, currentMonthPrefix, formatDate, todayISO, weekdayShort } from '../lib/dates'
-import { fichaTitulo } from '../lib/fichas'
+import { ESTADOS_CORRECTIVA, tipoAccionLabel, tipoAccionOf } from '../db/types'
 import { EmptyState, StatusBadge } from '../components/ui'
+import { FichaTitle } from '../components/FichaTitle'
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -139,7 +140,9 @@ export function DashboardPage() {
                 <span className="bar" style={{ background: bloque?.color ?? 'var(--accent)' }} />
                 <div className="grow">
                   <div className="row-spread">
-                    <strong>{ficha ? fichaTitulo(ficha) : 'Ficha'}</strong>
+                    <strong>
+                      <FichaTitle ficha={ficha} color={bloque?.color} />
+                    </strong>
                     <StatusBadge estado={o.estado} />
                   </div>
                   <div className="muted">
@@ -155,17 +158,33 @@ export function DashboardPage() {
 
       {acciones.length > 0 ? (
         <div style={{ marginTop: '1.25rem' }}>
-          <h2 className="title-sm">Acciones correctivas abiertas</h2>
+          <div className="page-head">
+            <h2 className="title-sm">Acciones y recomendaciones abiertas</h2>
+            <Link to="/historicos">Ver histórico</Link>
+          </div>
           <div className="list">
-            {acciones.slice(0, 5).map((a) => (
-              <div key={a.id} className="card">
+            {acciones.slice(0, 5).map((a) => {
+              const ficha = fichaMap[a.fichaId]
+              const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
+              return (
+              <Link
+                key={a.id}
+                className="card card-click"
+                to={a.ocurrenciaId ? `/ocurrencias/${a.ocurrenciaId}` : `/fichas/${a.fichaId}`}
+              >
                 <div className="row-spread">
                   <strong>{a.texto}</strong>
-                  <span className="badge badge-pendiente">{a.estado}</span>
+                  <span className={`badge badge-${a.estado}`}>
+                    {ESTADOS_CORRECTIVA.find((s) => s.id === a.estado)?.label ?? a.estado}
+                  </span>
                 </div>
-                <div className="muted">{fichaMap[a.fichaId] ? fichaTitulo(fichaMap[a.fichaId]) : ''}</div>
-              </div>
-            ))}
+                <div className="muted">
+                  {tipoAccionLabel(tipoAccionOf(a))} ·{' '}
+                  <FichaTitle ficha={ficha} color={bloque?.color} />
+                </div>
+              </Link>
+              )
+            })}
           </div>
         </div>
       ) : null}

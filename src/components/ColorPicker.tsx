@@ -3,11 +3,13 @@ export function ColorPicker({
   value,
   onChange,
   label = 'Color',
+  compact = false,
 }: {
   id?: string
   value: string
   onChange: (color: string) => void
   label?: string
+  compact?: boolean
 }) {
   const hex = /^#[0-9A-Fa-f]{6}$/.test(value) ? value : '#0f766e'
 
@@ -26,7 +28,7 @@ export function ColorPicker({
         />
         <input
           className="input"
-          style={{ maxWidth: 130 }}
+          style={{ maxWidth: 110 }}
           value={hex}
           onChange={(e) => {
             const next = e.target.value.startsWith('#') ? e.target.value : `#${e.target.value}`
@@ -37,9 +39,11 @@ export function ColorPicker({
         />
         <span className="color-swatch" style={{ background: hex }} aria-hidden />
       </div>
-      <p className="muted" style={{ margin: 0 }}>
-        Pulsa el recuadro para abrir la paleta completa del sistema.
-      </p>
+      {compact ? null : (
+        <p className="muted" style={{ margin: 0 }}>
+          Pulsa el recuadro para abrir la paleta completa del sistema.
+        </p>
+      )}
     </div>
   )
 }

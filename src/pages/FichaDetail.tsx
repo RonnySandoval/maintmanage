@@ -12,6 +12,8 @@ import { AttachmentList, removeAdjunto } from '../components/AttachmentList'
 import { FilePicker } from '../components/FilePicker'
 import { ShareMenu } from '../components/ShareMenu'
 import { StatusBadge } from '../components/ui'
+import { FichaTitle } from '../components/FichaTitle'
+import { AccionesPanel } from '../components/AccionesPanel'
 
 export function FichaDetailPage() {
   const { id } = useParams()
@@ -38,12 +40,6 @@ export function FichaDetailPage() {
       () => (id ? db.adjuntos.where('fichaId').equals(id).toArray() : []),
       [id],
     ) ?? []
-  const acciones =
-    useLiveQuery(async () => {
-      if (!id) return []
-      const rows = await db.accionesCorrectivas.where('fichaId').equals(id).toArray()
-      return rows.sort((a, b) => b.createdAt - a.createdAt)
-    }, [id]) ?? []
 
   if (!id) return null
   if (ficha === undefined) return <p className="muted">Cargando…</p>
@@ -64,9 +60,7 @@ export function FichaDetailPage() {
     (ficha.telefonos || encargado?.telefonos || encargado?.contacto)
       ? `Teléfono(s): ${ficha.telefonos || encargado?.telefonos || encargado?.contacto}`
       : '',
-    (ficha.congregacion || encargado?.congregacion)
-      ? `Congregación: ${ficha.congregacion || encargado?.congregacion}`
-      : '',
+    encargado?.congregacion ? `Congregación: ${encargado.congregacion}` : '',
     `Periodo: ${frecuenciaLabel(ficha.frecuencia)}`,
     ficha.notas ? `Notas: ${ficha.notas}` : '',
   ]
@@ -80,7 +74,7 @@ export function FichaDetailPage() {
       return
     }
     await deleteFichaCascade(current.id)
-    navigate('/fichas')
+    navigate('/fichas', { replace: true })
   }
 
   return (
@@ -88,7 +82,9 @@ export function FichaDetailPage() {
       <div className="card">
         <div className="row-spread" style={{ marginBottom: '0.6rem', flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ marginBottom: 4 }}>{fichaTitulo(ficha)}</h2>
+            <h2 style={{ marginBottom: 4 }}>
+              <FichaTitle ficha={ficha} color={bloque?.color} />
+            </h2>
             <p className="muted" style={{ margin: 0 }}>
               <span
                 className="color-dot"
@@ -115,17 +111,15 @@ export function FichaDetailPage() {
             </button>
           </div>
         </div>
-        {ficha.telefonos || ficha.congregacion || encargado?.telefonos || encargado?.congregacion ? (
+        {ficha.telefonos || encargado?.telefonos || encargado?.congregacion ? (
           <p className="muted">
             {ficha.telefonos || encargado?.telefonos || encargado?.contacto
               ? `Tel. ${ficha.telefonos || encargado?.telefonos || encargado?.contacto}`
               : ''}
-            {(ficha.congregacion || encargado?.congregacion) && (ficha.telefonos || encargado?.telefonos || encargado?.contacto)
+            {encargado?.congregacion && (ficha.telefonos || encargado?.telefonos || encargado?.contacto)
               ? ' · '
               : ''}
-            {ficha.congregacion || encargado?.congregacion
-              ? `Congregación: ${ficha.congregacion || encargado?.congregacion}`
-              : ''}
+            {encargado?.congregacion ? `Congregación: ${encargado.congregacion}` : ''}
           </p>
         ) : null}
         {ficha.notas ? <p>{ficha.notas}</p> : null}
@@ -166,19 +160,7 @@ export function FichaDetailPage() {
         </div>
       </div>
 
-      {acciones.length ? (
-        <div className="card">
-          <h3 className="title-sm">Acciones correctivas</h3>
-          <div className="list">
-            {acciones.map((a) => (
-              <div key={a.id} className="row-spread">
-                <span>{a.texto}</span>
-                <span className="badge badge-pendiente">{a.estado}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
+      <AccionesPanel fichaId={ficha.id} />
     </div>
   )
 }

@@ -19,6 +19,8 @@ export type EstadoOcurrencia = 'pendiente' | 'proxima' | 'vencida' | 'ejecutada'
 
 export type EstadoCorrectiva = 'pendiente' | 'programada' | 'ejecutada'
 
+export type TipoAccion = 'correctiva' | 'recomendacion'
+
 export type TipoAdjunto = 'ficha' | 'ejecucion' | 'manual'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
@@ -51,7 +53,6 @@ export interface Ficha {
   grupoId: string
   encargadoId?: string
   telefonos?: string
-  congregacion?: string
   frecuencia: Frecuencia
   fechaInicio: string
   fechaPrecision: FechaPrecision
@@ -82,6 +83,7 @@ export interface AccionCorrectiva {
   id: string
   fichaId: string
   ocurrenciaId?: string
+  tipo: TipoAccion
   texto: string
   estado: EstadoCorrectiva
   fechaObjetivo?: string
@@ -156,6 +158,17 @@ export const ESTADOS_CORRECTIVA: { id: EstadoCorrectiva; label: string }[] = [
   { id: 'programada', label: 'Programada' },
   { id: 'ejecutada', label: 'Ejecutada' },
 ]
+
+export function tipoAccionOf(
+  accion: Pick<AccionCorrectiva, 'tipo' | 'fechaObjetivo'>,
+): TipoAccion {
+  if (accion.tipo === 'recomendacion' || accion.tipo === 'correctiva') return accion.tipo
+  return accion.fechaObjetivo ? 'correctiva' : 'recomendacion'
+}
+
+export function tipoAccionLabel(tipo: TipoAccion): string {
+  return tipo === 'recomendacion' ? 'Recomendación' : 'Acción correctiva'
+}
 
 export const BLOQUE_COLORS = [
   '#0f766e',

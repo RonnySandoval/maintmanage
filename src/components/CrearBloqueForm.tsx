@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 import { Plus } from 'lucide-react'
 import { db } from '../db'
 import { createId } from '../lib/ids'
@@ -15,8 +15,7 @@ export function CrearBloqueForm({
   const [color, setColor] = useState('#0f766e')
   const [error, setError] = useState('')
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault()
+  async function submit() {
     const name = nombre.trim()
     if (!name) {
       setError('Escribe el nombre del bloque.')
@@ -37,12 +36,24 @@ export function CrearBloqueForm({
     onCreated?.(created.id)
   }
 
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    e.stopPropagation()
+    void submit()
+  }
+
   return (
-    <form className={compact ? '' : 'create-panel'} onSubmit={(e) => void onSubmit(e)}>
-      {!compact ? <h3 className="title-sm">Crear bloque</h3> : null}
-      <p className="muted" style={{ marginTop: compact ? 0 : undefined }}>
-        Un bloque agrupa fichas del mismo sector o sistema (p. ej. Edificio A, HVAC, Ascensores).
-      </p>
+    <div
+      className={`create-panel${compact ? ' compact-panel' : ''}`}
+      onKeyDown={onKeyDown}
+    >
+      <h3 className="title-sm">Crear bloque</h3>
+      {compact ? null : (
+        <p className="muted" style={{ marginTop: 0 }}>
+          Un bloque agrupa fichas del mismo sector o sistema (p. ej. Edificio A, HVAC, Ascensores).
+        </p>
+      )}
       <div className="field">
         <label htmlFor="bloque-nuevo-nombre">Nombre del bloque</label>
         <input
@@ -53,12 +64,12 @@ export function CrearBloqueForm({
           placeholder="p. ej. Planta baja, Eléctrico…"
         />
       </div>
-      <ColorPicker id="bloque-nuevo-color" value={color} onChange={setColor} />
+      <ColorPicker id="bloque-nuevo-color" value={color} onChange={setColor} compact={compact} />
       {error ? <p className="danger-text">{error}</p> : null}
-      <button className="btn btn-primary" type="submit">
+      <button className="btn btn-primary" type="button" onClick={() => void submit()}>
         <Plus size={16} />
         Crear bloque
       </button>
-    </form>
+    </div>
   )
 }

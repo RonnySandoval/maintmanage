@@ -1,17 +1,22 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
+  History,
   LayoutDashboard,
   Layers,
   Settings,
 } from 'lucide-react'
 import { ThemeQuickToggle } from './ThemeQuickToggle'
+import { useAppHistory } from '../hooks/useAppHistory'
 
 const LINKS = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, end: true },
   { to: '/cronograma', label: 'Cronograma', icon: CalendarDays, end: false },
   { to: '/fichas', label: 'Fichas', icon: ClipboardList, end: false },
+  { to: '/historicos', label: 'Histórico', icon: History, end: false },
   { to: '/bloques', label: 'Bloques', icon: Layers, end: false },
   { to: '/ajustes', label: 'Ajustes', icon: Settings, end: false },
 ]
@@ -20,6 +25,7 @@ const TITLES: Record<string, string> = {
   '/': 'Dashboard',
   '/cronograma': 'Cronograma',
   '/fichas': 'Fichas',
+  '/historicos': 'Histórico',
   '/bloques': 'Bloques',
   '/ajustes': 'Ajustes',
 }
@@ -55,6 +61,7 @@ function NavItems() {
 
 export function Layout() {
   const location = useLocation()
+  const { canBack, canForward, back, forward } = useAppHistory()
 
   return (
     <div className="shell">
@@ -72,7 +79,29 @@ export function Layout() {
       </aside>
       <div>
         <header className="topbar">
-          <h1>{titleFor(location.pathname)}</h1>
+          <div className="topbar-lead">
+            <div className="nav-hist">
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="Atrás"
+                disabled={!canBack}
+                onClick={back}
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="Adelante"
+                disabled={!canForward}
+                onClick={forward}
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+            <h1>{titleFor(location.pathname)}</h1>
+          </div>
           <ThemeQuickToggle />
         </header>
         <main className="page">

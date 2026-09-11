@@ -10,6 +10,7 @@ import { DashboardPage } from './pages/Dashboard'
 import { FichaDetailPage } from './pages/FichaDetail'
 import { FichaFormPage } from './pages/FichaForm'
 import { FichasPage } from './pages/Fichas'
+import { HistoricosPage } from './pages/Historicos'
 import { MaestrosPage } from './pages/Maestros'
 import { OcurrenciaDetailPage } from './pages/OcurrenciaDetail'
 
@@ -42,6 +43,7 @@ export default function App() {
             <Route path="fichas/:id/editar" element={<FichaFormPage />} />
             <Route path="fichas/:id" element={<FichaDetailPage />} />
             <Route path="ocurrencias/:id" element={<OcurrenciaDetailPage />} />
+            <Route path="historicos" element={<HistoricosPage />} />
             <Route path="bloques" element={<MaestrosPage />} />
             <Route path="maestros" element={<Navigate to="/bloques" replace />} />
             <Route path="ajustes" element={<AjustesPage />} />
