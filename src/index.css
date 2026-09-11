@@ -38,10 +38,9 @@
   --metal-delete-hover: #3b383a;
   --metal-ink: #f4f6f8;
   --app-texture:
-    radial-gradient(980px 520px at 10% -12%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
-    radial-gradient(720px 400px at 96% 6%, color-mix(in srgb, var(--bg-muted) 78%, transparent), transparent 55%),
-    radial-gradient(560px 280px at 48% 110%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 62%),
-    repeating-linear-gradient(-18deg, transparent 0 8px, rgb(15 28 39 / 0.028) 8px 9px);
+    radial-gradient(980px 520px at 10% -12%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 60%),
+    radial-gradient(720px 400px at 96% 6%, color-mix(in srgb, var(--bg-muted) 72%, transparent), transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='36' viewBox='0 0 72 36'%3E%3Cpath fill='none' stroke='%230f1c27' stroke-opacity='.08' stroke-width='1' d='M0 18h72M0 36h72M36 0v18M0 18v18M72 18v18'/%3E%3C/svg%3E");
 }
 
 [data-theme='dark'] {
@@ -76,10 +75,9 @@
   --metal-delete-hover: #8b8587;
   --metal-ink: #10151c;
   --app-texture:
-    radial-gradient(980px 520px at 10% -12%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 60%),
-    radial-gradient(720px 400px at 96% 6%, color-mix(in srgb, #1e3a5f 30%, transparent), transparent 55%),
-    radial-gradient(560px 280px at 48% 110%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 62%),
-    repeating-linear-gradient(-18deg, transparent 0 8px, rgb(255 255 255 / 0.032) 8px 9px);
+    radial-gradient(980px 520px at 10% -12%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
+    radial-gradient(720px 400px at 96% 6%, color-mix(in srgb, #1e3a5f 28%, transparent), transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='36' viewBox='0 0 72 36'%3E%3Cpath fill='none' stroke='%23e8eef4' stroke-opacity='.07' stroke-width='1' d='M0 18h72M0 36h72M36 0v18M0 18v18M72 18v18'/%3E%3C/svg%3E");
 }
 
 * {
@@ -96,6 +94,7 @@ body,
 html {
   background-color: var(--bg);
   background-image: var(--app-texture);
+  background-size: auto, auto, 72px 36px;
   background-attachment: fixed;
 }
 
