@@ -103,7 +103,7 @@ export function quarterIndex(month: number): number {
 }
 
 export function quarterLabel(date = new Date()): string {
-  const labels = ['1.er trim.', '2.º trim.', '3.er trim.', '4.º trim.']
+  const labels = ['Primer trimestre', 'Segundo trimestre', 'Tercer trimestre', 'Cuarto trimestre']
   return `${labels[quarterIndex(date.getMonth())]} ${date.getFullYear()}`
 }
 
@@ -166,4 +166,13 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export function formatDateTime(ts: number): string {
+  return new Date(ts).toLocaleString('es', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
