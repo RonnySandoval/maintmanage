@@ -98,6 +98,21 @@ export function currentMonthPrefix(): string {
   return todayISO().slice(0, 7)
 }
 
+export function quarterIndex(month: number): number {
+  return Math.floor(month / 3)
+}
+
+export function quarterLabel(date = new Date()): string {
+  const labels = ['1.er trim.', '2.º trim.', '3.er trim.', '4.º trim.']
+  return `${labels[quarterIndex(date.getMonth())]} ${date.getFullYear()}`
+}
+
+export function inCurrentQuarter(iso: string, date = new Date()): boolean {
+  const scheduled = parseISODate(iso)
+  if (scheduled.getFullYear() !== date.getFullYear()) return false
+  return quarterIndex(scheduled.getMonth()) === quarterIndex(date.getMonth())
+}
+
 export function nextDate(iso: string, freq: Frecuencia | string): string {
   const meses = mesesDeFrecuencia(freq)
   if (freq === 'unica') return iso

@@ -12,6 +12,7 @@ import {
   useGridSpan,
   windowStartForMonth,
   zoomFromSpan,
+  ZOOM_IN_MAX,
   type ZoomLevel,
 } from '../hooks/useGridSpan'
 import { FichaTitle } from './FichaTitle'
@@ -94,7 +95,7 @@ export function GrillaAnual({
   function zoomIn() {
     setManualZoom((current) => {
       const z = current ?? zoomFromSpan(autoSpan)
-      return (Math.min(2, z + 1) as ZoomLevel)
+      return (Math.min(ZOOM_IN_MAX, z + 1) as ZoomLevel)
     })
   }
 
@@ -126,9 +127,9 @@ export function GrillaAnual({
       }
       const ratio = dist / prev
       if (pinchRef.current.locked) return
-      if (ratio > 1.18 && zoomRef.current < 2) {
+      if (ratio > 1.18 && zoomRef.current < ZOOM_IN_MAX) {
         pinchRef.current.locked = true
-        setZoom((Math.min(2, zoomRef.current + 1) as ZoomLevel))
+        setZoom((Math.min(ZOOM_IN_MAX, zoomRef.current + 1) as ZoomLevel))
       } else if (ratio < 0.85 && zoomRef.current > 0) {
         pinchRef.current.locked = true
         setZoom((Math.max(0, zoomRef.current - 1) as ZoomLevel))
@@ -255,7 +256,7 @@ export function GrillaAnual({
           <button
             type="button"
             className="btn"
-            disabled={zoom === 2}
+            disabled={zoom === ZOOM_IN_MAX}
             onClick={zoomIn}
             aria-label="Acercar"
           >
@@ -273,7 +274,7 @@ export function GrillaAnual({
               {visibleTrimestres.map((t, i) => (
                 <th
                   key={t.id}
-                  className={`q-head${i > 0 ? ' q-gap' : ''}`}
+                  className={`q-head q-${t.id}${i > 0 ? ' q-gap' : ''}`}
                   colSpan={t.months.length}
                 >
                   {t.label}
@@ -284,7 +285,7 @@ export function GrillaAnual({
               {monthIndexes.map((m) => (
                 <th
                   key={m}
-                  className={monthClass(m, start, currentMonth)}
+                  className={`month-col ${monthClass(m, start, currentMonth)}`.trim()}
                   aria-current={m === currentMonth ? 'true' : undefined}
                 >
                   {MESES[m]}
@@ -311,7 +312,8 @@ export function GrillaAnual({
                   currentMonth={currentMonth}
                   byFichaMonth={byFichaMonth}
                   encargadoMap={encargadoMap}
-                  showFrecuencia={span === 'year'}
+                  showMeta={span === 'quarter' || span === 'semester'}
+                  showFrecuencia={span === 'quarter'}
                   correctivaOcc={correctivaOcc}
                   correctivaFicha={correctivaFicha}
                 />
@@ -333,6 +335,7 @@ function BloqueRows({
   currentMonth,
   byFichaMonth,
   encargadoMap,
+  showMeta,
   showFrecuencia,
   correctivaOcc,
   correctivaFicha,
@@ -344,6 +347,7 @@ function BloqueRows({
   currentMonth: number
   byFichaMonth: Map<string, Ocurrencia[]>
   encargadoMap: Record<string, Encargado>
+  showMeta: boolean
   showFrecuencia: boolean
   correctivaOcc: Set<string>
   correctivaFicha: Set<string>
@@ -356,29 +360,31 @@ function BloqueRows({
           {bloque.nombre}
         </td>
       </tr>
-      {fichas.map((ficha) => {
+      {fichas.map((ficha, index) => {
         const encargado = ficha.encargadoId ? encargadoMap[ficha.encargadoId] : undefined
         return (
-          <tr key={ficha.id}>
+          <tr key={ficha.id} className={`ficha-row${index % 2 ? ' is-alt' : ''}`}>
             <th className="ficha-col" scope="row">
               <Link to={`/fichas/${ficha.id}`}>
                 <FichaTitle ficha={ficha} color={bloque.color} />
               </Link>
-              <span className="ficha-meta">{encargado?.nombre ?? 'Sin encargado'}</span>
+              {showMeta ? (
+                <span className="ficha-meta">{encargado?.nombre ?? 'Sin encargado'}</span>
+              ) : null}
               {showFrecuencia ? (
                 <span className="ficha-meta">{frecuenciaLabel(ficha.frecuencia)}</span>
               ) : null}
             </th>
             {monthIndexes.map((month) => {
               const occ = pickOcc(byFichaMonth.get(`${ficha.id}:${month}`) ?? [])
-              const cls = monthClass(month, start, currentMonth)
-              if (!occ) return <td key={month} className={cls || undefined} />
+              const cls = `month-col ${monthClass(month, start, currentMonth)}`.trim()
+              if (!occ) return <td key={month} className={cls} />
               const hasCorrectiva = correctivaOcc.has(occ.id) || correctivaFicha.has(ficha.id)
               const title = hasCorrectiva
                 ? `${labelEstado(occ.estado)} · Con acción correctiva`
                 : labelEstado(occ.estado)
               return (
-                <td key={month} className={cls || undefined}>
+                <td key={month} className={cls}>
                   <Link
                     className={`grid-cell ${occ.estado}${hasCorrectiva ? ' has-correctiva' : ''}`}
                     to={`/ocurrencias/${occ.id}`}

@@ -77,7 +77,7 @@ export function Layout() {
           Datos locales en este dispositivo. Exporta una copia para usarlos en otro.
         </p>
       </aside>
-      <div>
+      <div className="content">
         <header className="topbar">
           <div className="topbar-lead">
             <div className="nav-hist">

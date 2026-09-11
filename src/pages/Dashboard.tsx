@@ -1,15 +1,14 @@
 import { useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { CalendarDays, ClipboardList } from 'lucide-react'
 import { db } from '../db'
-import { addDays, currentMonthPrefix, formatDate, todayISO, weekdayShort } from '../lib/dates'
+import { formatDate, inCurrentQuarter, quarterLabel } from '../lib/dates'
 import { ESTADOS_CORRECTIVA, tipoAccionLabel, tipoAccionOf } from '../db/types'
 import { EmptyState, StatusBadge } from '../components/ui'
 import { FichaTitle } from '../components/FichaTitle'
 
 export function DashboardPage() {
-  const navigate = useNavigate()
   const ocurrencias = useLiveQuery(() => db.ocurrencias.toArray()) ?? []
   const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
   const bloques = useLiveQuery(() => db.grupos.toArray()) ?? []
@@ -27,27 +26,18 @@ export function DashboardPage() {
     [bloques],
   )
 
-  const today = todayISO()
-  const month = currentMonthPrefix()
-
-  const vencidas = ocurrencias.filter((o) => o.estado === 'vencida')
-  const proximas = ocurrencias.filter((o) => o.estado === 'proxima')
-  const pendientes = ocurrencias.filter((o) => o.estado === 'pendiente')
-  const ejecutadasMes = ocurrencias.filter(
-    (o) => o.estado === 'ejecutada' && o.fechaProgramada.startsWith(month),
-  )
-  const delMes = ocurrencias.filter((o) => o.fechaProgramada.startsWith(month))
+  const trimestre = quarterLabel()
+  const delTrimestre = ocurrencias.filter((o) => inCurrentQuarter(o.fechaProgramada))
+  const vencidas = delTrimestre.filter((o) => o.estado === 'vencida')
+  const proximas = delTrimestre.filter((o) => o.estado === 'proxima')
+  const pendientes = delTrimestre.filter((o) => o.estado === 'pendiente')
+  const ejecutadas = delTrimestre.filter((o) => o.estado === 'ejecutada')
   const progreso =
-    delMes.length === 0
+    delTrimestre.length === 0
       ? 0
-      : Math.round((delMes.filter((o) => o.estado === 'ejecutada').length / delMes.length) * 100)
+      : Math.round((ejecutadas.length / delTrimestre.length) * 100)
 
-  const week = Array.from({ length: 7 }, (_, i) => addDays(today, i))
-  const byDay = (iso: string) => ocurrencias.filter((o) => o.fechaProgramada === iso)
-
-  const agenda = [...vencidas, ...proximas, ...pendientes]
-    .sort((a, b) => a.fechaProgramada.localeCompare(b.fechaProgramada))
-    .slice(0, 8)
+  const agenda = [...delTrimestre].sort((a, b) => a.fechaProgramada.localeCompare(b.fechaProgramada))
 
   if (!fichas.length) {
     return (
@@ -71,6 +61,9 @@ export function DashboardPage() {
 
   return (
     <div>
+      <p className="muted" style={{ marginTop: 0, marginBottom: '0.7rem' }}>
+        Actividad de {trimestre}
+      </p>
       <div className="kpis">
         <Link className="card kpi card-click" to="/cronograma?estado=vencida">
           <div className="label">Vencidas</div>
@@ -89,16 +82,16 @@ export function DashboardPage() {
           <div className="value">{pendientes.length}</div>
         </Link>
         <Link className="card kpi card-click" to="/cronograma?estado=ejecutada">
-          <div className="label">Ejecutadas del mes</div>
+          <div className="label">Ejecutadas</div>
           <div className="value" style={{ color: 'var(--ok)' }}>
-            {ejecutadasMes.length}
+            {ejecutadas.length}
           </div>
         </Link>
       </div>
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="row-spread" style={{ marginBottom: '0.55rem' }}>
-          <strong>Avance del mes</strong>
+          <strong>Avance del trimestre</strong>
           <span className="muted">{progreso}%</span>
         </div>
         <div className="progress" aria-label={`Avance ${progreso} por ciento`}>
@@ -106,30 +99,12 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div className="week">
-        {week.map((iso) => {
-          const count = byDay(iso).length
-          return (
-            <button
-              key={iso}
-              type="button"
-              className={`week-day${iso === today ? ' today' : ''}`}
-              onClick={() => navigate(`/cronograma?fecha=${iso}`)}
-            >
-              <span className="w">{weekdayShort(iso)}</span>
-              <span className="d">{iso.slice(8)}</span>
-              {count ? <span className="dot-count">{count}</span> : null}
-            </button>
-          )
-        })}
-      </div>
-
       <div className="page-head">
-        <h2 className="title-sm">Agenda</h2>
-        <Link to="/cronograma">Ver todo</Link>
+        <h2 className="title-sm">Agenda de {trimestre}</h2>
+        <Link to="/cronograma">Ver cronograma</Link>
       </div>
       {agenda.length === 0 ? (
-        <div className="card muted">No hay fichas abiertas en el horizonte actual.</div>
+        <div className="card muted">No hay actividades en este trimestre.</div>
       ) : (
         <div className="list">
           {agenda.map((o) => {
@@ -167,22 +142,22 @@ export function DashboardPage() {
               const ficha = fichaMap[a.fichaId]
               const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
               return (
-              <Link
-                key={a.id}
-                className="card card-click"
-                to={a.ocurrenciaId ? `/ocurrencias/${a.ocurrenciaId}` : `/fichas/${a.fichaId}`}
-              >
-                <div className="row-spread">
-                  <strong>{a.texto}</strong>
-                  <span className={`badge badge-${a.estado}`}>
-                    {ESTADOS_CORRECTIVA.find((s) => s.id === a.estado)?.label ?? a.estado}
-                  </span>
-                </div>
-                <div className="muted">
-                  {tipoAccionLabel(tipoAccionOf(a))} ·{' '}
-                  <FichaTitle ficha={ficha} color={bloque?.color} />
-                </div>
-              </Link>
+                <Link
+                  key={a.id}
+                  className="card card-click"
+                  to={a.ocurrenciaId ? `/ocurrencias/${a.ocurrenciaId}` : `/fichas/${a.fichaId}`}
+                >
+                  <div className="row-spread">
+                    <strong>{a.texto}</strong>
+                    <span className={`badge badge-${a.estado}`}>
+                      {ESTADOS_CORRECTIVA.find((s) => s.id === a.estado)?.label ?? a.estado}
+                    </span>
+                  </div>
+                  <div className="muted">
+                    {tipoAccionLabel(tipoAccionOf(a))} ·{' '}
+                    <FichaTitle ficha={ficha} color={bloque?.color} />
+                  </div>
+                </Link>
               )
             })}
           </div>
