@@ -28,9 +28,10 @@ const TRIMESTRES = [
 
 const PRIORIDAD: Record<EstadoOcurrencia, number> = {
   vencida: 0,
-  proxima: 1,
-  pendiente: 2,
-  ejecutada: 3,
+  pendiente: 1,
+  proxima: 2,
+  planificada: 3,
+  ejecutada: 4,
 }
 
 function pickOcc(list: Ocurrencia[]): Ocurrencia | undefined {
@@ -44,10 +45,13 @@ function monthClass(month: number, start: number, currentMonth: number): string 
   return parts.join(' ')
 }
 
-function pinchDistance(touches: TouchList): number {
-  const a = touches[0]
-  const b = touches[1]
-  return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+type DetailLevel = 0 | 1 | 2
+const DETAIL_MAX: DetailLevel = 2
+
+function pinchAxes(touches: TouchList): { dx: number; dy: number; dist: number } {
+  const dx = Math.abs(touches[0].clientX - touches[1].clientX)
+  const dy = Math.abs(touches[0].clientY - touches[1].clientY)
+  return { dx, dy, dist: Math.hypot(dx, dy) }
 }
 
 export function GrillaAnual({
@@ -79,10 +83,13 @@ export function GrillaAnual({
       monthsVisible(typeof window === 'undefined' ? 'quarter' : spanFromWidth(window.innerWidth)),
     ),
   )
+  const [detail, setDetail] = useState<DetailLevel>(0)
   const wrapRef = useRef<HTMLDivElement>(null)
-  const pinchRef = useRef({ dist: 0, locked: false })
+  const pinchRef = useRef({ dx: 0, dy: 0, dist: 0, locked: false })
   const zoomRef = useRef(zoom)
+  const detailRef = useRef(detail)
   zoomRef.current = zoom
+  detailRef.current = detail
 
   useEffect(() => {
     setStart((current) => Math.min(Math.max(0, Math.floor(current / 3) * 3), maxStart))
@@ -106,38 +113,56 @@ export function GrillaAnual({
     })
   }
 
+  function detailIn() {
+    setDetail((current) => Math.min(DETAIL_MAX, current + 1) as DetailLevel)
+  }
+
+  function detailOut() {
+    setDetail((current) => Math.max(0, current - 1) as DetailLevel)
+  }
+
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return
 
     const onStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
-        pinchRef.current = { dist: pinchDistance(e.touches), locked: false }
+        pinchRef.current = { ...pinchAxes(e.touches), locked: false }
       }
     }
 
     const onMove = (e: TouchEvent) => {
       if (e.touches.length !== 2) return
       e.preventDefault()
-      const dist = pinchDistance(e.touches)
-      const prev = pinchRef.current.dist
-      if (!prev) {
-        pinchRef.current.dist = dist
+      const next = pinchAxes(e.touches)
+      const prev = pinchRef.current
+      if (!prev.dist) {
+        pinchRef.current = { ...next, locked: false }
         return
       }
-      const ratio = dist / prev
       if (pinchRef.current.locked) return
-      if (ratio > 1.18 && zoomRef.current < ZOOM_IN_MAX) {
+      const ddx = next.dx - prev.dx
+      const ddy = next.dy - prev.dy
+      const horizontal = Math.abs(ddx) >= Math.abs(ddy)
+      if (horizontal) {
+        if (ddx > 28 && zoomRef.current > 0) {
+          pinchRef.current.locked = true
+          setZoom((Math.max(0, zoomRef.current - 1) as ZoomLevel))
+        } else if (ddx < -28 && zoomRef.current < ZOOM_IN_MAX) {
+          pinchRef.current.locked = true
+          setZoom((Math.min(ZOOM_IN_MAX, zoomRef.current + 1) as ZoomLevel))
+        }
+      } else if (ddy > 24 && detailRef.current < DETAIL_MAX) {
         pinchRef.current.locked = true
-        setZoom((Math.min(ZOOM_IN_MAX, zoomRef.current + 1) as ZoomLevel))
-      } else if (ratio < 0.85 && zoomRef.current > 0) {
+        setDetail((Math.min(DETAIL_MAX, detailRef.current + 1) as DetailLevel))
+      } else if (ddy < -24 && detailRef.current > 0) {
         pinchRef.current.locked = true
-        setZoom((Math.max(0, zoomRef.current - 1) as ZoomLevel))
+        setDetail((Math.max(0, detailRef.current - 1) as DetailLevel))
       }
     }
 
     const onEnd = () => {
-      pinchRef.current = { dist: 0, locked: false }
+      pinchRef.current = { dx: 0, dy: 0, dist: 0, locked: false }
     }
 
     el.addEventListener('touchstart', onStart, { passive: true })
@@ -243,29 +268,53 @@ export function GrillaAnual({
         ) : (
           <strong className="grid-year-label">{year}</strong>
         )}
-        <div className="zoom-controls" role="group" aria-label="Zoom del cronograma">
-          <button
-            type="button"
-            className="btn"
-            disabled={zoom === 0}
-            onClick={zoomOut}
-            aria-label="Alejar"
-          >
-            <Minus size={16} />
-          </button>
-          <button
-            type="button"
-            className="btn"
-            disabled={zoom === ZOOM_IN_MAX}
-            onClick={zoomIn}
-            aria-label="Acercar"
-          >
-            <Plus size={16} />
-          </button>
+        <div className="zoom-stack">
+          <div className="zoom-controls" role="group" aria-label="Meses visibles">
+            <span className="zoom-label">Meses</span>
+            <button
+              type="button"
+              className="btn"
+              disabled={zoom === 0}
+              onClick={zoomOut}
+              aria-label="Ver más meses"
+            >
+              <Minus size={16} />
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={zoom === ZOOM_IN_MAX}
+              onClick={zoomIn}
+              aria-label="Ver menos meses"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+          <div className="zoom-controls" role="group" aria-label="Detalle de ficha">
+            <span className="zoom-label">Ficha</span>
+            <button
+              type="button"
+              className="btn"
+              disabled={detail === 0}
+              onClick={detailOut}
+              aria-label="Menos detalle de ficha"
+            >
+              <Minus size={16} />
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={detail === DETAIL_MAX}
+              onClick={detailIn}
+              aria-label="Más detalle de ficha"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
         </div>
       </div>
       <div className="year-grid-wrap" ref={wrapRef}>
-        <table className={`year-grid mode-${span}`}>
+        <table className={`year-grid mode-${span} detail-${detail}`}>
           <thead>
             <tr>
               <th className="ficha-col" rowSpan={2}>
@@ -312,8 +361,8 @@ export function GrillaAnual({
                   currentMonth={currentMonth}
                   byFichaMonth={byFichaMonth}
                   encargadoMap={encargadoMap}
-                  showMeta={span === 'quarter' || span === 'semester'}
-                  showFrecuencia={span === 'quarter'}
+                  showMeta={detail >= 1}
+                  showFrecuencia={detail >= 2}
                   correctivaOcc={correctivaOcc}
                   correctivaFicha={correctivaFicha}
                 />
@@ -384,7 +433,7 @@ function BloqueRows({
                 ? `${labelEstado(occ.estado)} · Con acción correctiva`
                 : labelEstado(occ.estado)
               return (
-                <td key={month} className={cls}>
+                <td key={month} className={`${cls} occ-${occ.estado}`}>
                   <Link
                     className={`grid-cell ${occ.estado}${hasCorrectiva ? ' has-correctiva' : ''}`}
                     to={`/ocurrencias/${occ.id}`}

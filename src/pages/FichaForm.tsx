@@ -62,10 +62,6 @@ export function FichaFormPage() {
     setNumero(siguienteNumero(todasFichas))
   }, [editing, todasFichas, numeroTouched])
 
-  useEffect(() => {
-    if (!editing && bloques.length === 0) setShowCrearBloque(true)
-  }, [editing, bloques.length])
-
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
@@ -172,7 +168,7 @@ export function FichaFormPage() {
             </select>
             <button
               type="button"
-              className={`btn btn-icon${showCrearBloque ? ' btn-primary' : ''}`}
+              className={`btn btn-icon btn-add${showCrearBloque ? ' is-open' : ''}`}
               aria-label={showCrearBloque ? 'Cerrar crear bloque' : 'Crear bloque'}
               title="Crear bloque"
               onClick={() => {
@@ -203,7 +199,7 @@ export function FichaFormPage() {
             </select>
             <button
               type="button"
-              className={`btn btn-icon${showCrearEncargado ? ' btn-primary' : ''}`}
+              className={`btn btn-icon btn-add${showCrearEncargado ? ' is-open' : ''}`}
               aria-label={showCrearEncargado ? 'Cerrar crear encargado' : 'Crear encargado'}
               title="Crear encargado"
               onClick={() => {
@@ -268,17 +264,17 @@ export function FichaFormPage() {
 
         <div className="field">
           <label htmlFor="inicio">Inicio</label>
-          <div className="chip-row tight">
+          <div className="form-seg" role="group" aria-label="Precisión de inicio">
             <button
               type="button"
-              className={`chip${fechaPrecision === 'mes' ? ' active' : ''}`}
+              className={fechaPrecision === 'mes' ? 'active' : ''}
               onClick={() => setFechaPrecision('mes')}
             >
               Mes
             </button>
             <button
               type="button"
-              className={`chip${fechaPrecision === 'dia' ? ' active' : ''}`}
+              className={fechaPrecision === 'dia' ? 'active' : ''}
               onClick={() => setFechaPrecision('dia')}
             >
               Día
@@ -323,7 +319,7 @@ export function FichaFormPage() {
 
       {error ? <p className="danger-text">{error}</p> : null}
 
-      <div className="row" style={{ flexWrap: 'wrap', marginTop: '0.65rem' }}>
+      <div className="form-actions">
         <button className="btn btn-primary" type="submit" disabled={saving}>
           {saving ? 'Guardando…' : editing ? 'Guardar' : 'Crear ficha'}
         </button>

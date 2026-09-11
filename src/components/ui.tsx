@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { EstadoOcurrencia } from '../db/types'
+import { ESTADOS, type EstadoOcurrencia } from '../db/types'
 import { SIMBOLOS_ESTADO, SIMBOLO_CORRECTIVA } from '../lib/simbolos'
 
 export function StatusBadge({ estado }: { estado: EstadoOcurrencia }) {
@@ -17,14 +17,17 @@ export function StatusBadge({ estado }: { estado: EstadoOcurrencia }) {
 export function LeyendaSimbolos() {
   return (
     <div className="sym-legend" aria-label="Código de símbolos">
-      {(Object.values(SIMBOLOS_ESTADO) as { glyph: string; label: string }[]).map((item) => (
-        <span key={item.label} className="sym-legend-item">
-          <span className="sym" aria-hidden>
-            {item.glyph}
+      {ESTADOS.map((estado) => {
+        const item = SIMBOLOS_ESTADO[estado.id]
+        return (
+          <span key={estado.id} className="sym-legend-item">
+            <span className="sym" aria-hidden>
+              {item.glyph}
+            </span>
+            {item.label}
           </span>
-          {item.label}
-        </span>
-      ))}
+        )
+      })}
       <span className="sym-legend-item">
         <span className="sym" aria-hidden>
           {SIMBOLO_CORRECTIVA}

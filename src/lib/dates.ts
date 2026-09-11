@@ -143,18 +143,23 @@ export function generateDates(
 
 export function computeEstado(
   fechaProgramada: string,
-  umbralDias: number,
   today: string,
   ejecutada: boolean,
-  precision: FechaPrecision = 'dia',
+  _precision: FechaPrecision = 'dia',
 ): EstadoOcurrencia {
   if (ejecutada) return 'ejecutada'
-  const due = dueDate(fechaProgramada, precision)
+  const due = dueDate(fechaProgramada, _precision)
   if (due < today) return 'vencida'
-  if (precision === 'mes' && monthValue(today) === monthValue(fechaProgramada)) return 'proxima'
-  const limite = addDays(today, umbralDias)
-  if (due <= limite) return 'proxima'
-  return 'pendiente'
+  if (monthValue(today) === monthValue(fechaProgramada)) return 'pendiente'
+  const scheduled = parseISODate(fechaProgramada)
+  const now = parseISODate(today)
+  if (
+    scheduled.getFullYear() === now.getFullYear() &&
+    quarterIndex(scheduled.getMonth()) === quarterIndex(now.getMonth())
+  ) {
+    return 'proxima'
+  }
+  return 'planificada'
 }
 
 export function formatBytes(bytes: number): string {

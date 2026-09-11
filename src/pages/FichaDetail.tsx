@@ -14,6 +14,7 @@ import { ShareMenu } from '../components/ShareMenu'
 import { StatusBadge } from '../components/ui'
 import { FichaTitle } from '../components/FichaTitle'
 import { AccionesPanel } from '../components/AccionesPanel'
+import { CopyText } from '../components/CopyText'
 
 export function FichaDetailPage() {
   const { id } = useParams()
@@ -101,7 +102,7 @@ export function FichaDetailPage() {
             </p>
           </div>
           <div className="row" style={{ flexWrap: 'wrap' }}>
-            <Link className="btn" to={`/fichas/${ficha.id}/editar`}>
+            <Link className="btn btn-edit" to={`/fichas/${ficha.id}/editar`}>
               <Pencil size={16} />
               Editar
             </Link>
@@ -111,11 +112,17 @@ export function FichaDetailPage() {
             </button>
           </div>
         </div>
-        {ficha.telefonos || encargado?.telefonos || encargado?.congregacion ? (
-          <p className="muted">
-            {ficha.telefonos || encargado?.telefonos || encargado?.contacto
-              ? `Tel. ${ficha.telefonos || encargado?.telefonos || encargado?.contacto}`
-              : ''}
+        {ficha.telefonos || encargado?.telefonos || encargado?.contacto || encargado?.congregacion ? (
+          <p className="muted phone-line">
+            {ficha.telefonos || encargado?.telefonos || encargado?.contacto ? (
+              <>
+                Tel. {ficha.telefonos || encargado?.telefonos || encargado?.contacto}
+                <CopyText
+                  text={ficha.telefonos || encargado?.telefonos || encargado?.contacto || ''}
+                  label="Copiar teléfono"
+                />
+              </>
+            ) : null}
             {encargado?.congregacion && (ficha.telefonos || encargado?.telefonos || encargado?.contacto)
               ? ' · '
               : ''}

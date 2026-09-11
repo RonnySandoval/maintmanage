@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Bell, Download, Monitor, Moon, Smartphone, Sun, Upload } from 'lucide-react'
 import { db } from '../db'
 import { downloadBlob, exportBackup, importBackup } from '../db/backup'
-import { ensureHorizon, refreshEstados } from '../db/occurrences'
+import { ensureHorizon } from '../db/occurrences'
 import { formatBytes } from '../lib/dates'
 import { requestNotificaciones } from '../lib/notifications'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
@@ -31,11 +31,6 @@ export function AjustesPage() {
         ? `${formatBytes(used)} de ${formatBytes(total)} usados en este origen.`
         : formatBytes(used),
     )
-  }
-
-  async function changeUmbral(value: number) {
-    await db.ajustes.update('app', { umbralProximaDias: value })
-    await refreshEstados()
   }
 
   async function exportNow() {
@@ -77,7 +72,7 @@ export function AjustesPage() {
     const ok = await requestNotificaciones()
     setMessage(
       ok
-        ? 'Avisos activados. Verás un recordatorio al abrir la app si hay fichas vencidas o próximas.'
+        ? 'Avisos activados. Verás un recordatorio al abrir la app si hay fichas vencidas o pendientes.'
         : 'No se concedió el permiso de notificaciones (o este navegador no las soporta).',
     )
   }
@@ -111,26 +106,31 @@ export function AjustesPage() {
       </section>
 
       <section className="card">
-        <h2 className="title-sm">Cronograma</h2>
-        <div className="field">
-          <label htmlFor="umbral">Días para marcar una ficha como próxima</label>
-          <input
-            id="umbral"
-            className="input"
-            type="number"
-            min={1}
-            max={60}
-            value={ajustes?.umbralProximaDias ?? 7}
-            onChange={(e) => void changeUmbral(Number(e.target.value) || 7)}
-          />
-        </div>
+        <h2 className="title-sm">Estados de la ficha</h2>
+        <ul className="estado-help">
+          <li>
+            <strong>Pendiente</strong> — del mes actual y aún no ejecutada.
+          </li>
+          <li>
+            <strong>Programada</strong> — del trimestre, en un mes que todavía no llega.
+          </li>
+          <li>
+            <strong>Planificada</strong> — más allá del trimestre. Se ve en el cronograma, no en el dashboard.
+          </li>
+          <li>
+            <strong>Vencida</strong> — la fecha ya pasó y no se ejecutó.
+          </li>
+          <li>
+            <strong>Ejecutada</strong> — registrada como hecha.
+          </li>
+        </ul>
       </section>
 
       <section className="card">
         <h2 className="title-sm">Recordatorios</h2>
         <p className="muted">
           Sin servidor no hay avisos con la app cerrada. Al abrirla (o volver a ella) se puede
-          notificar si hay vencidas o próximas, una vez al día.
+          notificar si hay vencidas o pendientes del mes, una vez al día.
         </p>
         <button type="button" className="btn" onClick={() => void enableNotifs()}>
           <Bell size={16} />

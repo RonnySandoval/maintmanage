@@ -15,7 +15,8 @@ export type Frecuencia =
 
 export type FechaPrecision = 'mes' | 'dia'
 
-export type EstadoOcurrencia = 'pendiente' | 'proxima' | 'vencida' | 'ejecutada'
+/** pendiente = mes actual; proxima = resto del trimestre; planificada = más allá del trimestre */
+export type EstadoOcurrencia = 'pendiente' | 'proxima' | 'planificada' | 'vencida' | 'ejecutada'
 
 export type EstadoCorrectiva = 'pendiente' | 'programada' | 'ejecutada'
 
@@ -148,8 +149,9 @@ export function normalizeFrecuencia(freq: string): Frecuencia {
 
 export const ESTADOS: { id: EstadoOcurrencia; label: string }[] = [
   { id: 'vencida', label: 'Vencida' },
-  { id: 'proxima', label: 'Programada' },
   { id: 'pendiente', label: 'Pendiente' },
+  { id: 'proxima', label: 'Programada' },
+  { id: 'planificada', label: 'Planificada' },
   { id: 'ejecutada', label: 'Ejecutada' },
 ]
 

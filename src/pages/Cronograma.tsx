@@ -82,7 +82,7 @@ export function CronogramaPage() {
         title="Sin cronograma"
         text="Cuando existan fichas con periodo, aquí verás las fechas programadas."
         action={
-          <Link className="btn btn-primary" to="/fichas/nueva">
+          <Link className="btn btn-add" to="/fichas/nueva">
             Nueva ficha
           </Link>
         }

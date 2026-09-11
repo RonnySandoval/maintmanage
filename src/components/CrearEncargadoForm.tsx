@@ -79,7 +79,7 @@ export function CrearEncargadoForm({
         </div>
       </div>
       {error ? <p className="danger-text">{error}</p> : null}
-      <button className="btn btn-primary" type="button" onClick={() => void submit()}>
+      <button className="btn btn-add" type="button" onClick={() => void submit()}>
         <Plus size={16} />
         Crear encargado
       </button>

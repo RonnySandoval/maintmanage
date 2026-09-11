@@ -19,12 +19,12 @@ export async function notifyIfNeeded(): Promise<void> {
   if (ajustes.lastNotifiedDate === today) return
 
   const vencidas = await db.ocurrencias.where('estado').equals('vencida').count()
-  const proximas = await db.ocurrencias.where('estado').equals('proxima').count()
-  if (vencidas + proximas === 0) return
+  const pendientes = await db.ocurrencias.where('estado').equals('pendiente').count()
+  if (vencidas + pendientes === 0) return
 
   const parts: string[] = []
   if (vencidas) parts.push(`${vencidas} vencida${vencidas === 1 ? '' : 's'}`)
-  if (proximas) parts.push(`${proximas} próxima${proximas === 1 ? '' : 's'}`)
+  if (pendientes) parts.push(`${pendientes} pendiente${pendientes === 1 ? '' : 's'}`)
 
   try {
     const registration = await navigator.serviceWorker?.ready

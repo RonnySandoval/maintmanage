@@ -57,7 +57,7 @@ export function AttachmentList({
             {onDelete ? (
               <button
                 type="button"
-                className="icon-btn"
+                className="icon-btn icon-btn-delete"
                 style={{ position: 'absolute', top: 0, right: 0 }}
                 aria-label={`Eliminar ${a.nombre}`}
                 onClick={() => onDelete(a.id)}

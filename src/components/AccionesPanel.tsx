@@ -150,7 +150,7 @@ export function AccionesPanel({
           )}
         </div>
         {error ? <p className="danger-text">{error}</p> : null}
-        <button className="btn btn-primary" type="submit">
+        <button className="btn btn-add" type="submit">
           <Plus size={16} />
           Añadir
         </button>
@@ -192,7 +192,7 @@ export function AccionesPanel({
                 <span className="table-actions">
                   <button
                     type="button"
-                    className="icon-btn"
+                    className="icon-btn icon-btn-edit"
                     aria-label="Editar"
                     onClick={() => setEditId(a.id)}
                   >
@@ -200,7 +200,7 @@ export function AccionesPanel({
                   </button>
                   <button
                     type="button"
-                    className="icon-btn"
+                    className="icon-btn icon-btn-delete"
                     aria-label="Borrar"
                     onClick={() => void remove(a.id)}
                   >

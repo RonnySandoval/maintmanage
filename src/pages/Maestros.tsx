@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Layers, Pencil, Plus, Trash2, Users } from 'lucide-react'
@@ -6,6 +6,7 @@ import { db } from '../db'
 import type { Encargado } from '../db/types'
 import { createId } from '../lib/ids'
 import { ColorPicker } from '../components/ColorPicker'
+import { CopyText } from '../components/CopyText'
 import { CrearBloqueForm } from '../components/CrearBloqueForm'
 
 export function MaestrosPage() {
@@ -46,6 +47,30 @@ export function MaestrosPage() {
     await db.grupos.delete(id)
     setError('')
   }
+
+  const encargadosPorCongregacion = useMemo(() => {
+    const map = new Map<string, Encargado[]>()
+    for (const enc of encargados) {
+      const key = enc.congregacion?.trim() ?? ''
+      const list = map.get(key) ?? []
+      list.push(enc)
+      map.set(key, list)
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => {
+        if (!a) return 1
+        if (!b) return -1
+        return a.localeCompare(b, 'es')
+      })
+      .map(([key, rows]) => ({
+        key: key || '__none',
+        label: key || 'Sin congregación',
+        rows,
+      }))
+  }, [encargados])
 
   async function removeEncargado(id: string) {
     if (fichas.some((f) => f.encargadoId === id)) {
@@ -121,7 +146,7 @@ export function MaestrosPage() {
                       value={b.color}
                       onChange={(color) => void db.grupos.update(b.id, { color, updatedAt: Date.now() })}
                     />
-                    <button type="button" className="btn" onClick={() => setEditBloque(null)}>
+                    <button type="button" className="btn btn-primary" onClick={() => setEditBloque(null)}>
                       Listo
                     </button>
                   </div>
@@ -137,7 +162,7 @@ export function MaestrosPage() {
                     <span className="table-actions">
                       <button
                         type="button"
-                        className="icon-btn"
+                        className="icon-btn icon-btn-edit"
                         aria-label="Editar"
                         onClick={() => setEditBloque(b.id)}
                       >
@@ -145,7 +170,7 @@ export function MaestrosPage() {
                       </button>
                       <button
                         type="button"
-                        className="icon-btn"
+                        className="icon-btn icon-btn-delete"
                         aria-label="Eliminar"
                         onClick={() => void removeBloque(b.id)}
                       >
@@ -158,7 +183,7 @@ export function MaestrosPage() {
             ))}
           </div>
         )}
-        <Link className="btn" to="/fichas/nueva" style={{ marginTop: '0.85rem' }}>
+        <Link className="btn btn-add" to="/fichas/nueva" style={{ marginTop: '0.85rem' }}>
           <Plus size={16} />
           Nueva ficha
         </Link>
@@ -196,7 +221,7 @@ export function MaestrosPage() {
               onChange={(e) => setEncCongregacion(e.target.value)}
             />
           </div>
-          <button className="btn btn-primary" type="submit">
+          <button className="btn btn-add" type="submit">
             <Plus size={16} />
             Añadir encargado
           </button>
@@ -209,48 +234,67 @@ export function MaestrosPage() {
               <div className="table-head table-cols-encargados">
                 <span>Nombre</span>
                 <span className="col-md">Teléfono</span>
-                <span className="col-md">Congregación</span>
                 <span className="table-actions">Acciones</span>
               </div>
-              {encargados.map((p) => (
-                <div
-                  key={p.id}
-                  className={`table-row table-cols-encargados${editEnc === p.id ? ' is-editing' : ''}`}
-                >
-                  {editEnc === p.id ? (
-                    <EncargadoEditor enc={p} onDone={() => setEditEnc(null)} />
-                  ) : (
-                    <>
-                      <span className="table-cell">
-                        <strong>{p.nombre}</strong>
-                        <span className="muted col-sm-only">
-                          {[p.telefonos || p.contacto, p.congregacion].filter(Boolean).join(' · ') ||
-                            'Sin teléfono ni congregación'}
-                        </span>
-                      </span>
-                      <span className="col-md muted">{p.telefonos || p.contacto || '—'}</span>
-                      <span className="col-md muted">{p.congregacion || '—'}</span>
-                      <span className="table-actions">
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          aria-label="Editar"
-                          onClick={() => setEditEnc(p.id)}
-                        >
-                          <Pencil size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          aria-label="Eliminar"
-                          onClick={() => void removeEncargado(p.id)}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </span>
-                    </>
-                  )}
-                </div>
+              {encargadosPorCongregacion.map((group) => (
+                <section key={group.key}>
+                  <div className="table-section">{group.label}</div>
+                  {group.rows.map((p) => {
+                    const phone = p.telefonos || p.contacto || ''
+                    return (
+                      <div
+                        key={p.id}
+                        className={`table-row table-cols-encargados${editEnc === p.id ? ' is-editing' : ''}`}
+                      >
+                        {editEnc === p.id ? (
+                          <EncargadoEditor enc={p} onDone={() => setEditEnc(null)} />
+                        ) : (
+                          <>
+                            <span className="table-cell">
+                              <strong>{p.nombre}</strong>
+                              {phone ? (
+                                <span className="muted col-sm-only phone-line">
+                                  {phone}
+                                  <CopyText text={phone} label="Copiar teléfono" />
+                                </span>
+                              ) : (
+                                <span className="muted col-sm-only">Sin teléfono</span>
+                              )}
+                            </span>
+                            <span className="col-md phone-cell">
+                              {phone ? (
+                                <>
+                                  <span className="muted">{phone}</span>
+                                  <CopyText text={phone} label="Copiar teléfono" />
+                                </>
+                              ) : (
+                                <span className="muted">—</span>
+                              )}
+                            </span>
+                            <span className="table-actions">
+                              <button
+                                type="button"
+                                className="icon-btn icon-btn-edit"
+                                aria-label="Editar"
+                                onClick={() => setEditEnc(p.id)}
+                              >
+                                <Pencil size={16} />
+                              </button>
+                              <button
+                                type="button"
+                                className="icon-btn icon-btn-delete"
+                                aria-label="Eliminar"
+                                onClick={() => void removeEncargado(p.id)}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
+                </section>
               ))}
             </>
           )}

@@ -50,11 +50,11 @@ export function FichasPage() {
           {fichas.length} ficha{fichas.length === 1 ? '' : 's'}
         </p>
         <div className="row" style={{ flexWrap: 'wrap' }}>
-          <Link className="btn" to="/bloques">
+          <Link className="btn btn-add" to="/bloques">
             <Layers size={16} />
             Bloques
           </Link>
-          <Link className="btn btn-primary" to="/fichas/nueva">
+          <Link className="btn btn-add" to="/fichas/nueva">
             <Plus size={16} />
             Nueva
           </Link>
@@ -97,10 +97,10 @@ export function FichasPage() {
           text="Crea un bloque y luego las fichas (número, nombre, foto/PDF/Word y frecuencia)."
           action={
             <div className="row" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
-              <Link className="btn" to="/bloques">
+              <Link className="btn btn-add" to="/bloques">
                 Crear bloque
               </Link>
-              <Link className="btn btn-primary" to="/fichas/nueva">
+              <Link className="btn btn-add" to="/fichas/nueva">
                 Crear ficha
               </Link>
             </div>

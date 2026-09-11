@@ -66,7 +66,7 @@ export function CrearBloqueForm({
       </div>
       <ColorPicker id="bloque-nuevo-color" value={color} onChange={setColor} compact={compact} />
       {error ? <p className="danger-text">{error}</p> : null}
-      <button className="btn btn-primary" type="button" onClick={() => void submit()}>
+      <button className="btn btn-add" type="button" onClick={() => void submit()}>
         <Plus size={16} />
         Crear bloque
       </button>

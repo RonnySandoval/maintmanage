@@ -34,8 +34,6 @@ export async function syncOcurrenciasForFicha(ficha: Ficha): Promise<void> {
 }
 
 export async function refreshEstados(): Promise<void> {
-  const ajustes = await db.ajustes.get('app')
-  const umbral = ajustes?.umbralProximaDias ?? 7
   const today = todayISO()
   const occs = await db.ocurrencias.toArray()
   const fichas = await db.fichas.toArray()
@@ -49,7 +47,6 @@ export async function refreshEstados(): Promise<void> {
   for (const o of occs) {
     const estado = computeEstado(
       o.fechaProgramada,
-      umbral,
       today,
       executed.has(o.id),
       precisionByFicha[o.fichaId] ?? 'mes',

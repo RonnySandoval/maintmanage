@@ -47,10 +47,10 @@ export function DashboardPage() {
         text="Crea bloques, encargados y fichas de mantenimiento para ver el cronograma aquí."
         action={
           <div className="row" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link className="btn" to="/bloques">
+            <Link className="btn btn-add" to="/bloques">
               Crear bloque
             </Link>
-            <Link className="btn btn-primary" to="/fichas/nueva">
+            <Link className="btn btn-add" to="/fichas/nueva">
               Crear primera ficha
             </Link>
           </div>
@@ -60,39 +60,38 @@ export function DashboardPage() {
   }
 
   return (
-    <div>
-      <p className="muted" style={{ marginTop: 0, marginBottom: '0.7rem' }}>
-        Actividad de {trimestre}
-      </p>
+    <div className="dash">
+      <header className="dash-hero">
+        <p className="dash-kicker">Trimestre en curso</p>
+        <h2 className="dash-title">{trimestre}</h2>
+        <p className="dash-sub">
+          {delTrimestre.length} actividad{delTrimestre.length === 1 ? '' : 'es'} · {progreso}% ejecutado
+        </p>
+      </header>
+
       <div className="kpis">
-        <Link className="card kpi card-click" to="/cronograma?estado=vencida">
+        <Link className="card kpi card-click tone-vencida" to="/cronograma?estado=vencida">
           <div className="label">Vencidas</div>
-          <div className="value" style={{ color: 'var(--danger)' }}>
-            {vencidas.length}
-          </div>
+          <div className="value">{vencidas.length}</div>
         </Link>
-        <Link className="card kpi card-click" to="/cronograma?estado=proxima">
+        <Link className="card kpi card-click tone-proxima" to="/cronograma?estado=proxima">
           <div className="label">Programadas</div>
-          <div className="value" style={{ color: 'var(--warning)' }}>
-            {proximas.length}
-          </div>
+          <div className="value">{proximas.length}</div>
         </Link>
-        <Link className="card kpi card-click" to="/cronograma?estado=pendiente">
+        <Link className="card kpi card-click tone-pendiente" to="/cronograma?estado=pendiente">
           <div className="label">Pendientes</div>
           <div className="value">{pendientes.length}</div>
         </Link>
-        <Link className="card kpi card-click" to="/cronograma?estado=ejecutada">
+        <Link className="card kpi card-click tone-ejecutada" to="/cronograma?estado=ejecutada">
           <div className="label">Ejecutadas</div>
-          <div className="value" style={{ color: 'var(--ok)' }}>
-            {ejecutadas.length}
-          </div>
+          <div className="value">{ejecutadas.length}</div>
         </Link>
       </div>
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
+      <div className="card dash-progress">
         <div className="row-spread" style={{ marginBottom: '0.55rem' }}>
           <strong>Avance del trimestre</strong>
-          <span className="muted">{progreso}%</span>
+          <span className="dash-pct">{progreso}%</span>
         </div>
         <div className="progress" aria-label={`Avance ${progreso} por ciento`}>
           <span style={{ width: `${progreso}%` }} />
@@ -100,7 +99,7 @@ export function DashboardPage() {
       </div>
 
       <div className="page-head">
-        <h2 className="title-sm">Agenda de {trimestre}</h2>
+        <h2 className="title-sm">Agenda</h2>
         <Link to="/cronograma">Ver cronograma</Link>
       </div>
       {agenda.length === 0 ? (
@@ -111,7 +110,7 @@ export function DashboardPage() {
             const ficha = fichaMap[o.fichaId]
             const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
             return (
-              <Link key={o.id} className="card card-click item" to={`/ocurrencias/${o.id}`}>
+              <Link key={o.id} className="card card-click item dash-item" to={`/ocurrencias/${o.id}`}>
                 <span className="bar" style={{ background: bloque?.color ?? 'var(--accent)' }} />
                 <div className="grow">
                   <div className="row-spread">
@@ -144,7 +143,7 @@ export function DashboardPage() {
               return (
                 <Link
                   key={a.id}
-                  className="card card-click"
+                  className="card card-click dash-item"
                   to={a.ocurrenciaId ? `/ocurrencias/${a.ocurrenciaId}` : `/fichas/${a.fichaId}`}
                 >
                   <div className="row-spread">
@@ -164,7 +163,7 @@ export function DashboardPage() {
         </div>
       ) : null}
 
-      <p className="muted" style={{ marginTop: '1.2rem', display: 'flex', gap: 8, alignItems: 'center' }}>
+      <p className="muted dash-foot">
         <CalendarDays size={14} /> Datos solo en este navegador. Sincroniza con una copia en Ajustes.
       </p>
     </div>
