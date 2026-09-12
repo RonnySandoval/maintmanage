@@ -3,18 +3,31 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Layers, Plus, Search, SlidersHorizontal, Wrench } from 'lucide-react'
 import { db } from '../db'
-import { frecuenciaLabel, mesesDeFrecuencia, tipoActividadLabel } from '../db/types'
-import { tipoActividadColor } from '../db/types'
+import {
+  frecuenciaLabel,
+  mesesDeFrecuencia,
+  prioridadOf,
+  tipoAccionOf,
+  tipoActividadColor,
+  tipoActividadLabel,
+} from '../db/types'
 import { useTiposActividad } from '../hooks/useTiposActividad'
+import { accionHref, estadoAgendaCorrectiva } from '../lib/acciones'
 import { bloqueColorVar } from '../lib/colors'
+import { formatDate } from '../lib/dates'
 import { compareActividadesByTitulo, estadoVigente } from '../lib/actividades'
-import { label, useAliases } from '../lib/labels'
-import { congregacionDe, congregacionLabel } from '../lib/fichas'
+import { accionLabel, label, useAliases } from '../lib/labels'
+import { congregacionDe, congregacionLabel, fichaTitulo } from '../lib/fichas'
 import { ActividadTitle } from './ActividadTitle'
+import { PrioridadMark } from './PrioridadMark'
 import { SortHeader } from './SortHeader'
 import { EmptyState, StatusBadge, TipoBadge } from './ui'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
-import type { Actividad } from '../db/types'
+import type { AccionCorrectiva, Actividad, Ficha } from '../db/types'
+
+type ListRow =
+  | { kind: 'act'; id: string; actividad: Actividad }
+  | { kind: 'acc'; id: string; accion: AccionCorrectiva }
 
 type GroupBy = 'tipo' | 'encargado' | 'congregacion'
 type SortCol = 'titulo' | 'tipo' | 'encargado' | 'periodo'
@@ -46,6 +59,12 @@ export function ActividadesPanel() {
 
   const actividades = useLiveQuery(() => db.actividades.toArray()) ?? []
   const eventos = useLiveQuery(() => db.eventos.toArray()) ?? []
+  const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
+  const acciones =
+    useLiveQuery(async () => {
+      const rows = await db.accionesCorrectivas.toArray()
+      return rows.filter((a) => tipoAccionOf(a) === 'correctiva')
+    }) ?? []
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
   const tipos = useTiposActividad()
   const aliases = useAliases()
@@ -53,6 +72,11 @@ export function ActividadesPanel() {
     () => Object.fromEntries(encargados.map((e) => [e.id, e])),
     [encargados],
   )
+  const actividadMap = useMemo(
+    () => Object.fromEntries(actividades.map((a) => [a.id, a])),
+    [actividades],
+  )
+  const fichaMap = useMemo(() => Object.fromEntries(fichas.map((f) => [f.id, f])), [fichas])
   const eventosByAct = useMemo(() => {
     const map = new Map<string, typeof eventos>()
     for (const e of eventos) {
@@ -104,7 +128,23 @@ export function ActividadesPanel() {
     patch({ col: column === 'titulo' ? undefined : column, dir: undefined })
   }
 
-  const filtered = useMemo(() => {
+  const correctivaLabel = accionLabel('correctiva', aliases)
+
+  function parentOf(accion: AccionCorrectiva): {
+    actividad?: Actividad
+    ficha?: Ficha
+    encargadoId: string
+  } {
+    const actividad = accion.actividadId ? actividadMap[accion.actividadId] : undefined
+    const ficha = accion.fichaId ? fichaMap[accion.fichaId] : undefined
+    return {
+      actividad,
+      ficha,
+      encargadoId: actividad?.encargadoId ?? ficha?.encargadoId ?? '',
+    }
+  }
+
+  const filteredActs = useMemo(() => {
     return actividades.filter((a) => {
       if (tipoId && a.tipo !== tipoId) return false
       if (encargadoId && a.encargadoId !== encargadoId) return false
@@ -116,46 +156,96 @@ export function ActividadesPanel() {
     })
   }, [actividades, tipoId, encargadoId, q, tipos])
 
+  const filteredAcciones = useMemo(() => {
+    const qLower = q.toLowerCase()
+    return acciones.filter((a) => {
+      const act = a.actividadId ? actividadMap[a.actividadId] : undefined
+      const ficha = a.fichaId ? fichaMap[a.fichaId] : undefined
+      if (tipoId && (!act || act.tipo !== tipoId)) return false
+      if (encargadoId) {
+        const enc = act?.encargadoId ?? ficha?.encargadoId
+        if (enc !== encargadoId) return false
+      }
+      if (q) {
+        const hay = `${a.texto} ${act?.titulo ?? ''} ${ficha ? fichaTitulo(ficha) : ''} ${correctivaLabel}`
+        if (!hay.toLowerCase().includes(qLower)) return false
+      }
+      return true
+    })
+  }, [acciones, actividadMap, fichaMap, tipoId, encargadoId, q, correctivaLabel])
+
+  const filtered: ListRow[] = useMemo(
+    () => [
+      ...filteredActs.map((actividad) => ({ kind: 'act' as const, id: actividad.id, actividad })),
+      ...filteredAcciones.map((accion) => ({ kind: 'acc' as const, id: accion.id, accion })),
+    ],
+    [filteredActs, filteredAcciones],
+  )
+
   const grouped = useMemo(() => {
     const dir = sortDir === 'desc' ? -1 : 1
 
-    function encargadoName(a: Actividad) {
-      return (a.encargadoId ? encargadoMap[a.encargadoId]?.nombre : '') ?? ''
-    }
-    function groupOf(a: Actividad): { key: string; label: string } {
-      if (groupBy === 'encargado') {
-        const name = encargadoName(a)
-        return { key: a.encargadoId || '__none', label: name || 'Sin encargado' }
+    function encargadoName(row: ListRow) {
+      if (row.kind === 'act') {
+        return (row.actividad.encargadoId ? encargadoMap[row.actividad.encargadoId]?.nombre : '') ?? ''
       }
-      if (groupBy === 'congregacion') {
-        const key = congregacionDe(a.encargadoId ? encargadoMap[a.encargadoId] : undefined)
-        return { key: key || '__none', label: congregacionLabel(key) }
-      }
-      return { key: a.tipo, label: tipoActividadLabel(a.tipo, tipos) }
+      const encId = parentOf(row.accion).encargadoId
+      return (encId ? encargadoMap[encId]?.nombre : '') ?? ''
     }
 
-    function compareRows(a: Actividad, b: Actividad) {
+    function tipoLabel(row: ListRow) {
+      return row.kind === 'acc' ? correctivaLabel : tipoActividadLabel(row.actividad.tipo, tipos)
+    }
+
+    function titleOf(row: ListRow) {
+      return row.kind === 'acc' ? row.accion.texto : row.actividad.titulo
+    }
+
+    function groupOf(row: ListRow): { key: string; label: string } {
+      if (groupBy === 'encargado') {
+        const name = encargadoName(row)
+        const id = row.kind === 'act' ? row.actividad.encargadoId : parentOf(row.accion).encargadoId
+        return { key: id || '__none', label: name || 'Sin encargado' }
+      }
+      if (groupBy === 'congregacion') {
+        const encId = row.kind === 'act' ? row.actividad.encargadoId : parentOf(row.accion).encargadoId
+        const key = congregacionDe(encId ? encargadoMap[encId] : undefined)
+        return { key: key || '__none', label: congregacionLabel(key) }
+      }
+      if (row.kind === 'acc') return { key: '__correctiva', label: correctivaLabel }
+      return { key: row.actividad.tipo, label: tipoActividadLabel(row.actividad.tipo, tipos) }
+    }
+
+    function compareRows(a: ListRow, b: ListRow) {
       if (sortCol === 'tipo') {
-        const cmp = tipoActividadLabel(a.tipo, tipos).localeCompare(tipoActividadLabel(b.tipo, tipos), 'es')
-        return cmp !== 0 ? cmp * dir : compareActividadesByTitulo(a, b)
+        const cmp = tipoLabel(a).localeCompare(tipoLabel(b), 'es')
+        return cmp !== 0 ? cmp * dir : titleOf(a).localeCompare(titleOf(b), 'es') * dir
       }
       if (sortCol === 'encargado') {
         const cmp = (encargadoName(a) || '\uffff').localeCompare(encargadoName(b) || '\uffff', 'es')
-        return cmp !== 0 ? cmp * dir : compareActividadesByTitulo(a, b)
+        return cmp !== 0 ? cmp * dir : titleOf(a).localeCompare(titleOf(b), 'es') * dir
       }
       if (sortCol === 'periodo') {
-        const cmp = mesesDeFrecuencia(a.frecuencia) - mesesDeFrecuencia(b.frecuencia)
-        if (cmp !== 0) return cmp * dir
-        return frecuenciaLabel(a.frecuencia).localeCompare(frecuenciaLabel(b.frecuencia), 'es') * dir
+        if (a.kind === 'act' && b.kind === 'act') {
+          const cmp = mesesDeFrecuencia(a.actividad.frecuencia) - mesesDeFrecuencia(b.actividad.frecuencia)
+          if (cmp !== 0) return cmp * dir
+          return (
+            frecuenciaLabel(a.actividad.frecuencia).localeCompare(frecuenciaLabel(b.actividad.frecuencia), 'es') * dir
+          )
+        }
+        const pa = a.kind === 'acc' ? a.accion.fechaObjetivo || '\uffff' : frecuenciaLabel(a.actividad.frecuencia)
+        const pb = b.kind === 'acc' ? b.accion.fechaObjetivo || '\uffff' : frecuenciaLabel(b.actividad.frecuencia)
+        return pa.localeCompare(pb, 'es') * dir
       }
-      return compareActividadesByTitulo(a, b) * dir
+      if (a.kind === 'act' && b.kind === 'act') return compareActividadesByTitulo(a.actividad, b.actividad) * dir
+      return titleOf(a).localeCompare(titleOf(b), 'es') * dir
     }
 
-    const map = new Map<string, { label: string; rows: Actividad[] }>()
-    for (const a of filtered) {
-      const { key, label } = groupOf(a)
-      const group = map.get(key) ?? { label, rows: [] }
-      group.rows.push(a)
+    const map = new Map<string, { label: string; rows: ListRow[] }>()
+    for (const row of filtered) {
+      const { key, label: groupLabel } = groupOf(row)
+      const group = map.get(key) ?? { label: groupLabel, rows: [] }
+      group.rows.push(row)
       map.set(key, group)
     }
     for (const group of map.values()) {
@@ -174,6 +264,8 @@ export function ActividadesPanel() {
       (groupBy === 'congregacion' && sortCol === 'encargado')
 
     groups.sort((a, b) => {
+      if (a.key === '__correctiva' && b.key !== '__correctiva') return 1
+      if (b.key === '__correctiva' && a.key !== '__correctiva') return -1
       const emptyA = a.key === '__none'
       const emptyB = b.key === '__none'
       if (emptyA && emptyB) return 0
@@ -184,7 +276,7 @@ export function ActividadesPanel() {
     })
 
     return groups
-  }, [filtered, encargadoMap, groupBy, sortCol, sortDir, tipos])
+  }, [filtered, encargadoMap, actividadMap, fichaMap, groupBy, sortCol, sortDir, tipos, correctivaLabel])
 
   const filterTools = useMemo<FilterTool[]>(
     () => [
@@ -279,6 +371,7 @@ export function ActividadesPanel() {
       <div className="page-head">
         <p className="muted" style={{ margin: 0 }}>
           {actividades.length} actividad{actividades.length === 1 ? '' : 'es'}
+          {acciones.length ? ` · ${acciones.length} correctiva${acciones.length === 1 ? '' : 's'}` : ''}
         </p>
         <div className="row" style={{ flexWrap: 'wrap' }}>
           <Link className="btn btn-add" to="/actividades/nueva">
@@ -288,14 +381,14 @@ export function ActividadesPanel() {
         </div>
       </div>
 
-      {actividades.length > 0 ? (
+      {actividades.length > 0 || acciones.length > 0 ? (
         <label className="search-field" htmlFor="act-q">
           <Search size={16} aria-hidden />
           <input
             id="act-q"
             className="input"
             type="search"
-            placeholder="Buscar por título o tipo"
+            placeholder="Buscar actividad o correctiva"
             value={searchText}
             onChange={(e) => onSearchChange(e.target.value)}
             autoComplete="off"
@@ -305,7 +398,7 @@ export function ActividadesPanel() {
         </label>
       ) : null}
 
-      {actividades.length === 0 ? (
+      {actividades.length === 0 && acciones.length === 0 ? (
         <EmptyState
           icon={<Wrench size={36} />}
           title="Sin actividades"
@@ -318,7 +411,7 @@ export function ActividadesPanel() {
         />
       ) : filtered.length === 0 ? (
         <div className="table-card">
-          <p className="table-empty">No hay actividades con esos filtros.</p>
+          <p className="table-empty">No hay actividades ni correctivas con esos filtros.</p>
         </div>
       ) : (
         <div className="table-card">
@@ -354,12 +447,51 @@ export function ActividadesPanel() {
           {grouped.map((group) => (
             <section key={group.key}>
               <div className="table-section">{group.label}</div>
-              {group.rows.map((a) => {
+              {group.rows.map((row) => {
+                if (row.kind === 'acc') {
+                  const { actividad, ficha, encargadoId } = parentOf(row.accion)
+                  const encargado = encargadoId ? encargadoMap[encargadoId] : undefined
+                  const parent = actividad ? actividad.titulo : ficha ? fichaTitulo(ficha) : ''
+                  return (
+                    <Link
+                      key={row.id}
+                      className="table-row table-cols-fichas"
+                      to={accionHref(row.accion)}
+                    >
+                      <span
+                        className="table-bar"
+                        style={{
+                          background: bloqueColorVar(
+                            actividad ? tipoActividadColor(actividad.tipo, tipos) : 'rose',
+                          ),
+                        }}
+                      />
+                      <span className="table-cell">
+                        <span className="row" style={{ flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
+                          <strong>{row.accion.texto}</strong>
+                          <PrioridadMark prioridad={prioridadOf(row.accion)} />
+                          <StatusBadge estado={estadoAgendaCorrectiva(row.accion)} />
+                        </span>
+                        <span className="muted col-sm-only">
+                          {correctivaLabel}
+                          {parent ? ` · ${parent}` : ''}
+                          {encargado ? ` · ${encargado.nombre}` : ''}
+                        </span>
+                      </span>
+                      <span className="col-md muted">{correctivaLabel}</span>
+                      <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
+                      <span className="muted table-nowrap">
+                        {row.accion.fechaObjetivo ? formatDate(row.accion.fechaObjetivo) : '—'}
+                      </span>
+                    </Link>
+                  )
+                }
+                const a = row.actividad
                 const encargado = a.encargadoId ? encargadoMap[a.encargadoId] : undefined
                 const vigente = estadoVigente(eventosByAct.get(a.id) ?? [])
                 return (
                   <Link
-                    key={a.id}
+                    key={row.id}
                     className="table-row table-cols-fichas"
                     to={`/actividades/${a.id}`}
                   >

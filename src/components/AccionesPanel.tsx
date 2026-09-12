@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react'
-import { ChevronDown, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ChevronDown, CircleCheck, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import {
-  ESTADOS_CORRECTIVA,
   PRIORIDADES,
   prioridadOf,
   tipoAccionLabel,
@@ -13,10 +13,12 @@ import {
   type PrioridadAccion,
   type TipoAccion,
 } from '../db/types'
+import { accionHref, estadoAgendaCorrectiva } from '../lib/acciones'
 import { createId } from '../lib/ids'
 import { formatDate } from '../lib/dates'
 import { accionLabel, accionesTitulo, useAliases } from '../lib/labels'
 import { PrioridadMark } from './PrioridadMark'
+import { StatusBadge } from './ui'
 
 export function AccionesPanel({
   fichaId,
@@ -52,7 +54,6 @@ export function AccionesPanel({
 
   const [tipo, setTipo] = useState<TipoAccion>('correctiva')
   const [texto, setTexto] = useState('')
-  const [estado, setEstado] = useState<EstadoCorrectiva>('pendiente')
   const [fecha, setFecha] = useState('')
   const [prioridad, setPrioridad] = useState<PrioridadAccion>('media')
   const [error, setError] = useState('')
@@ -77,6 +78,7 @@ export function AccionesPanel({
     }
     const nextTipo = onlyCorrectiva ? 'correctiva' : tipo
     const now = Date.now()
+    const nextEstado: EstadoCorrectiva = fecha ? 'programada' : 'pendiente'
     await db.accionesCorrectivas.add({
       id: createId(),
       fichaId: fichaId || undefined,
@@ -85,7 +87,7 @@ export function AccionesPanel({
       eventoId: eventoId || undefined,
       tipo: nextTipo,
       texto: texto.trim(),
-      estado,
+      estado: nextEstado,
       fechaObjetivo: fecha || undefined,
       prioridad: nextTipo === 'correctiva' ? prioridad : undefined,
       createdAt: now,
@@ -93,13 +95,17 @@ export function AccionesPanel({
     })
     setTexto('')
     setFecha('')
-    setEstado('pendiente')
     setPrioridad('media')
     setTipo('correctiva')
   }
 
   async function remove(id: string) {
     if (!confirm('¿Borrar este registro?')) return
+    const ejec = await db.ejecuciones.where('accionId').equals(id).first()
+    if (ejec) {
+      await db.adjuntos.where('ejecucionId').equals(ejec.id).delete()
+      await db.ejecuciones.delete(ejec.id)
+    }
     await db.accionesCorrectivas.delete(id)
     if (editId === id) setEditId(null)
   }
@@ -165,32 +171,15 @@ export function AccionesPanel({
             }
           />
         </div>
-        <div className="ficha-form-grid">
-          <div className="field">
-            <label htmlFor="accion-estado">Estado</label>
-            <select
-              id="accion-estado"
-              className="select"
-              value={estado}
-              onChange={(e) => setEstado(e.target.value as EstadoCorrectiva)}
-            >
-              {ESTADOS_CORRECTIVA.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="accion-fecha">Fecha límite (opcional)</label>
-            <input
-              id="accion-fecha"
-              className="input"
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-            />
-          </div>
+        <div className="field">
+          <label htmlFor="accion-fecha">Fecha programada (opcional)</label>
+          <input
+            id="accion-fecha"
+            className="input"
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
+          />
         </div>
         {onlyCorrectiva || tipo === 'correctiva' ? (
           <div className="field">
@@ -293,7 +282,9 @@ export function AccionesPanel({
             ) : (
               <div key={a.id} className="table-row table-cols-accion">
                 <span className="table-cell">
-                  <strong>{a.texto}</strong>
+                  <Link to={accionHref(a)}>
+                    <strong>{a.texto}</strong>
+                  </Link>
                   <span className="muted col-sm-only">
                     {tipoAccionLabel(tipoAccionOf(a), aliases)}
                     {tipoAccionOf(a) === 'correctiva' ? (
@@ -312,10 +303,18 @@ export function AccionesPanel({
                 <span className="col-md">
                   {tipoAccionOf(a) === 'correctiva' ? <PrioridadMark prioridad={prioridadOf(a)} /> : '—'}
                 </span>
-                <span className={`badge badge-${a.estado}`}>
-                  {ESTADOS_CORRECTIVA.find((s) => s.id === a.estado)?.label ?? a.estado}
-                </span>
+                <StatusBadge estado={estadoAgendaCorrectiva(a)} />
                 <span className="table-actions">
+                  {a.fechaObjetivo ? (
+                    <Link
+                      className="icon-btn"
+                      to={accionHref(a)}
+                      aria-label={a.estado === 'ejecutada' ? 'Ver ejecución' : 'Ejecutar'}
+                      title={a.estado === 'ejecutada' ? 'Ver ejecución' : 'Ejecutar'}
+                    >
+                      <CircleCheck size={16} />
+                    </Link>
+                  ) : null}
                   <button
                     type="button"
                     className="icon-btn icon-btn-edit"
@@ -378,8 +377,18 @@ function AccionEditor({
     }
     if (fecha) next.fechaObjetivo = fecha
     else delete next.fechaObjetivo
+    if (estado !== 'ejecutada') {
+      next.estado = fecha ? 'programada' : 'pendiente'
+    }
     if (nextTipo === 'correctiva') next.prioridad = prioridad
     else delete next.prioridad
+    if (next.estado !== 'ejecutada') {
+      const ejec = await db.ejecuciones.where('accionId').equals(accion.id).first()
+      if (ejec) {
+        await db.adjuntos.where('ejecucionId').equals(ejec.id).delete()
+        await db.ejecuciones.delete(ejec.id)
+      }
+    }
     await db.accionesCorrectivas.put(next)
     onDone()
   }
@@ -408,31 +417,26 @@ function AccionEditor({
         <label>Texto</label>
         <input className="input" value={texto} onChange={(e) => setTexto(e.target.value)} />
       </div>
-      <div className="ficha-form-grid">
-        <div className="field">
-          <label>Estado</label>
-          <select
-            className="select"
-            value={estado}
-            onChange={(e) => setEstado(e.target.value as EstadoCorrectiva)}
-          >
-            {ESTADOS_CORRECTIVA.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>Fecha límite (opcional)</label>
-          <input
-            className="input"
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-          />
-        </div>
+      <div className="field">
+        <label>Fecha programada (opcional)</label>
+        <input
+          className="input"
+          type="date"
+          value={fecha}
+          onChange={(e) => setFecha(e.target.value)}
+        />
       </div>
+      <p className="muted" style={{ marginTop: 0 }}>
+        El estado se calcula por esa fecha, no por la inspección o actividad de origen.
+        {fecha ? (
+          <>
+            {' '}
+            <Link to={accionHref(accion)}>
+              {accion.estado === 'ejecutada' ? 'Ver o editar ejecución' : 'Ejecutar'}
+            </Link>
+          </>
+        ) : null}
+      </p>
       {onlyCorrectiva || tipo === 'correctiva' ? (
         <div className="field">
           <label>Prioridad</label>

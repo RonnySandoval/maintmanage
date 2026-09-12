@@ -9,9 +9,8 @@ import {
   tipoAccionOf,
   type AccionCorrectiva,
 } from '../db/types'
-import { accionHref } from '../lib/acciones'
+import { accionHref, estadoAgendaCorrectiva } from '../lib/acciones'
 import { compareActividadesByTitulo } from '../lib/actividades'
-import { computeEstado, todayISO } from '../lib/dates'
 import { compareFichasByNumero, fichaTitulo } from '../lib/fichas'
 import { labelEstado, SIMBOLO_CORRECTIVA, simboloEstado } from '../lib/simbolos'
 import {
@@ -47,10 +46,6 @@ const PRIORIDAD: Record<EstadoOcurrencia, number> = {
 
 function pickOcc<T extends { estado: EstadoOcurrencia }>(list: T[]): T | undefined {
   return [...list].sort((a, b) => PRIORIDAD[a.estado] - PRIORIDAD[b.estado])[0]
-}
-
-export function estadoAgendaCorrectiva(accion: Pick<AccionCorrectiva, 'fechaObjetivo' | 'estado'>): EstadoOcurrencia {
-  return computeEstado(accion.fechaObjetivo ?? '', todayISO(), accion.estado === 'ejecutada', 'dia')
 }
 
 function monthClass(month: number, start: number, currentMonth: number): string {

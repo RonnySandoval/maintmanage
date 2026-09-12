@@ -212,11 +212,17 @@ export async function aplicarEventosDesdeFecha(
 export async function deleteActividadCascade(actividadId: string): Promise<void> {
   const eventos = await db.eventos.where('actividadId').equals(actividadId).toArray()
   const eventoIds = eventos.map((e) => e.id)
-  const ejecuciones =
+  const acciones = await db.accionesCorrectivas.where('actividadId').equals(actividadId).toArray()
+  const accionIds = acciones.map((a) => a.id)
+  const ejecucionesEvt =
     eventoIds.length === 0
       ? []
       : await db.ejecuciones.where('eventoId').anyOf(eventoIds).toArray()
-  const ejecIds = ejecuciones.map((e) => e.id)
+  const ejecucionesAcc =
+    accionIds.length === 0
+      ? []
+      : await db.ejecuciones.where('accionId').anyOf(accionIds).toArray()
+  const ejecIds = [...ejecucionesEvt, ...ejecucionesAcc].map((e) => e.id)
 
   await db.transaction(
     'rw',
@@ -225,6 +231,7 @@ export async function deleteActividadCascade(actividadId: string): Promise<void>
       await db.actividades.delete(actividadId)
       await db.eventos.where('actividadId').equals(actividadId).delete()
       if (eventoIds.length) await db.ejecuciones.where('eventoId').anyOf(eventoIds).delete()
+      if (accionIds.length) await db.ejecuciones.where('accionId').anyOf(accionIds).delete()
       await db.adjuntos.where('actividadId').equals(actividadId).delete()
       if (ejecIds.length) await db.adjuntos.where('ejecucionId').anyOf(ejecIds).delete()
       await db.accionesCorrectivas.where('actividadId').equals(actividadId).delete()

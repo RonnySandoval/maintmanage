@@ -12,25 +12,29 @@ import { Modal } from './ui'
 export function EjecucionForm({
   ocurrenciaId,
   eventoId,
+  accionId,
   fichaId,
   actividadId,
   onSaved,
 }: {
   ocurrenciaId?: string
   eventoId?: string
+  accionId?: string
   fichaId?: string
   actividadId?: string
   onSaved?: () => void
 }) {
-  const parentId = ocurrenciaId ?? eventoId ?? 'ejec'
+  const parentId = ocurrenciaId ?? eventoId ?? accionId ?? 'ejec'
   const ejecucion = useLiveQuery(
     () =>
       ocurrenciaId
         ? db.ejecuciones.where('ocurrenciaId').equals(ocurrenciaId).first()
         : eventoId
           ? db.ejecuciones.where('eventoId').equals(eventoId).first()
-          : undefined,
-    [ocurrenciaId, eventoId],
+          : accionId
+            ? db.ejecuciones.where('accionId').equals(accionId).first()
+            : undefined,
+    [ocurrenciaId, eventoId, accionId],
   )
   const evidencia =
     useLiveQuery(
@@ -56,7 +60,7 @@ export function EjecucionForm({
 
   async function save(e: FormEvent) {
     e.preventDefault()
-    if (!ocurrenciaId && !eventoId) return
+    if (!ocurrenciaId && !eventoId && !accionId) return
     setSaving(true)
     try {
       const now = Date.now()
@@ -65,6 +69,7 @@ export function EjecucionForm({
         id: ejecucionId,
         ocurrenciaId: ocurrenciaId || undefined,
         eventoId: eventoId || undefined,
+        accionId: accionId || undefined,
         fechaReal,
         observaciones: observaciones.trim() || undefined,
         realizadoPor: realizadoPor.trim() || undefined,
@@ -91,7 +96,13 @@ export function EjecucionForm({
           updatedAt: now,
         })
       }
-      await refreshEstados()
+      if (accionId) {
+        await db.accionesCorrectivas.update(accionId, {
+          estado: 'ejecutada',
+          updatedAt: now,
+        })
+      }
+      if (!accionId) await refreshEstados()
       setDraft(null)
       setFiles([])
       onSaved?.()
@@ -169,6 +180,7 @@ export function EjecucionModal({
   open,
   ocurrenciaId,
   eventoId,
+  accionId,
   fichaId,
   actividadId,
   onClose,
@@ -176,6 +188,7 @@ export function EjecucionModal({
   open: boolean
   ocurrenciaId?: string
   eventoId?: string
+  accionId?: string
   fichaId?: string
   actividadId?: string
   onClose: () => void
@@ -185,6 +198,7 @@ export function EjecucionModal({
       <EjecucionForm
         ocurrenciaId={ocurrenciaId}
         eventoId={eventoId}
+        accionId={accionId}
         fichaId={fichaId}
         actividadId={actividadId}
         onSaved={onClose}

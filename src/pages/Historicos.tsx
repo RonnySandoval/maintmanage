@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { db } from '../db'
 import {
-  ESTADOS_CORRECTIVA,
+  ESTADOS,
   esExtraordinaria,
   prioridadOf,
   prioridadRank,
@@ -21,7 +21,7 @@ import {
   tipoActividadColor,
   type AccionCorrectiva,
   type Actividad,
-  type EstadoCorrectiva,
+  type EstadoOcurrencia,
   type Ejecucion,
   type Encargado,
   type Evento,
@@ -30,7 +30,7 @@ import {
 } from '../db/types'
 import { bloqueColorVar } from '../lib/colors'
 import { formatDate, formatFechaProgramada } from '../lib/dates'
-import { accionHref } from '../lib/acciones'
+import { accionHref, estadoAgendaCorrectiva } from '../lib/acciones'
 import { actividadTitulo } from '../lib/actividades'
 import { fichaTitulo } from '../lib/fichas'
 import { ActividadTitle } from '../components/ActividadTitle'
@@ -85,8 +85,9 @@ function groupAcciones(
       const p = prioridadOf(a)
       push(p, p === 'alta' ? 'Alta' : p === 'media' ? 'Media' : 'Baja', a)
     } else if (group === 'estado') {
-      const meta = ESTADOS_CORRECTIVA.find((s) => s.id === a.estado)
-      push(a.estado, meta?.label ?? a.estado, a)
+      const estado = estadoAgendaCorrectiva(a)
+      const meta = ESTADOS.find((s) => s.id === estado)
+      push(estado, meta?.label ?? estado, a)
     } else {
       if (a.actividadId) {
         const act = actividadMap[a.actividadId]
@@ -104,7 +105,7 @@ function groupAcciones(
       : group === 'prioridad'
         ? ['alta', 'media', 'baja']
         : group === 'estado'
-          ? ESTADOS_CORRECTIVA.map((s) => s.id)
+          ? ESTADOS.map((s) => s.id)
           : [...buckets.keys()].sort((a, b) => (labels.get(a) ?? '').localeCompare(labels.get(b) ?? '', 'es'))
 
   return order
@@ -115,7 +116,7 @@ function groupAcciones(
 export function HistoricosPage() {
   const [tab, setTab] = useState<'ocurrencias' | 'acciones'>('ocurrencias')
   const [groupBy, setGroupBy] = useState<'ficha' | 'fecha'>('ficha')
-  const [estadoAcc, setEstadoAcc] = useState<EstadoCorrectiva | ''>('')
+  const [estadoAcc, setEstadoAcc] = useState<EstadoOcurrencia | ''>('')
   const [groupAcc, setGroupAcc] = useState<AccGroup>('lista')
   const [sortAcc, setSortAcc] = useState<AccSort>('fecha')
   const [openOcc, setOpenOcc] = useState<string | null>(null)
@@ -233,7 +234,7 @@ export function HistoricosPage() {
   })
 
   const accionesFiltradas = sortAcciones(
-    acciones.filter((a) => !estadoAcc || a.estado === estadoAcc),
+    acciones.filter((a) => !estadoAcc || estadoAgendaCorrectiva(a) === estadoAcc),
     sortAcc,
   )
   const gruposAcc = groupAcciones(accionesFiltradas, groupAcc, fichaMap, actividadMap)
@@ -255,7 +256,7 @@ export function HistoricosPage() {
               >
                 Todos
               </button>
-              {ESTADOS_CORRECTIVA.map((s) => (
+              {ESTADOS.map((s) => (
                 <button
                   key={s.id}
                   type="button"
@@ -570,9 +571,7 @@ export function HistoricosPage() {
                         <span className="col-md">
                           <PrioridadMark prioridad={prioridadOf(a)} />
                         </span>
-                        <span className={`badge badge-${a.estado}`}>
-                          {ESTADOS_CORRECTIVA.find((s) => s.id === a.estado)?.label ?? a.estado}
-                        </span>
+                        <StatusBadge estado={estadoAgendaCorrectiva(a)} />
                       </Link>
                     )
                   })}
@@ -706,12 +705,10 @@ function EjecutadaRow({
           </div>
           {acciones.length ? (
             acciones.map((a) => (
-              <Link key={a.id} className="hist-occ-accion" to={href}>
+              <Link key={a.id} className="hist-occ-accion" to={accionHref(a)}>
                 <PrioridadMark prioridad={prioridadOf(a)} />
                 <span className="grow">{a.texto}</span>
-                <span className={`badge badge-${a.estado}`}>
-                  {ESTADOS_CORRECTIVA.find((s) => s.id === a.estado)?.label ?? a.estado}
-                </span>
+                <StatusBadge estado={estadoAgendaCorrectiva(a)} />
               </Link>
             ))
           ) : (

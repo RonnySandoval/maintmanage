@@ -16,6 +16,7 @@ import {
 import { FilterDrawer, FilterDrawerToggle } from './FilterDrawer'
 import { NuevoFab } from './NuevoFab'
 import { ThemeQuickToggle } from './ThemeQuickToggle'
+import { AppLogo } from './AppLogo'
 import { FilterDrawerProvider } from '../hooks/useFilterDrawer'
 import { useAppHistory } from '../hooks/useAppHistory'
 import { useAutoBackup } from '../hooks/useAutoBackup'
@@ -39,6 +40,7 @@ const TITLES: Record<string, string> = {
 function titleFor(pathname: string, search = ''): string {
   if (pathname.startsWith('/ocurrencias/')) return 'Ocurrencia'
   if (pathname.startsWith('/eventos/')) return 'Evento'
+  if (pathname.startsWith('/acciones/')) return 'Acción'
   if (pathname.startsWith('/inspecciones/nueva')) return 'Nueva inspección'
   if (pathname.startsWith('/actividades/nueva')) {
     const tipo = new URLSearchParams(search).get('tipo')
@@ -69,6 +71,7 @@ function titleFor(pathname: string, search = ''): string {
 function PageHeading({ pathname, search }: { pathname: string; search: string }) {
   const occId = pathname.match(/^\/ocurrencias\/([^/]+)/)?.[1]
   const eventoId = pathname.match(/^\/eventos\/([^/]+)/)?.[1]
+  const accionId = pathname.match(/^\/acciones\/([^/]+)/)?.[1]
   const occ = useLiveQuery(() => (occId ? db.ocurrencias.get(occId) : undefined), [occId])
   const ficha = useLiveQuery(
     () => (occ?.fichaId ? db.fichas.get(occ.fichaId) : undefined),
@@ -79,11 +82,15 @@ function PageHeading({ pathname, search }: { pathname: string; search: string })
     () => (evento?.actividadId ? db.actividades.get(evento.actividadId) : undefined),
     [evento?.actividadId],
   )
+  const accion = useLiveQuery(() => (accionId ? db.accionesCorrectivas.get(accionId) : undefined), [accionId])
   if (occId && ficha && occ) {
     return `${fichaTitulo(ficha)} · ${monthLabel(occ.fechaProgramada)}`
   }
   if (eventoId && actividad && evento) {
     return `${actividadTitulo(actividad)} · ${monthLabel(evento.fechaProgramada)}`
+  }
+  if (accionId && accion) {
+    return accion.fechaObjetivo ? `${accion.texto} · ${monthLabel(accion.fechaObjetivo)}` : accion.texto
   }
   return titleFor(pathname, search)
 }
@@ -126,7 +133,7 @@ function LayoutShell() {
     <div className="shell">
       <aside className="sidebar">
         <Link className="brand" to="/">
-          <span className="brand-mark">M</span>
+          <AppLogo className="brand-mark" />
           MaintManage
         </Link>
         <nav>
@@ -139,6 +146,9 @@ function LayoutShell() {
       <div className="content">
         <header className="topbar">
           <div className="topbar-lead">
+            <Link className="topbar-logo" to="/" aria-label="Inicio">
+              <AppLogo />
+            </Link>
             <div className="nav-hist">
               <button
                 type="button"

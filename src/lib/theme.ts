@@ -21,7 +21,7 @@ export function applyTheme(mode: ThemeMode): 'light' | 'dark' {
   const resolved = resolvedTheme(mode)
   document.documentElement.dataset.theme = resolved
   document.documentElement.style.colorScheme = resolved
-  const color = resolved === 'dark' ? '#0b1220' : '#0f766e'
+  const color = resolved === 'dark' ? '#0b1220' : '#072F63'
   const meta = document.querySelector('meta[name="theme-color"]')
   if (meta) meta.setAttribute('content', color)
   return resolved

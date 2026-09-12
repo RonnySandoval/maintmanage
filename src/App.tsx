@@ -1,9 +1,11 @@
 import { useEffect } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
+import { Splash } from './components/Splash'
 import { ThemeProvider } from './hooks/useTheme'
 import { ensureHorizon } from './db/occurrences'
 import { notifyIfNeeded } from './lib/notifications'
+import { AccionDetailPage } from './pages/AccionDetail'
 import { ActividadDetailPage } from './pages/ActividadDetail'
 import { ActividadFormPage } from './pages/ActividadForm'
 import { AjustesPage } from './pages/Ajustes'
@@ -36,6 +38,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
+      <Splash />
       <HashRouter>
         <Routes>
           <Route element={<Layout />}>
@@ -52,6 +55,7 @@ export default function App() {
             <Route path="actividades/:id/editar" element={<ActividadFormPage />} />
             <Route path="actividades/:id" element={<ActividadDetailPage />} />
             <Route path="eventos/:id" element={<EventoDetailPage />} />
+            <Route path="acciones/:id" element={<AccionDetailPage />} />
             <Route path="historicos" element={<HistoricosPage />} />
             <Route path="bloques" element={<Navigate to="/fichas?tab=bloques" replace />} />
             <Route path="maestros" element={<Navigate to="/fichas?tab=bloques" replace />} />

@@ -16,7 +16,6 @@ import { bloqueColorVar } from '../lib/colors'
 import { formatDate, inCurrentQuarter, quarterLabel } from '../lib/dates'
 import { accionesTitulo, label, useAliases } from '../lib/labels'
 import {
-  ESTADOS_CORRECTIVA,
   esExtraordinaria,
   prioridadOf,
   tipoAccionLabel,
@@ -30,7 +29,7 @@ import { PrioridadMark } from '../components/PrioridadMark'
 import { FichaTitle } from '../components/FichaTitle'
 import { RestorePanel } from '../components/RestorePanel'
 import { isRestoreSkipped, skipRestore } from '../lib/restoreSkip'
-import { accionHref } from '../lib/acciones'
+import { accionHref, estadoAgendaCorrectiva } from '../lib/acciones'
 import { useSettled } from '../hooks/useSettled'
 import { useTiposActividad } from '../hooks/useTiposActividad'
 
@@ -396,9 +395,7 @@ export function DashboardPage() {
                 >
                   <div className="row-spread">
                     <strong>{a.texto}</strong>
-                    <span className={`badge badge-${a.estado}`}>
-                      {ESTADOS_CORRECTIVA.find((s) => s.id === a.estado)?.label ?? a.estado}
-                    </span>
+                    <StatusBadge estado={estadoAgendaCorrectiva(a)} />
                   </div>
                   <div className="muted occ-meta">
                     {tipoAccionOf(a) === 'correctiva' ? <PrioridadMark prioridad={prioridadOf(a)} /> : null}

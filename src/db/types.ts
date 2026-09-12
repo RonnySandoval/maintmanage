@@ -92,6 +92,7 @@ export interface Ejecucion {
   id: string
   ocurrenciaId?: string
   eventoId?: string
+  accionId?: string
   fechaReal: string
   observaciones?: string
   realizadoPor?: string

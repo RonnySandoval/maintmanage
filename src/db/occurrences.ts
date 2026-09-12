@@ -218,11 +218,17 @@ export async function aplicarDesdeFecha(
 export async function deleteFichaCascade(fichaId: string): Promise<void> {
   const occs = await db.ocurrencias.where('fichaId').equals(fichaId).toArray()
   const occIds = occs.map((o) => o.id)
-  const ejecuciones =
+  const acciones = await db.accionesCorrectivas.where('fichaId').equals(fichaId).toArray()
+  const accionIds = acciones.map((a) => a.id)
+  const ejecucionesOcc =
     occIds.length === 0
       ? []
       : await db.ejecuciones.where('ocurrenciaId').anyOf(occIds).toArray()
-  const ejecIds = ejecuciones.map((e) => e.id)
+  const ejecucionesAcc =
+    accionIds.length === 0
+      ? []
+      : await db.ejecuciones.where('accionId').anyOf(accionIds).toArray()
+  const ejecIds = [...ejecucionesOcc, ...ejecucionesAcc].map((e) => e.id)
 
   await db.transaction(
     'rw',
@@ -237,6 +243,7 @@ export async function deleteFichaCascade(fichaId: string): Promise<void> {
       await db.fichas.delete(fichaId)
       await db.ocurrencias.where('fichaId').equals(fichaId).delete()
       if (occIds.length) await db.ejecuciones.where('ocurrenciaId').anyOf(occIds).delete()
+      if (accionIds.length) await db.ejecuciones.where('accionId').anyOf(accionIds).delete()
       await db.accionesCorrectivas.where('fichaId').equals(fichaId).delete()
       await db.adjuntos.where('fichaId').equals(fichaId).delete()
       if (ejecIds.length) await db.adjuntos.where('ejecucionId').anyOf(ejecIds).delete()
