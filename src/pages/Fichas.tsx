@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ClipboardList, Layers, Plus, Users } from 'lucide-react'
+import { ClipboardList, Layers, Plus, Search, SlidersHorizontal, Users } from 'lucide-react'
 import { db } from '../db'
 import { frecuenciaLabel, mesesDeFrecuencia } from '../db/types'
 import { bloqueColorVar } from '../lib/colors'
@@ -11,6 +11,7 @@ import { EncargadosPanel } from '../components/EncargadosPanel'
 import { FichaTitle } from '../components/FichaTitle'
 import { SortHeader } from '../components/SortHeader'
 import { EmptyState } from '../components/ui'
+import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
 import type { Ficha } from '../db/types'
 
 type FichasTab = 'fichas' | 'encargados' | 'bloques'
@@ -180,8 +181,106 @@ export function FichasPage() {
     return groups
   }, [filtered, bloqueMap, encargadoMap, groupBy, sortCol, sortDir])
 
+  const filterTools = useMemo<FilterTool[]>(() => {
+    if (tab !== 'fichas') return []
+    return [
+      {
+        id: 'buscar',
+        label: 'Buscar',
+        icon: Search,
+        active: Boolean(q),
+        content: (
+          <div className="field" style={{ margin: 0 }}>
+            <label htmlFor="fichas-q">Nombre o número</label>
+            <input
+              id="fichas-q"
+              className="input"
+              placeholder="Buscar"
+              value={q}
+              onChange={(e) => setFilter('q', e.target.value)}
+            />
+          </div>
+        ),
+      },
+      {
+        id: 'filtrar',
+        label: 'Filtrar',
+        icon: SlidersHorizontal,
+        active: Boolean(bloqueId || encargadoId),
+        content: (
+          <div className="stack" style={{ gap: '0.7rem' }}>
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="fichas-bloque">Bloque</label>
+              <select
+                id="fichas-bloque"
+                className="select"
+                value={bloqueId}
+                onChange={(e) => setFilter('bloque', e.target.value)}
+              >
+                <option value="">Todos</option>
+                {bloques.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="fichas-encargado">Encargado</label>
+              <select
+                id="fichas-encargado"
+                className="select"
+                value={encargadoId}
+                onChange={(e) => setFilter('encargado', e.target.value)}
+              >
+                <option value="">Todos</option>
+                {encargados.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'agrupar',
+        label: 'Agrupar',
+        icon: Layers,
+        active: groupBy !== 'bloque',
+        content: (
+          <div className="chip-row tight" role="tablist" aria-label="Agrupar">
+            <button
+              type="button"
+              className={`chip compact${groupBy === 'bloque' ? ' active' : ''}`}
+              onClick={() => setGroup('bloque')}
+            >
+              Bloque
+            </button>
+            <button
+              type="button"
+              className={`chip compact${groupBy === 'encargado' ? ' active' : ''}`}
+              onClick={() => setGroup('encargado')}
+            >
+              Encargado
+            </button>
+            <button
+              type="button"
+              className={`chip compact${groupBy === 'congregacion' ? ' active' : ''}`}
+              onClick={() => setGroup('congregacion')}
+            >
+              Congregación
+            </button>
+          </div>
+        ),
+      },
+    ]
+  }, [tab, q, bloqueId, encargadoId, groupBy, bloques, encargados])
+
   return (
     <div>
+      {filterTools.length ? <FilterDrawerSlot title="Fichas" tools={filterTools} /> : null}
       <div className="seg-toggle tabs-3" role="tablist" aria-label="Fichas, encargados o bloques">
         <button
           type="button"
@@ -229,62 +328,6 @@ export function FichasPage() {
                 Nueva
               </Link>
             </div>
-          </div>
-
-          <div className="filters">
-            <input
-              className="input"
-              placeholder="Buscar"
-              value={q}
-              onChange={(e) => setFilter('q', e.target.value)}
-            />
-            <select className="select" value={bloqueId} onChange={(e) => setFilter('bloque', e.target.value)}>
-              <option value="">Bloque</option>
-              {bloques.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.nombre}
-                </option>
-              ))}
-            </select>
-            <select
-              className="select"
-              value={encargadoId}
-              onChange={(e) => setFilter('encargado', e.target.value)}
-            >
-              <option value="">Encargado</option>
-              {encargados.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <p className="muted" style={{ margin: '0 0 0.35rem', fontSize: '0.78rem' }}>
-            Agrupar por
-          </p>
-          <div className="seg-toggle tabs-3 compact" role="group" aria-label="Agrupar fichas">
-            <button
-              type="button"
-              className={groupBy === 'bloque' ? 'active' : ''}
-              onClick={() => setGroup('bloque')}
-            >
-              Bloque
-            </button>
-            <button
-              type="button"
-              className={groupBy === 'encargado' ? 'active' : ''}
-              onClick={() => setGroup('encargado')}
-            >
-              Encargado
-            </button>
-            <button
-              type="button"
-              className={groupBy === 'congregacion' ? 'active' : ''}
-              onClick={() => setGroup('congregacion')}
-            >
-              Congregación
-            </button>
           </div>
 
           {fichas.length === 0 ? (

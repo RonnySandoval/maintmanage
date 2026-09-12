@@ -2,14 +2,24 @@ import type { ReactNode } from 'react'
 import { ESTADOS, type EstadoOcurrencia } from '../db/types'
 import { SIMBOLOS_ESTADO, SIMBOLO_CORRECTIVA } from '../lib/simbolos'
 
-export function StatusBadge({ estado }: { estado: EstadoOcurrencia }) {
+export function ExtraBadge() {
+  return <span className="badge badge-extra">Extraordinaria</span>
+}
+
+export function StatusBadge({
+  estado,
+  iconOnly = false,
+}: {
+  estado: EstadoOcurrencia
+  iconOnly?: boolean
+}) {
   const meta = SIMBOLOS_ESTADO[estado]
   return (
-    <span className={`badge badge-${estado}`}>
+    <span className={`badge badge-${estado}${iconOnly ? ' badge-icon' : ''}`} title={meta.label}>
       <span className="sym" aria-hidden>
         {meta.glyph}
       </span>
-      {meta.label}
+      {iconOnly ? <span className="sr-only">{meta.label}</span> : meta.label}
     </span>
   )
 }

@@ -7,10 +7,12 @@ export function ShareMenu({
   title,
   text,
   files,
+  iconOnly = false,
 }: {
   title: string
   text: string
   files?: File[]
+  iconOnly?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -28,9 +30,15 @@ export function ShareMenu({
 
   return (
     <>
-      <button type="button" className="btn" onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className={iconOnly ? 'icon-btn' : 'btn'}
+        aria-label="Compartir"
+        title="Compartir"
+        onClick={() => setOpen(true)}
+      >
         <Share2 size={16} />
-        Compartir
+        {iconOnly ? null : 'Compartir'}
       </button>
       <Modal open={open} title="Compartir" onClose={() => setOpen(false)}>
         <div className="stack">

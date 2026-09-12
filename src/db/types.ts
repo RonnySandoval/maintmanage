@@ -22,7 +22,11 @@ export type EstadoCorrectiva = 'pendiente' | 'programada' | 'ejecutada'
 
 export type TipoAccion = 'correctiva' | 'recomendacion'
 
+export type PrioridadAccion = 'alta' | 'media' | 'baja'
+
 export type TipoAdjunto = 'ficha' | 'ejecucion' | 'manual'
+
+export type OrigenOcurrencia = 'programada' | 'extraordinaria'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -58,6 +62,8 @@ export interface Ficha {
   fechaInicio: string
   fechaPrecision: FechaPrecision
   notas?: string
+  /** Fechas de inspecciones programadas que no deben regenerarse. */
+  fechasOmitidas?: string[]
   createdAt: number
   updatedAt: number
 }
@@ -67,6 +73,9 @@ export interface Ocurrencia {
   fichaId: string
   fechaProgramada: string
   estado: EstadoOcurrencia
+  origen?: OrigenOcurrencia
+  /** Si es true, refreshEstados no recalcula el estado. */
+  estadoFijado?: boolean
   createdAt: number
   updatedAt: number
 }
@@ -76,6 +85,7 @@ export interface Ejecucion {
   ocurrenciaId: string
   fechaReal: string
   observaciones?: string
+  realizadoPor?: string
   createdAt: number
   updatedAt: number
 }
@@ -88,6 +98,7 @@ export interface AccionCorrectiva {
   texto: string
   estado: EstadoCorrectiva
   fechaObjetivo?: string
+  prioridad?: PrioridadAccion
   createdAt: number
   updatedAt: number
 }
@@ -168,6 +179,27 @@ export const ESTADOS_CORRECTIVA: { id: EstadoCorrectiva; label: string }[] = [
   { id: 'ejecutada', label: 'Ejecutada' },
 ]
 
+export const PRIORIDADES: { id: PrioridadAccion; label: string }[] = [
+  { id: 'alta', label: 'Alta' },
+  { id: 'media', label: 'Media' },
+  { id: 'baja', label: 'Baja' },
+]
+
+export function prioridadOf(accion: Pick<AccionCorrectiva, 'prioridad'>): PrioridadAccion {
+  if (accion.prioridad === 'alta' || accion.prioridad === 'baja') return accion.prioridad
+  return 'media'
+}
+
+export function prioridadLabel(prioridad: PrioridadAccion): string {
+  return PRIORIDADES.find((p) => p.id === prioridad)?.label ?? prioridad
+}
+
+export function prioridadRank(prioridad: PrioridadAccion): number {
+  if (prioridad === 'alta') return 0
+  if (prioridad === 'media') return 1
+  return 2
+}
+
 export function tipoAccionOf(
   accion: Pick<AccionCorrectiva, 'tipo' | 'fechaObjetivo'>,
 ): TipoAccion {
@@ -177,6 +209,14 @@ export function tipoAccionOf(
 
 export function tipoAccionLabel(tipo: TipoAccion): string {
   return tipo === 'recomendacion' ? 'Recomendación' : 'Acción correctiva'
+}
+
+export function esOcurrenciaProgramada(o: Pick<Ocurrencia, 'origen'>): boolean {
+  return o.origen !== 'extraordinaria'
+}
+
+export function esExtraordinaria(o: Pick<Ocurrencia, 'origen'>): boolean {
+  return o.origen === 'extraordinaria'
 }
 
 export { BLOQUE_COLORS, GRUPO_COLORS } from '../lib/colors'

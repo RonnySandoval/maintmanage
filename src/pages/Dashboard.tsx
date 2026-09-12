@@ -5,9 +5,16 @@ import { CalendarDays, ClipboardList } from 'lucide-react'
 import { db } from '../db'
 import { bloqueColorVar } from '../lib/colors'
 import { formatDate, inCurrentQuarter, quarterLabel } from '../lib/dates'
-import { ESTADOS_CORRECTIVA, tipoAccionLabel, tipoAccionOf } from '../db/types'
+import {
+  ESTADOS_CORRECTIVA,
+  esExtraordinaria,
+  prioridadOf,
+  tipoAccionLabel,
+  tipoAccionOf,
+} from '../db/types'
 import { CountUp } from '../components/CountUp'
-import { EmptyState, StatusBadge } from '../components/ui'
+import { EmptyState, ExtraBadge, StatusBadge } from '../components/ui'
+import { PrioridadMark } from '../components/PrioridadMark'
 import { FichaTitle } from '../components/FichaTitle'
 import { RestorePanel } from '../components/RestorePanel'
 import { isRestoreSkipped, skipRestore } from '../lib/restoreSkip'
@@ -20,25 +27,42 @@ type DashCounts = {
   ejecutadas: number
   total: number
   progreso: number
+  correctivasHechas: number
+  correctivasTotal: number
 }
 
 function packCounts(c: DashCounts): string {
-  return `${c.vencidas}:${c.programadas}:${c.pendientes}:${c.ejecutadas}:${c.total}:${c.progreso}`
+  return `${c.vencidas}:${c.programadas}:${c.pendientes}:${c.ejecutadas}:${c.total}:${c.progreso}:${c.correctivasHechas}:${c.correctivasTotal}`
 }
 
 function unpackCounts(token: string): DashCounts {
-  const [vencidas, programadas, pendientes, ejecutadas, total, progreso] = token.split(':').map(Number)
-  return { vencidas, programadas, pendientes, ejecutadas, total, progreso }
+  const [
+    vencidas,
+    programadas,
+    pendientes,
+    ejecutadas,
+    total,
+    progreso,
+    correctivasHechas,
+    correctivasTotal,
+  ] = token.split(':').map(Number)
+  return {
+    vencidas,
+    programadas,
+    pendientes,
+    ejecutadas,
+    total,
+    progreso,
+    correctivasHechas,
+    correctivasTotal,
+  }
 }
 
 export function DashboardPage() {
   const ocurrencias = useLiveQuery(() => db.ocurrencias.toArray())
   const fichas = useLiveQuery(() => db.fichas.toArray())
   const bloques = useLiveQuery(() => db.grupos.toArray()) ?? []
-  const acciones =
-    useLiveQuery(() =>
-      db.accionesCorrectivas.where('estado').anyOf(['pendiente', 'programada']).toArray(),
-    ) ?? []
+  const acciones = useLiveQuery(() => db.accionesCorrectivas.toArray()) ?? []
   const extraCounts = useLiveQuery(async () => ({
     encargados: await db.encargados.count(),
     adjuntos: await db.adjuntos.count(),
@@ -60,6 +84,19 @@ export function DashboardPage() {
 
   const trimestre = quarterLabel()
   const delTrimestre = occs.filter((o) => inCurrentQuarter(o.fechaProgramada))
+  const occById = useMemo(
+    () => Object.fromEntries(occs.map((o) => [o.id, o])),
+    [occs],
+  )
+  const correctivasTrimestre = acciones.filter((a) => {
+    if (tipoAccionOf(a) !== 'correctiva') return false
+    if (a.fechaObjetivo) return inCurrentQuarter(a.fechaObjetivo)
+    const occ = a.ocurrenciaId ? occById[a.ocurrenciaId] : undefined
+    return occ ? inCurrentQuarter(occ.fechaProgramada) : false
+  })
+  const accionesAbiertas = acciones.filter(
+    (a) => a.estado === 'pendiente' || a.estado === 'programada',
+  )
   const rawCounts: DashCounts = {
     vencidas: delTrimestre.filter((o) => o.estado === 'vencida').length,
     programadas: delTrimestre.filter((o) => o.estado === 'proxima').length,
@@ -72,6 +109,8 @@ export function DashboardPage() {
         : Math.round(
             (delTrimestre.filter((o) => o.estado === 'ejecutada').length / delTrimestre.length) * 100,
           ),
+    correctivasHechas: correctivasTrimestre.filter((a) => a.estado === 'ejecutada').length,
+    correctivasTotal: correctivasTrimestre.length,
   }
   const skipTransientEmpty = loaded && fichasList.length > 0 && occs.length === 0
   const settledToken = useSettled(
@@ -164,6 +203,22 @@ export function DashboardPage() {
             {ready ? <CountUp value={counts.ejecutadas} ready /> : <span className="count-wait">—</span>}
           </div>
         </Link>
+        <Link className="card kpi card-click tone-correctiva" to="/historicos">
+          <div className="label">Acciones correctivas</div>
+          <div className="value kpi-frac">
+            {ready ? (
+              <>
+                <CountUp value={counts.correctivasHechas} ready />
+                <span className="kpi-slash">/</span>
+                <span className="kpi-den">
+                  <CountUp value={counts.correctivasTotal} ready />
+                </span>
+              </>
+            ) : (
+              <span className="count-wait">—</span>
+            )}
+          </div>
+        </Link>
       </div>
 
       <div className="card dash-progress">
@@ -197,9 +252,10 @@ export function DashboardPage() {
                     </strong>
                     <StatusBadge estado={o.estado} />
                   </div>
-                  <div className="muted">
+                  <div className="muted occ-meta">
                     {formatDate(o.fechaProgramada)}
                     {bloque ? ` · ${bloque.nombre}` : ''}
+                    {esExtraordinaria(o) ? <ExtraBadge /> : null}
                   </div>
                 </div>
               </Link>
@@ -208,14 +264,14 @@ export function DashboardPage() {
         </div>
       )}
 
-      {acciones.length > 0 ? (
+      {accionesAbiertas.length > 0 ? (
         <div style={{ marginTop: '1.25rem' }}>
           <div className="page-head">
             <h2 className="title-sm">Acciones y recomendaciones abiertas</h2>
             <Link to="/historicos">Ver histórico</Link>
           </div>
           <div className="list">
-            {acciones.slice(0, 5).map((a) => {
+            {accionesAbiertas.slice(0, 5).map((a) => {
               const ficha = fichaMap[a.fichaId]
               const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
               return (
@@ -230,7 +286,8 @@ export function DashboardPage() {
                       {ESTADOS_CORRECTIVA.find((s) => s.id === a.estado)?.label ?? a.estado}
                     </span>
                   </div>
-                  <div className="muted">
+                  <div className="muted occ-meta">
+                    {tipoAccionOf(a) === 'correctiva' ? <PrioridadMark prioridad={prioridadOf(a)} /> : null}
                     {tipoAccionLabel(tipoAccionOf(a))} ·{' '}
                     <FichaTitle ficha={ficha} color={bloque?.color} />
                   </div>

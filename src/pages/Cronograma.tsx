@@ -3,11 +3,11 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react'
 import { db } from '../db'
-import { ESTADOS, type EstadoOcurrencia } from '../db/types'
+import { ESTADOS, esExtraordinaria, type EstadoOcurrencia } from '../db/types'
 import { bloqueColorVar } from '../lib/colors'
 import { formatFechaProgramada, formatDateLong } from '../lib/dates'
 import { compareFichasByNumero, fichaTitulo } from '../lib/fichas'
-import { EmptyState, LeyendaSimbolos, StatusBadge } from '../components/ui'
+import { EmptyState, ExtraBadge, LeyendaSimbolos, StatusBadge } from '../components/ui'
 import { SIMBOLOS_ESTADO } from '../lib/simbolos'
 import { GrillaAnual } from '../components/GrillaAnual'
 import { FichaTitle } from '../components/FichaTitle'
@@ -278,7 +278,10 @@ export function CronogramaPage() {
                           style={{ background: bloqueColorVar(bloque?.color) }}
                         />
                         <span className="table-cell">
-                          <FichaTitle ficha={ficha} color={bloque?.color} />
+                          <span className="occ-meta">
+                            <FichaTitle ficha={ficha} color={bloque?.color} />
+                            {esExtraordinaria(o) ? <ExtraBadge /> : null}
+                          </span>
                           <span className="muted col-sm-only">
                             {showBloque && bloque?.nombre
                               ? `${bloque.nombre}${encargado ? ` · ${encargado.nombre}` : ''}`

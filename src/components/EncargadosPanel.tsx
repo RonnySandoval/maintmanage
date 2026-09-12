@@ -1,37 +1,17 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { db } from '../db'
 import type { Encargado } from '../db/types'
-import { createId } from '../lib/ids'
 import { congregacionDe, congregacionLabel } from '../lib/fichas'
 import { CopyText } from './CopyText'
+import { CrearEncargadoForm } from './CrearEncargadoForm'
 
 export function EncargadosPanel() {
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
   const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
-  const [encNombre, setEncNombre] = useState('')
-  const [encTelefonos, setEncTelefonos] = useState('')
-  const [encCongregacion, setEncCongregacion] = useState('')
   const [error, setError] = useState('')
   const [editEnc, setEditEnc] = useState<string | null>(null)
-
-  async function addEncargado(e: FormEvent) {
-    e.preventDefault()
-    if (!encNombre.trim()) return
-    const now = Date.now()
-    await db.encargados.add({
-      id: createId(),
-      nombre: encNombre.trim(),
-      telefonos: encTelefonos.trim() || undefined,
-      congregacion: encCongregacion.trim() || undefined,
-      createdAt: now,
-      updatedAt: now,
-    })
-    setEncNombre('')
-    setEncTelefonos('')
-    setEncCongregacion('')
-  }
 
   async function removeEncargado(id: string) {
     if (fichas.some((f) => f.encargadoId === id)) {
@@ -70,41 +50,7 @@ export function EncargadosPanel() {
     <section className="card">
       {error ? <p className="danger-text">{error}</p> : null}
       <h2 className="title-sm">Encargados</h2>
-      <form onSubmit={(e) => void addEncargado(e)}>
-        <div className="field">
-          <label htmlFor="en">Nombre</label>
-          <input
-            id="en"
-            className="input"
-            value={encNombre}
-            onChange={(e) => setEncNombre(e.target.value)}
-            placeholder="Nombre"
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="et">Teléfono(s) (opcional)</label>
-          <input
-            id="et"
-            className="input"
-            value={encTelefonos}
-            onChange={(e) => setEncTelefonos(e.target.value)}
-            placeholder="Varios, separados por coma"
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="eco">Congregación (opcional)</label>
-          <input
-            id="eco"
-            className="input"
-            value={encCongregacion}
-            onChange={(e) => setEncCongregacion(e.target.value)}
-          />
-        </div>
-        <button className="btn btn-add" type="submit">
-          <Plus size={16} />
-          Añadir encargado
-        </button>
-      </form>
+      <CrearEncargadoForm accordion defaultOpen={false} />
       <div className="table-card" style={{ marginTop: '1rem' }}>
         {encargados.length === 0 ? (
           <p className="table-empty">Aún no hay encargados.</p>
@@ -112,7 +58,7 @@ export function EncargadosPanel() {
           <>
             <div className="table-head table-cols-encargados">
               <span>Nombre</span>
-              <span className="col-md">Teléfono</span>
+              <span>Teléfono</span>
               <span className="table-actions">Acciones</span>
             </div>
             {encargadosPorCongregacion.map((group) => (
@@ -131,16 +77,8 @@ export function EncargadosPanel() {
                         <>
                           <span className="table-cell">
                             <strong>{p.nombre}</strong>
-                            {phone ? (
-                              <span className="muted col-sm-only phone-line">
-                                {phone}
-                                <CopyText text={phone} label="Copiar teléfono" />
-                              </span>
-                            ) : (
-                              <span className="muted col-sm-only">Sin teléfono</span>
-                            )}
                           </span>
-                          <span className="col-md phone-cell">
+                          <span className="phone-cell">
                             {phone ? (
                               <>
                                 <span className="muted">{phone}</span>

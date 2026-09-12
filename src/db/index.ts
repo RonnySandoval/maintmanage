@@ -143,6 +143,46 @@ export class MaintDB extends Dexie {
             accion.tipo = accion.fechaObjetivo ? 'correctiva' : 'recomendacion'
           })
       })
+    this.version(6)
+      .stores({
+        encargados: 'id, nombre',
+        grupos: 'id, nombre',
+        fichas: 'id, grupoId, encargadoId, nombre, numero',
+        ocurrencias: 'id, fichaId, fechaProgramada, estado, origen, [fichaId+fechaProgramada]',
+        ejecuciones: 'id, ocurrenciaId',
+        accionesCorrectivas: 'id, fichaId, ocurrenciaId, estado, tipo',
+        adjuntos: 'id, fichaId, ejecucionId, tipo',
+        ajustes: 'id',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('ocurrencias')
+          .toCollection()
+          .modify((occ: { origen?: string }) => {
+            if (occ.origen !== 'extraordinaria') occ.origen = 'programada'
+          })
+      })
+    this.version(7)
+      .stores({
+        encargados: 'id, nombre',
+        grupos: 'id, nombre',
+        fichas: 'id, grupoId, encargadoId, nombre, numero',
+        ocurrencias: 'id, fichaId, fechaProgramada, estado, origen, [fichaId+fechaProgramada]',
+        ejecuciones: 'id, ocurrenciaId',
+        accionesCorrectivas: 'id, fichaId, ocurrenciaId, estado, tipo, prioridad',
+        adjuntos: 'id, fichaId, ejecucionId, tipo',
+        ajustes: 'id',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('accionesCorrectivas')
+          .toCollection()
+          .modify((accion: { prioridad?: string }) => {
+            if (accion.prioridad !== 'alta' && accion.prioridad !== 'baja') {
+              accion.prioridad = 'media'
+            }
+          })
+      })
   }
 }
 

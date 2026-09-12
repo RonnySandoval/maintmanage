@@ -1,17 +1,22 @@
 import { useState, type KeyboardEvent } from 'react'
-import { Plus } from 'lucide-react'
+import { ChevronDown, Plus } from 'lucide-react'
 import { db } from '../db'
 import { createId } from '../lib/ids'
 
 export function CrearEncargadoForm({
   onCreated,
+  accordion = false,
+  defaultOpen = true,
 }: {
   onCreated?: (id: string) => void
+  accordion?: boolean
+  defaultOpen?: boolean
 }) {
   const [nombre, setNombre] = useState('')
   const [telefonos, setTelefonos] = useState('')
   const [congregacion, setCongregacion] = useState('')
   const [error, setError] = useState('')
+  const [open, setOpen] = useState(accordion ? defaultOpen : true)
 
   async function submit() {
     const name = nombre.trim()
@@ -43,9 +48,9 @@ export function CrearEncargadoForm({
     void submit()
   }
 
-  return (
-    <div className="create-panel compact-panel" onKeyDown={onKeyDown}>
-      <h3 className="title-sm">Crear encargado</h3>
+  const body = (
+    <div onKeyDown={onKeyDown}>
+      {accordion ? null : <h3 className="title-sm">Crear encargado</h3>}
       <div className="field">
         <label htmlFor="enc-nuevo-nombre">Nombre</label>
         <input
@@ -83,6 +88,25 @@ export function CrearEncargadoForm({
         <Plus size={16} />
         Crear encargado
       </button>
+    </div>
+  )
+
+  if (!accordion) {
+    return <div className="create-panel compact-panel">{body}</div>
+  }
+
+  return (
+    <div className={`create-panel compact-panel accordion-panel${open ? '' : ' is-collapsed'}`}>
+      <button
+        type="button"
+        className="accordion-trigger"
+        aria-expanded={open}
+        onClick={() => setOpen((was) => !was)}
+      >
+        <span>Nuevo encargado</span>
+        <ChevronDown size={18} className={open ? 'is-open' : ''} />
+      </button>
+      {open ? <div className="accordion-body">{body}</div> : null}
     </div>
   )
 }

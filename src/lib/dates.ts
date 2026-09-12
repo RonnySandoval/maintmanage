@@ -168,6 +168,16 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+/** true si `fecha` es esta o posterior a `desde` (por mes o por día). */
+export function fechaEnAdelante(
+  fecha: string,
+  desde: string,
+  precision: FechaPrecision = 'dia',
+): boolean {
+  if (precision === 'mes') return monthValue(fecha) >= monthValue(desde)
+  return normalizeISODate(fecha) >= normalizeISODate(desde)
+}
+
 export function formatDateTime(ts: number): string {
   return new Date(ts).toLocaleString('es', {
     day: 'numeric',

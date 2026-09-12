@@ -1,18 +1,24 @@
+import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Pencil, Trash2 } from 'lucide-react'
+import { CalendarPlus, CalendarRange, Pencil, Trash2 } from 'lucide-react'
 import { db } from '../db'
-import { frecuenciaLabel } from '../db/types'
+import { ESTADOS, esExtraordinaria, frecuenciaLabel, type EstadoOcurrencia } from '../db/types'
 import { bloqueColorVar } from '../lib/colors'
-import { formatFechaProgramada } from '../lib/dates'
+import { formatFechaProgramada, todayISO } from '../lib/dates'
 import { fichaTitulo } from '../lib/fichas'
 import { saveAdjuntos } from '../lib/files'
 import { blobToFile } from '../lib/share'
-import { deleteFichaCascade } from '../db/occurrences'
+import {
+  addInspeccionExtraordinaria,
+  aplicarDesdeFecha,
+  deleteFichaCascade,
+  ocurrenciasDesdeFecha,
+} from '../db/occurrences'
 import { AttachmentList, removeAdjunto } from '../components/AttachmentList'
 import { FilePicker } from '../components/FilePicker'
 import { ShareMenu } from '../components/ShareMenu'
-import { StatusBadge } from '../components/ui'
+import { ExtraBadge, Modal, StatusBadge } from '../components/ui'
 import { FichaTitle } from '../components/FichaTitle'
 import { AccionesPanel } from '../components/AccionesPanel'
 import { CopyText } from '../components/CopyText'
@@ -43,6 +49,16 @@ export function FichaDetailPage() {
       [id],
     ) ?? []
 
+  const [modal, setModal] = useState<'extra' | 'desde' | null>(null)
+  const [extraFecha, setExtraFecha] = useState(todayISO())
+  const [extraError, setExtraError] = useState('')
+  const [extraSaving, setExtraSaving] = useState(false)
+  const [desdeFecha, setDesdeFecha] = useState(todayISO())
+  const [desdeModo, setDesdeModo] = useState<'fijar' | 'eliminar'>('fijar')
+  const [desdeEstado, setDesdeEstado] = useState<EstadoOcurrencia>('pendiente')
+  const [desdeError, setDesdeError] = useState('')
+  const [desdeSaving, setDesdeSaving] = useState(false)
+
   if (!id) return null
   if (ficha === undefined) return <p className="muted">Cargando…</p>
   if (ficha === null) {
@@ -56,6 +72,8 @@ export function FichaDetailPage() {
   const current = ficha
   const plantilla = adjuntos.filter((a) => a.tipo === 'ficha')
   const telefonoEncargado = encargado?.telefonos || encargado?.contacto || ''
+  const precision = ficha.fechaPrecision === 'dia' ? 'dia' : 'mes'
+  const afectadas = ocurrenciasDesdeFecha(ocurrencias, desdeFecha, precision)
   const shareText = [
     `Ficha: ${fichaTitulo(current)}`,
     bloque ? `Bloque: ${bloque.nombre}` : '',
@@ -76,6 +94,68 @@ export function FichaDetailPage() {
     }
     await deleteFichaCascade(current.id)
     navigate('/fichas', { replace: true })
+  }
+
+  function openExtra() {
+    setExtraFecha(todayISO())
+    setExtraError('')
+    setModal('extra')
+  }
+
+  function openDesde() {
+    setDesdeFecha(todayISO())
+    setDesdeModo('fijar')
+    setDesdeEstado('pendiente')
+    setDesdeError('')
+    setModal('desde')
+  }
+
+  async function submitExtra(e: FormEvent) {
+    e.preventDefault()
+    setExtraError('')
+    setExtraSaving(true)
+    try {
+      const result = await addInspeccionExtraordinaria(current, extraFecha)
+      if (!result.ok) {
+        setExtraError(result.error)
+        return
+      }
+      setModal(null)
+    } finally {
+      setExtraSaving(false)
+    }
+  }
+
+  async function submitDesde(e: FormEvent) {
+    e.preventDefault()
+    setDesdeError('')
+    if (desdeModo === 'eliminar') {
+      const label = precision === 'mes'
+        ? formatFechaProgramada(desdeFecha, 'mes')
+        : formatFechaProgramada(desdeFecha, 'dia')
+      if (
+        !confirm(
+          `¿Eliminar ${afectadas.length} inspección(es) desde ${label} (esta y las posteriores)? No quedará registro. Las anteriores no se tocan.`,
+        )
+      ) {
+        return
+      }
+    }
+    setDesdeSaving(true)
+    try {
+      const result = await aplicarDesdeFecha(
+        current.id,
+        desdeFecha,
+        desdeModo === 'fijar' ? { tipo: 'fijar', estado: desdeEstado } : { tipo: 'eliminar' },
+      )
+      if (!result.ok) {
+        setDesdeError(result.error)
+        return
+      }
+      setModal(null)
+    } finally {
+      setDesdeSaving(false)
+    }
   }
 
   return (
@@ -142,27 +222,149 @@ export function FichaDetailPage() {
       </div>
 
       <div className="card">
-        <div className="row-spread">
+        <div className="row-spread" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
           <h3 className="title-sm" style={{ margin: 0 }}>
             Cronograma
           </h3>
-          <Link to={`/cronograma?ficha=${ficha.id}`}>Filtrar</Link>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-add" onClick={openExtra}>
+              <CalendarPlus size={16} />
+              Añadir inspección
+            </button>
+            <button type="button" className="btn" onClick={openDesde}>
+              <CalendarRange size={16} />
+              Desde esta fecha…
+            </button>
+            <Link to={`/cronograma?ficha=${ficha.id}`}>Filtrar</Link>
+          </div>
         </div>
         <div className="list" style={{ marginTop: '0.7rem' }}>
-          {ocurrencias.slice(0, 18).map((o) => (
-            <Link key={o.id} className="card-click item" to={`/ocurrencias/${o.id}`}>
-              <div className="grow">
-                <div className="row-spread">
-                  <span>{formatFechaProgramada(o.fechaProgramada, ficha.fechaPrecision ?? 'mes')}</span>
-                  <StatusBadge estado={o.estado} />
+          {ocurrencias.length === 0 ? (
+            <p className="muted" style={{ margin: 0 }}>
+              Sin inspecciones. Añade una extraordinaria o espera al periodo programado.
+            </p>
+          ) : (
+            ocurrencias.map((o) => (
+              <Link key={o.id} className="card-click item" to={`/ocurrencias/${o.id}`}>
+                <div className="grow">
+                  <div className="row-spread">
+                    <span className="occ-meta">
+                      {formatFechaProgramada(o.fechaProgramada, ficha.fechaPrecision ?? 'mes')}
+                      {esExtraordinaria(o) ? <ExtraBadge /> : null}
+                      {o.estadoFijado ? <span className="muted">Fijado</span> : null}
+                    </span>
+                    <StatusBadge estado={o.estado} />
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            ))
+          )}
         </div>
       </div>
 
       <AccionesPanel fichaId={ficha.id} />
+
+      <Modal open={modal === 'extra'} title="Añadir inspección" onClose={() => setModal(null)}>
+        <form onSubmit={(e) => void submitExtra(e)}>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Inspección extraordinaria, fuera del periodo. No la regenera la frecuencia.
+          </p>
+          <div className="field">
+            <label htmlFor="extra-fecha">Fecha</label>
+            <input
+              id="extra-fecha"
+              className="input"
+              type="date"
+              value={extraFecha}
+              onChange={(e) => setExtraFecha(e.target.value)}
+              required
+            />
+          </div>
+          {extraError ? <p className="danger-text">{extraError}</p> : null}
+          <div className="row" style={{ marginTop: '0.85rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-primary" type="submit" disabled={extraSaving}>
+              {extraSaving ? 'Guardando…' : 'Añadir'}
+            </button>
+            <button type="button" className="btn" onClick={() => setModal(null)}>
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={modal === 'desde'} title="Desde esta fecha…" onClose={() => setModal(null)}>
+        <form onSubmit={(e) => void submitDesde(e)}>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Aplica a esta fecha y las posteriores. Las anteriores no se tocan, estén hechas o no.
+          </p>
+          <div className="field">
+            <label htmlFor="desde-fecha">Fecha</label>
+            <input
+              id="desde-fecha"
+              className="input"
+              type="date"
+              value={desdeFecha}
+              onChange={(e) => setDesdeFecha(e.target.value)}
+              required
+            />
+          </div>
+          <div className="chip-row tight" role="tablist" aria-label="Acción">
+            <button
+              type="button"
+              className={`chip compact${desdeModo === 'fijar' ? ' active' : ''}`}
+              onClick={() => setDesdeModo('fijar')}
+            >
+              Fijar estado
+            </button>
+            <button
+              type="button"
+              className={`chip compact${desdeModo === 'eliminar' ? ' active' : ''}`}
+              onClick={() => setDesdeModo('eliminar')}
+            >
+              Eliminar
+            </button>
+          </div>
+          {desdeModo === 'fijar' ? (
+            <div className="field">
+              <label htmlFor="desde-estado">Estado</label>
+              <select
+                id="desde-estado"
+                className="select"
+                value={desdeEstado}
+                onChange={(e) => setDesdeEstado(e.target.value as EstadoOcurrencia)}
+              >
+                {ESTADOS.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <p className="muted">
+              Se borra el registro (ejecución y fotos). Las programadas no volverán a aparecer.
+            </p>
+          )}
+          <p className="muted">
+            {afectadas.length
+              ? `Se aplicará a ${afectadas.length} inspección(es).`
+              : 'No hay inspecciones desde esa fecha.'}
+          </p>
+          {desdeError ? <p className="danger-text">{desdeError}</p> : null}
+          <div className="row" style={{ marginTop: '0.85rem', flexWrap: 'wrap' }}>
+            <button
+              className={desdeModo === 'eliminar' ? 'btn btn-danger' : 'btn btn-primary'}
+              type="submit"
+              disabled={desdeSaving || afectadas.length === 0}
+            >
+              {desdeSaving ? 'Aplicando…' : 'Aplicar'}
+            </button>
+            <button type="button" className="btn" onClick={() => setModal(null)}>
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

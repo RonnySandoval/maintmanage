@@ -1,17 +1,21 @@
 import { useState, type FormEvent } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import {
   ESTADOS_CORRECTIVA,
+  PRIORIDADES,
+  prioridadOf,
   tipoAccionLabel,
   tipoAccionOf,
   type AccionCorrectiva,
   type EstadoCorrectiva,
+  type PrioridadAccion,
   type TipoAccion,
 } from '../db/types'
 import { createId } from '../lib/ids'
-import { formatDate, todayISO } from '../lib/dates'
+import { formatDate } from '../lib/dates'
+import { PrioridadMark } from './PrioridadMark'
 
 export function AccionesPanel({
   fichaId,
@@ -37,9 +41,20 @@ export function AccionesPanel({
   const [tipo, setTipo] = useState<TipoAccion>('correctiva')
   const [texto, setTexto] = useState('')
   const [estado, setEstado] = useState<EstadoCorrectiva>('pendiente')
-  const [fecha, setFecha] = useState(todayISO())
+  const [fecha, setFecha] = useState('')
+  const [prioridad, setPrioridad] = useState<PrioridadAccion>('media')
   const [error, setError] = useState('')
   const [editId, setEditId] = useState<string | null>(null)
+  const [filtroTipo, setFiltroTipo] = useState<'todas' | TipoAccion>('todas')
+  const [filtroFecha, setFiltroFecha] = useState<'todas' | 'con' | 'sin'>('todas')
+  const [open, setOpen] = useState(false)
+
+  const visibles = acciones.filter((a) => {
+    if (!onlyCorrectiva && filtroTipo !== 'todas' && tipoAccionOf(a) !== filtroTipo) return false
+    if (filtroFecha === 'con' && !a.fechaObjetivo) return false
+    if (filtroFecha === 'sin' && a.fechaObjetivo) return false
+    return true
+  })
 
   async function add(e: FormEvent) {
     e.preventDefault()
@@ -49,10 +64,6 @@ export function AccionesPanel({
       return
     }
     const nextTipo = onlyCorrectiva ? 'correctiva' : tipo
-    if (nextTipo === 'correctiva' && !fecha) {
-      setError('La acción correctiva necesita una fecha.')
-      return
-    }
     const now = Date.now()
     await db.accionesCorrectivas.add({
       id: createId(),
@@ -61,13 +72,15 @@ export function AccionesPanel({
       tipo: nextTipo,
       texto: texto.trim(),
       estado,
-      fechaObjetivo: nextTipo === 'correctiva' ? fecha : undefined,
+      fechaObjetivo: fecha || undefined,
+      prioridad: nextTipo === 'correctiva' ? prioridad : undefined,
       createdAt: now,
       updatedAt: now,
     })
     setTexto('')
-    setFecha(todayISO())
+    setFecha('')
     setEstado('pendiente')
+    setPrioridad('media')
     setTipo('correctiva')
   }
 
@@ -77,9 +90,29 @@ export function AccionesPanel({
     if (editId === id) setEditId(null)
   }
 
+  const titulo = onlyCorrectiva ? 'Acciones correctivas' : 'Acciones y recomendaciones'
+
   return (
-    <div className="card">
-      <h3 className="title-sm">{onlyCorrectiva ? 'Acciones correctivas' : 'Acciones y recomendaciones'}</h3>
+    <div className={`card accordion-panel${open ? '' : ' is-collapsed'}`}>
+      <button
+        type="button"
+        className="accordion-trigger"
+        aria-expanded={open}
+        onClick={() => setOpen((was) => !was)}
+      >
+        <span>
+          {titulo}
+          {!open && acciones.length ? (
+            <span className="muted" style={{ fontWeight: 500 }}>
+              {' · '}
+              {acciones.length}
+            </span>
+          ) : null}
+        </span>
+        <ChevronDown size={18} className={open ? 'is-open' : ''} />
+      </button>
+      {open ? (
+      <div className="accordion-body">
       <form onSubmit={(e) => void add(e)}>
         {onlyCorrectiva ? null : (
         <div className="chip-row tight" role="tablist" aria-label="Tipo">
@@ -115,7 +148,7 @@ export function AccionesPanel({
             }
           />
         </div>
-        <div className={tipo === 'correctiva' ? 'ficha-form-grid' : ''}>
+        <div className="ficha-form-grid">
           <div className="field">
             <label htmlFor="accion-estado">Estado</label>
             <select
@@ -131,24 +164,36 @@ export function AccionesPanel({
               ))}
             </select>
           </div>
-          {tipo === 'correctiva' ? (
-            <div className="field">
-              <label htmlFor="accion-fecha">Fecha (obligatoria)</label>
-              <input
-                id="accion-fecha"
-                className="input"
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                required
-              />
-            </div>
-          ) : (
-            <p className="muted" style={{ marginTop: 0 }}>
-              Las recomendaciones no llevan fecha.
-            </p>
-          )}
+          <div className="field">
+            <label htmlFor="accion-fecha">Fecha límite (opcional)</label>
+            <input
+              id="accion-fecha"
+              className="input"
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+            />
+          </div>
         </div>
+        {onlyCorrectiva || tipo === 'correctiva' ? (
+          <div className="field">
+            <label id="accion-prioridad">Prioridad</label>
+            <div className="chip-row tight" role="radiogroup" aria-labelledby="accion-prioridad">
+              {PRIORIDADES.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={prioridad === p.id}
+                  className={`chip compact${prioridad === p.id ? ' active' : ''}`}
+                  onClick={() => setPrioridad(p.id)}
+                >
+                  <PrioridadMark prioridad={p.id} />
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {error ? <p className="danger-text">{error}</p> : null}
         <button className="btn btn-add" type="submit">
           <Plus size={16} />
@@ -157,18 +202,73 @@ export function AccionesPanel({
       </form>
 
       <div className="table-card" style={{ marginTop: '0.9rem', boxShadow: 'none' }}>
+        {acciones.length > 0 ? (
+          <div className="acciones-filtros">
+            {onlyCorrectiva ? null : (
+              <div className="chip-row tight" role="tablist" aria-label="Tipo en la lista">
+                <button
+                  type="button"
+                  className={`chip compact${filtroTipo === 'todas' ? ' active' : ''}`}
+                  onClick={() => setFiltroTipo('todas')}
+                >
+                  Todas
+                </button>
+                <button
+                  type="button"
+                  className={`chip compact${filtroTipo === 'correctiva' ? ' active' : ''}`}
+                  onClick={() => setFiltroTipo('correctiva')}
+                >
+                  Correctivas
+                </button>
+                <button
+                  type="button"
+                  className={`chip compact${filtroTipo === 'recomendacion' ? ' active' : ''}`}
+                  onClick={() => setFiltroTipo('recomendacion')}
+                >
+                  Recomendadas
+                </button>
+              </div>
+            )}
+            <div className="chip-row tight" role="tablist" aria-label="Fecha límite">
+              <button
+                type="button"
+                className={`chip compact${filtroFecha === 'todas' ? ' active' : ''}`}
+                onClick={() => setFiltroFecha('todas')}
+              >
+                Con o sin fecha
+              </button>
+              <button
+                type="button"
+                className={`chip compact${filtroFecha === 'con' ? ' active' : ''}`}
+                onClick={() => setFiltroFecha('con')}
+              >
+                Con fecha
+              </button>
+              <button
+                type="button"
+                className={`chip compact${filtroFecha === 'sin' ? ' active' : ''}`}
+                onClick={() => setFiltroFecha('sin')}
+              >
+                Sin fecha
+              </button>
+            </div>
+          </div>
+        ) : null}
         {acciones.length === 0 ? (
           <p className="table-empty">Ningún registro aún.</p>
+        ) : visibles.length === 0 ? (
+          <p className="table-empty">Ninguna coincide con el filtro.</p>
         ) : (
           <>
             <div className="table-head table-cols-accion">
               <span>Texto</span>
               <span className="col-md">Tipo</span>
               <span className="col-md">Fecha</span>
+              <span className="col-md">Prioridad</span>
               <span>Estado</span>
               <span className="table-actions"> </span>
             </div>
-            {acciones.map((a) =>
+            {visibles.map((a) =>
             editId === a.id ? (
               <div key={a.id} className="table-row is-editing">
                 <AccionEditor accion={a} onDone={() => setEditId(null)} onlyCorrectiva={onlyCorrectiva} />
@@ -179,12 +279,21 @@ export function AccionesPanel({
                   <strong>{a.texto}</strong>
                   <span className="muted col-sm-only">
                     {tipoAccionLabel(tipoAccionOf(a))}
+                    {tipoAccionOf(a) === 'correctiva' ? (
+                      <>
+                        {' · '}
+                        <PrioridadMark prioridad={prioridadOf(a)} />
+                      </>
+                    ) : null}
                     {a.fechaObjetivo ? ` · ${formatDate(a.fechaObjetivo)}` : ''}
                   </span>
                 </span>
                 <span className="col-md muted">{tipoAccionLabel(tipoAccionOf(a))}</span>
                 <span className="col-md muted table-nowrap">
                   {a.fechaObjetivo ? formatDate(a.fechaObjetivo) : '—'}
+                </span>
+                <span className="col-md">
+                  {tipoAccionOf(a) === 'correctiva' ? <PrioridadMark prioridad={prioridadOf(a)} /> : '—'}
                 </span>
                 <span className={`badge badge-${a.estado}`}>
                   {ESTADOS_CORRECTIVA.find((s) => s.id === a.estado)?.label ?? a.estado}
@@ -213,6 +322,8 @@ export function AccionesPanel({
           </>
         )}
       </div>
+      </div>
+      ) : null}
     </div>
   )
 }
@@ -229,7 +340,8 @@ function AccionEditor({
   const [tipo, setTipo] = useState<TipoAccion>(tipoAccionOf(accion))
   const [texto, setTexto] = useState(accion.texto)
   const [estado, setEstado] = useState<EstadoCorrectiva>(accion.estado)
-  const [fecha, setFecha] = useState(accion.fechaObjetivo || todayISO())
+  const [fecha, setFecha] = useState(accion.fechaObjetivo || '')
+  const [prioridad, setPrioridad] = useState<PrioridadAccion>(prioridadOf(accion))
   const [error, setError] = useState('')
 
   async function save() {
@@ -239,10 +351,6 @@ function AccionEditor({
       return
     }
     const nextTipo = onlyCorrectiva ? 'correctiva' : tipo
-    if (nextTipo === 'correctiva' && !fecha) {
-      setError('La acción correctiva necesita una fecha.')
-      return
-    }
     const next: AccionCorrectiva = {
       ...accion,
       tipo: nextTipo,
@@ -250,8 +358,10 @@ function AccionEditor({
       estado,
       updatedAt: Date.now(),
     }
-    if (nextTipo === 'correctiva') next.fechaObjetivo = fecha
+    if (fecha) next.fechaObjetivo = fecha
     else delete next.fechaObjetivo
+    if (nextTipo === 'correctiva') next.prioridad = prioridad
+    else delete next.prioridad
     await db.accionesCorrectivas.put(next)
     onDone()
   }
@@ -280,7 +390,7 @@ function AccionEditor({
         <label>Texto</label>
         <input className="input" value={texto} onChange={(e) => setTexto(e.target.value)} />
       </div>
-      <div className={tipo === 'correctiva' ? 'ficha-form-grid' : ''}>
+      <div className="ficha-form-grid">
         <div className="field">
           <label>Estado</label>
           <select
@@ -295,18 +405,35 @@ function AccionEditor({
             ))}
           </select>
         </div>
-        {tipo === 'correctiva' ? (
-          <div className="field">
-            <label>Fecha</label>
-            <input
-              className="input"
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-            />
-          </div>
-        ) : null}
+        <div className="field">
+          <label>Fecha límite (opcional)</label>
+          <input
+            className="input"
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
+          />
+        </div>
       </div>
+      {onlyCorrectiva || tipo === 'correctiva' ? (
+        <div className="field">
+          <label>Prioridad</label>
+          <div className="chip-row tight" role="radiogroup" aria-label="Prioridad">
+            {PRIORIDADES.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                role="radio"
+                aria-checked={prioridad === p.id}
+                className={`chip compact${prioridad === p.id ? ' active' : ''}`}
+                onClick={() => setPrioridad(p.id)}
+              >
+                <PrioridadMark prioridad={p.id} />
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {error ? <p className="danger-text">{error}</p> : null}
       <div className="row">
         <button type="button" className="btn btn-primary" onClick={() => void save()}>

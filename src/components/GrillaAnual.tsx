@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react'
 import type { AccionCorrectiva, Bloque, Encargado, EstadoOcurrencia, Ficha, Ocurrencia } from '../db/types'
-import { frecuenciaLabel, tipoAccionOf } from '../db/types'
+import { esExtraordinaria, frecuenciaLabel, tipoAccionOf } from '../db/types'
 import { compareFichasByNumero } from '../lib/fichas'
 import { labelEstado, SIMBOLO_CORRECTIVA, simboloEstado } from '../lib/simbolos'
 import {
@@ -411,9 +411,13 @@ function FichaRow({
         const cls = `month-col ${monthClass(month, start, currentMonth)}`.trim()
         if (!occ) return <td key={month} className={cls} />
         const hasCorrectiva = correctivaOcc.has(occ.id) || correctivaFicha.has(ficha.id)
-        const title = hasCorrectiva
-          ? `${labelEstado(occ.estado)} · Con acción correctiva`
-          : labelEstado(occ.estado)
+        const title = [
+          labelEstado(occ.estado),
+          esExtraordinaria(occ) ? 'Extraordinaria' : '',
+          hasCorrectiva ? 'Con acción correctiva' : '',
+        ]
+          .filter(Boolean)
+          .join(' · ')
         return (
           <td key={month} className={cls}>
             <Link

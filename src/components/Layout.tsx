@@ -1,4 +1,8 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../db'
+import { fichaTitulo } from '../lib/fichas'
+import { monthLabel } from '../lib/dates'
 import {
   CalendarDays,
   ChevronLeft,
@@ -8,7 +12,9 @@ import {
   LayoutDashboard,
   Settings,
 } from 'lucide-react'
+import { FilterDrawer, FilterDrawerToggle } from './FilterDrawer'
 import { ThemeQuickToggle } from './ThemeQuickToggle'
+import { FilterDrawerProvider } from '../hooks/useFilterDrawer'
 import { useAppHistory } from '../hooks/useAppHistory'
 import { useAutoBackup } from '../hooks/useAutoBackup'
 
@@ -41,6 +47,19 @@ function titleFor(pathname: string, search = ''): string {
   return TITLES[pathname] ?? 'MaintManage'
 }
 
+function PageHeading({ pathname, search }: { pathname: string; search: string }) {
+  const occId = pathname.match(/^\/ocurrencias\/([^/]+)/)?.[1]
+  const occ = useLiveQuery(() => (occId ? db.ocurrencias.get(occId) : undefined), [occId])
+  const ficha = useLiveQuery(
+    () => (occ?.fichaId ? db.fichas.get(occ.fichaId) : undefined),
+    [occ?.fichaId],
+  )
+  if (occId && ficha && occ) {
+    return `${fichaTitulo(ficha)} · ${monthLabel(occ.fechaProgramada)}`
+  }
+  return titleFor(pathname, search)
+}
+
 function NavItems() {
   return (
     <>
@@ -63,6 +82,14 @@ function NavItems() {
 }
 
 export function Layout() {
+  return (
+    <FilterDrawerProvider>
+      <LayoutShell />
+    </FilterDrawerProvider>
+  )
+}
+
+function LayoutShell() {
   const location = useLocation()
   const { canBack, canForward, back, forward } = useAppHistory()
   const { banner, busy, saveNow, dismiss } = useAutoBackup()
@@ -104,9 +131,14 @@ export function Layout() {
                 <ChevronRight size={20} />
               </button>
             </div>
-            <h1>{titleFor(location.pathname, location.search)}</h1>
+            <h1>
+              <PageHeading pathname={location.pathname} search={location.search} />
+            </h1>
           </div>
-          <ThemeQuickToggle />
+          <div className="topbar-actions">
+            <FilterDrawerToggle />
+            <ThemeQuickToggle />
+          </div>
         </header>
         <main className="page">
           {banner ? (
@@ -124,6 +156,7 @@ export function Layout() {
           ) : null}
           <Outlet />
         </main>
+        <FilterDrawer />
       </div>
       <nav className="bottom-nav" aria-label="Principal">
         <NavItems />

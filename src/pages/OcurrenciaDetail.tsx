@@ -1,22 +1,22 @@
-import { useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { ChevronDown, Trash2 } from 'lucide-react'
 import { db } from '../db'
-import { createId } from '../lib/ids'
-import { formatFechaProgramada, todayISO } from '../lib/dates'
+import { esExtraordinaria, esOcurrenciaProgramada } from '../db/types'
+import { formatFechaProgramada, monthLabel } from '../lib/dates'
 import { fichaTitulo } from '../lib/fichas'
-import { saveAdjuntos } from '../lib/files'
 import { blobToFile } from '../lib/share'
-import { refreshEstados } from '../db/occurrences'
-import { AttachmentList, removeAdjunto } from '../components/AttachmentList'
-import { FilePicker } from '../components/FilePicker'
+import { deleteOcurrencia } from '../db/occurrences'
 import { ShareMenu } from '../components/ShareMenu'
-import { StatusBadge } from '../components/ui'
+import { ExtraBadge, StatusBadge } from '../components/ui'
 import { FichaTitle } from '../components/FichaTitle'
 import { AccionesPanel } from '../components/AccionesPanel'
+import { EjecucionForm } from '../components/EjecucionForm'
 
 export function OcurrenciaDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const occ = useLiveQuery(async () => {
     if (!id) return null
     return (await db.ocurrencias.get(id)) ?? null
@@ -51,10 +51,8 @@ export function OcurrenciaDetailPage() {
       [occ?.fichaId],
     ) ?? []
 
-  const [fechaReal, setFechaReal] = useState(todayISO())
-  const [observaciones, setObservaciones] = useState('')
-  const [files, setFiles] = useState<File[]>([])
-  const [saving, setSaving] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const [ejecOpen, setEjecOpen] = useState(false)
 
   if (!id) return null
   if (occ === undefined) return <p className="muted">Cargando…</p>
@@ -80,9 +78,11 @@ export function OcurrenciaDetailPage() {
   const shareText = [
     `Ficha: ${fichaTitulo(currentFicha)}`,
     `Programada: ${ocurrencia.fechaProgramada}`,
+    esExtraordinaria(ocurrencia) ? 'Origen: Extraordinaria' : '',
     `Estado: ${ocurrencia.estado}`,
     bloque ? `Bloque: ${bloque.nombre}` : '',
     encargado ? `Encargado: ${encargado.nombre}` : '',
+    ejecucion?.realizadoPor ? `Realizado por: ${ejecucion.realizadoPor}` : '',
     ejecucion?.observaciones ? `Observaciones: ${ejecucion.observaciones}` : '',
   ]
     .filter(Boolean)
@@ -92,110 +92,89 @@ export function OcurrenciaDetailPage() {
     blobToFile(a.blob, a.nombre, a.mimeType),
   )
 
-  async function markDone(e: FormEvent) {
-    e.preventDefault()
-    setSaving(true)
+  async function removeOcc() {
+    const extra = esOcurrenciaProgramada(ocurrencia)
+      ? ' Si era programada, no volverá a aparecer en el cronograma.'
+      : ''
+    if (!confirm(`¿Eliminar esta inspección? No se borra la ficha.${extra}`)) return
+    setRemoving(true)
     try {
-      const now = Date.now()
-      const ejecucionId = ejecucion?.id ?? createId()
-      await db.ejecuciones.put({
-        id: ejecucionId,
-        ocurrenciaId: ocurrencia.id,
-        fechaReal,
-        observaciones: observaciones.trim() || undefined,
-        createdAt: ejecucion?.createdAt ?? now,
-        updatedAt: now,
-      })
-      if (files.length) await saveAdjuntos(files, { tipo: 'ejecucion', ejecucionId, fichaId: currentFicha.id })
-      await refreshEstados()
-      setFiles([])
-      setObservaciones('')
+      const fichaId = await deleteOcurrencia(ocurrencia.id)
+      navigate(fichaId ? `/fichas/${fichaId}` : '/cronograma', { replace: true })
     } finally {
-      setSaving(false)
+      setRemoving(false)
     }
   }
 
+  const periodo = monthLabel(ocurrencia.fechaProgramada)
+
   return (
     <div className="stack">
-      <div className="card">
+      <div className="card occ-head-card">
         <div className="row-spread" style={{ marginBottom: 8, flexWrap: 'wrap' }}>
           <div>
-            <p className="muted" style={{ margin: 0, textTransform: 'capitalize' }}>
-              {formatFechaProgramada(
-                ocurrencia.fechaProgramada,
-                currentFicha.fechaPrecision === 'dia' ? 'dia' : 'mes',
-              )}
-            </p>
-            <h2>
+            <h2 style={{ marginBottom: 4 }}>
               <Link to={`/fichas/${currentFicha.id}`}>
                 <FichaTitle ficha={currentFicha} color={bloque?.color} />
               </Link>
             </h2>
-            <p className="muted">
-              {bloque?.nombre} · {encargado?.nombre}
+            <p className="occ-period">{periodo}</p>
+            <p className="muted occ-meta" style={{ marginBottom: 0 }}>
+              {formatFechaProgramada(
+                ocurrencia.fechaProgramada,
+                currentFicha.fechaPrecision === 'dia' ? 'dia' : 'mes',
+              )}
+              {bloque?.nombre ? ` · ${bloque.nombre}` : ''}
+              {encargado?.nombre ? ` · ${encargado.nombre}` : ''}
+              {esExtraordinaria(ocurrencia) ? <ExtraBadge /> : null}
+              {ocurrencia.estadoFijado ? <span>Fijado</span> : null}
             </p>
           </div>
           <StatusBadge estado={ocurrencia.estado} />
         </div>
         <ShareMenu title={fichaTitulo(currentFicha)} text={shareText} files={shareFiles} />
+        <div className="card-delete-corner">
+          <button
+            type="button"
+            className="icon-btn icon-btn-delete discreet"
+            aria-label={removing ? 'Eliminando…' : 'Eliminar inspección'}
+            title="Eliminar inspección"
+            onClick={() => void removeOcc()}
+            disabled={removing}
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
       </div>
 
-      <div className="card">
-        <h3 className="title-sm">{ejecucion ? 'Ejecución' : 'Marcar como ejecutada'}</h3>
-        {ejecucion ? (
-          <div>
-            <p>
-              Realizada el <strong>{ejecucion.fechaReal}</strong>
-            </p>
-            {ejecucion.observaciones ? <p>{ejecucion.observaciones}</p> : <p className="muted">Sin observaciones.</p>}
-            <FilePicker
-              onFiles={(list) =>
-                void saveAdjuntos(list, {
-                  tipo: 'ejecucion',
-                  ejecucionId: ejecucion.id,
-                  fichaId: currentFicha.id,
-                })
-              }
+      <div className={`card accordion-panel${ejecOpen ? '' : ' is-collapsed'}`}>
+        <button
+          type="button"
+          className="accordion-trigger"
+          aria-expanded={ejecOpen}
+          onClick={() => setEjecOpen((was) => !was)}
+        >
+          <span>
+            {ejecucion ? 'Editar ejecución' : 'Marcar como ejecutada'}
+            {ejecucion && !ejecOpen ? (
+              <span className="muted" style={{ fontWeight: 500 }}>
+                {' · '}
+                {ejecucion.fechaReal}
+                {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
+              </span>
+            ) : null}
+          </span>
+          <ChevronDown size={18} className={ejecOpen ? 'is-open' : ''} />
+        </button>
+        {ejecOpen ? (
+          <div className="accordion-body">
+            <EjecucionForm
+              ocurrenciaId={ocurrencia.id}
+              fichaId={currentFicha.id}
+              onSaved={() => setEjecOpen(false)}
             />
-            <div style={{ marginTop: '0.75rem' }}>
-              <AttachmentList
-                adjuntos={evidencia}
-                onDelete={(adjId) => void removeAdjunto(adjId)}
-              />
-            </div>
           </div>
-        ) : (
-          <form onSubmit={(e) => void markDone(e)}>
-            <div className="field">
-              <label htmlFor="fechaReal">Fecha real</label>
-              <input
-                id="fechaReal"
-                className="input"
-                type="date"
-                value={fechaReal}
-                onChange={(e) => setFechaReal(e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="obs">Observaciones</label>
-              <textarea
-                id="obs"
-                className="textarea"
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-                placeholder="Hallazgos, piezas, condiciones…"
-              />
-            </div>
-            <div className="field">
-              <label>Evidencia</label>
-              <FilePicker onFiles={(list) => setFiles((prev) => [...prev, ...list])} />
-              {files.length ? <p className="muted">{files.length} archivo(s)</p> : null}
-            </div>
-            <button className="btn btn-primary" type="submit" disabled={saving}>
-              {saving ? 'Guardando…' : 'Registrar ejecución'}
-            </button>
-          </form>
-        )}
+        ) : null}
       </div>
 
       <AccionesPanel fichaId={currentFicha.id} ocurrenciaId={ocurrencia.id} onlyCorrectiva />

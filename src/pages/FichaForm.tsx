@@ -3,7 +3,13 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, X } from 'lucide-react'
 import { db } from '../db'
-import { FRECUENCIAS, normalizeFrecuencia, type FechaPrecision, type Frecuencia } from '../db/types'
+import {
+  FRECUENCIAS,
+  normalizeFrecuencia,
+  type FechaPrecision,
+  type Ficha,
+  type Frecuencia,
+} from '../db/types'
 import { currentMonthPrefix, monthValue } from '../lib/dates'
 import { createId } from '../lib/ids'
 import { siguienteNumero } from '../lib/fichas'
@@ -95,7 +101,7 @@ export function FichaFormPage() {
     try {
       const now = Date.now()
       const fichaId = id ?? createId()
-      const record = {
+      const record: Ficha = {
         id: fichaId,
         numero: numero.trim(),
         nombre: nombre.trim(),
@@ -108,6 +114,8 @@ export function FichaFormPage() {
         createdAt: ficha?.createdAt ?? now,
         updatedAt: now,
       }
+      if (ficha?.fechasOmitidas?.length) record.fechasOmitidas = ficha.fechasOmitidas
+      if (ficha?.telefonos) record.telefonos = ficha.telefonos
       await db.fichas.put(record)
       if (files.length) await saveAdjuntos(files, { tipo: 'ficha', fichaId })
       await syncOcurrenciasForFicha(record)
