@@ -11,16 +11,26 @@ import { Modal } from './ui'
 
 export function EjecucionForm({
   ocurrenciaId,
+  eventoId,
   fichaId,
+  actividadId,
   onSaved,
 }: {
-  ocurrenciaId: string
-  fichaId: string
+  ocurrenciaId?: string
+  eventoId?: string
+  fichaId?: string
+  actividadId?: string
   onSaved?: () => void
 }) {
+  const parentId = ocurrenciaId ?? eventoId ?? 'ejec'
   const ejecucion = useLiveQuery(
-    () => db.ejecuciones.where('ocurrenciaId').equals(ocurrenciaId).first(),
-    [ocurrenciaId],
+    () =>
+      ocurrenciaId
+        ? db.ejecuciones.where('ocurrenciaId').equals(ocurrenciaId).first()
+        : eventoId
+          ? db.ejecuciones.where('eventoId').equals(eventoId).first()
+          : undefined,
+    [ocurrenciaId, eventoId],
   )
   const evidencia =
     useLiveQuery(
@@ -46,13 +56,15 @@ export function EjecucionForm({
 
   async function save(e: FormEvent) {
     e.preventDefault()
+    if (!ocurrenciaId && !eventoId) return
     setSaving(true)
     try {
       const now = Date.now()
       const ejecucionId = ejecucion?.id ?? createId()
       await db.ejecuciones.put({
         id: ejecucionId,
-        ocurrenciaId,
+        ocurrenciaId: ocurrenciaId || undefined,
+        eventoId: eventoId || undefined,
         fechaReal,
         observaciones: observaciones.trim() || undefined,
         realizadoPor: realizadoPor.trim() || undefined,
@@ -60,12 +72,25 @@ export function EjecucionForm({
         updatedAt: now,
       })
       if (files.length) {
-        await saveAdjuntos(files, { tipo: 'ejecucion', ejecucionId, fichaId })
+        await saveAdjuntos(files, {
+          tipo: 'ejecucion',
+          ejecucionId,
+          fichaId,
+          actividadId,
+        })
       }
-      await db.ocurrencias.update(ocurrenciaId, {
-        estado: 'ejecutada',
-        updatedAt: now,
-      })
+      if (ocurrenciaId) {
+        await db.ocurrencias.update(ocurrenciaId, {
+          estado: 'ejecutada',
+          updatedAt: now,
+        })
+      }
+      if (eventoId) {
+        await db.eventos.update(eventoId, {
+          estado: 'ejecutada',
+          updatedAt: now,
+        })
+      }
       await refreshEstados()
       setDraft(null)
       setFiles([])
@@ -79,9 +104,9 @@ export function EjecucionForm({
     <form onSubmit={(e) => void save(e)}>
       <div className="ficha-form-grid">
         <div className="field">
-          <label htmlFor={`fechaReal-${ocurrenciaId}`}>Fecha real</label>
+          <label htmlFor={`fechaReal-${parentId}`}>Fecha real</label>
           <input
-            id={`fechaReal-${ocurrenciaId}`}
+            id={`fechaReal-${parentId}`}
             className="input"
             type="date"
             value={fechaReal}
@@ -89,9 +114,9 @@ export function EjecucionForm({
           />
         </div>
         <div className="field">
-          <label htmlFor={`realizadoPor-${ocurrenciaId}`}>Realizado por (opcional)</label>
+          <label htmlFor={`realizadoPor-${parentId}`}>Realizado por (opcional)</label>
           <input
-            id={`realizadoPor-${ocurrenciaId}`}
+            id={`realizadoPor-${parentId}`}
             className="input"
             value={realizadoPor}
             onChange={(e) => patchDraft({ realizadoPor: e.target.value })}
@@ -100,9 +125,9 @@ export function EjecucionForm({
         </div>
       </div>
       <div className="field">
-        <label htmlFor={`obs-${ocurrenciaId}`}>Observaciones</label>
+        <label htmlFor={`obs-${parentId}`}>Observaciones</label>
         <textarea
-          id={`obs-${ocurrenciaId}`}
+          id={`obs-${parentId}`}
           className="textarea"
           value={observaciones}
           onChange={(e) => patchDraft({ observaciones: e.target.value })}
@@ -118,6 +143,7 @@ export function EjecucionForm({
                 tipo: 'ejecucion',
                 ejecucionId: ejecucion.id,
                 fichaId,
+                actividadId,
               })
               return
             }
@@ -141,17 +167,27 @@ export function EjecucionForm({
 export function EjecucionModal({
   open,
   ocurrenciaId,
+  eventoId,
   fichaId,
+  actividadId,
   onClose,
 }: {
   open: boolean
-  ocurrenciaId: string
-  fichaId: string
+  ocurrenciaId?: string
+  eventoId?: string
+  fichaId?: string
+  actividadId?: string
   onClose: () => void
 }) {
   return (
     <Modal open={open} title="Editar ejecución" onClose={onClose}>
-      <EjecucionForm ocurrenciaId={ocurrenciaId} fichaId={fichaId} onSaved={onClose} />
+      <EjecucionForm
+        ocurrenciaId={ocurrenciaId}
+        eventoId={eventoId}
+        fichaId={fichaId}
+        actividadId={actividadId}
+        onSaved={onClose}
+      />
     </Modal>
   )
 }

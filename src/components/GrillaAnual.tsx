@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react'
-import type { AccionCorrectiva, Bloque, Encargado, EstadoOcurrencia, Ficha, Ocurrencia } from '../db/types'
-import { esExtraordinaria, frecuenciaLabel, tipoAccionOf } from '../db/types'
-import { compareFichasByNumero } from '../lib/fichas'
+import type { Actividad, Bloque, Encargado, EstadoOcurrencia, Evento, Ficha, Ocurrencia } from '../db/types'
+import {
+  esExtraordinaria,
+  frecuenciaLabel,
+  tipoAccionLabel,
+  tipoAccionOf,
+  type AccionCorrectiva,
+} from '../db/types'
+import { compareActividadesByTitulo } from '../lib/actividades'
+import { computeEstado, todayISO } from '../lib/dates'
+import { compareFichasByNumero, fichaTitulo } from '../lib/fichas'
 import { labelEstado, SIMBOLO_CORRECTIVA, simboloEstado } from '../lib/simbolos'
 import {
   monthsVisible,
@@ -15,8 +23,9 @@ import {
   ZOOM_IN_MAX,
   type ZoomLevel,
 } from '../hooks/useGridSpan'
+import { ActividadTitle } from './ActividadTitle'
 import { FichaTitle } from './FichaTitle'
-import { LeyendaSimbolos } from './ui'
+import { LeyendaSimbolos, TipoBadge } from './ui'
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const TRIMESTRES = [
@@ -34,8 +43,12 @@ const PRIORIDAD: Record<EstadoOcurrencia, number> = {
   ejecutada: 4,
 }
 
-function pickOcc(list: Ocurrencia[]): Ocurrencia | undefined {
+function pickOcc<T extends { estado: EstadoOcurrencia }>(list: T[]): T | undefined {
   return [...list].sort((a, b) => PRIORIDAD[a.estado] - PRIORIDAD[b.estado])[0]
+}
+
+export function estadoAgendaCorrectiva(accion: Pick<AccionCorrectiva, 'fechaObjetivo' | 'estado'>): EstadoOcurrencia {
+  return computeEstado(accion.fechaObjetivo ?? '', todayISO(), accion.estado === 'ejecutada', 'dia')
 }
 
 function monthClass(month: number, start: number, currentMonth: number): string {
@@ -56,20 +69,28 @@ function pinchAxes(touches: TouchList): { dx: number; dy: number; dist: number }
 
 export function GrillaAnual({
   year,
+  modo = 'fichas',
   fichas,
+  actividades = [],
   bloques,
   encargados,
   ocurrencias,
+  eventos = [],
   acciones,
   showBloque = true,
+  onToggleBloque,
 }: {
   year: number
+  modo?: 'fichas' | 'actividades'
   fichas: Ficha[]
+  actividades?: Actividad[]
   bloques: Bloque[]
   encargados: Encargado[]
   ocurrencias: Ocurrencia[]
+  eventos?: Evento[]
   acciones: AccionCorrectiva[]
   showBloque?: boolean
+  onToggleBloque?: () => void
 }) {
   const autoSpan = useGridSpan()
   const [manualZoom, setManualZoom] = useState<ZoomLevel | null>(null)
@@ -194,6 +215,16 @@ export function GrillaAnual({
     byFichaMonth.set(key, list)
   }
 
+  const byActividadMonth = new Map<string, Evento[]>()
+  for (const e of eventos) {
+    if (!e.fechaProgramada.startsWith(String(year))) continue
+    const month = Number(e.fechaProgramada.slice(5, 7)) - 1
+    const key = `${e.actividadId}:${month}`
+    const list = byActividadMonth.get(key) ?? []
+    list.push(e)
+    byActividadMonth.set(key, list)
+  }
+
   const correctivaOcc = new Set(
     acciones
       .filter((a) => tipoAccionOf(a) === 'correctiva' && a.ocurrenciaId)
@@ -202,10 +233,19 @@ export function GrillaAnual({
   const correctivaFicha = new Set(
     acciones.filter((a) => tipoAccionOf(a) === 'correctiva' && !a.ocurrenciaId).map((a) => a.fichaId),
   )
+  const correctivasFechadas = acciones
+    .filter((a) => tipoAccionOf(a) === 'correctiva' && Boolean(a.fechaObjetivo))
+    .sort((a, b) => {
+      const byFecha = (a.fechaObjetivo ?? '').localeCompare(b.fechaObjetivo ?? '')
+      if (byFecha) return byFecha
+      return a.texto.localeCompare(b.texto, 'es')
+    })
+  const fichaById = Object.fromEntries(fichas.map((f) => [f.id, f]))
 
   const encargadoMap = Object.fromEntries(encargados.map((e) => [e.id, e]))
   const bloqueMap = Object.fromEntries(bloques.map((b) => [b.id, b]))
   const fichasOrdenadas = [...fichas].sort(compareFichasByNumero)
+  const actividadesOrdenadas = [...actividades].sort(compareActividadesByTitulo)
 
   const visibleTrimestres = TRIMESTRES.map((t) => ({
     ...t,
@@ -220,8 +260,18 @@ export function GrillaAnual({
     setStart((current) => Math.min(maxStart, Math.max(0, current + delta)))
   }
 
-  if (!fichas.length) {
-    return <div className="card muted">No hay fichas para este año.</div>
+  const vacia =
+    modo === 'fichas'
+      ? !fichas.length
+      : !actividades.length && !correctivasFechadas.length
+  if (vacia) {
+    return (
+      <div className="card muted">
+        {modo === 'fichas'
+          ? 'No hay fichas para este año.'
+          : 'No hay actividades ni acciones correctivas con fecha para este año.'}
+      </div>
+    )
   }
 
   return (
@@ -254,8 +304,7 @@ export function GrillaAnual({
             <strong className="grid-year-label">{year}</strong>
           )}
           <div className="zoom-stack">
-            <div className="zoom-controls" role="group" aria-label="Zoom de meses y ficha">
-              <span className="zoom-label">Mes</span>
+            <div className="zoom-controls" role="group" aria-label="Zoom de meses">
               <button
                 type="button"
                 className="btn"
@@ -265,6 +314,7 @@ export function GrillaAnual({
               >
                 <Minus size={14} />
               </button>
+              <span className="zoom-label">Mes</span>
               <button
                 type="button"
                 className="btn"
@@ -274,8 +324,8 @@ export function GrillaAnual({
               >
                 <Plus size={14} />
               </button>
-              <span className="zoom-split" aria-hidden />
-              <span className="zoom-label">Ficha</span>
+            </div>
+            <div className="zoom-controls" role="group" aria-label="Detalle de ficha">
               <button
                 type="button"
                 className="btn"
@@ -285,6 +335,7 @@ export function GrillaAnual({
               >
                 <Minus size={14} />
               </button>
+              <span className="zoom-label">Ficha</span>
               <button
                 type="button"
                 className="btn"
@@ -295,6 +346,19 @@ export function GrillaAnual({
                 <Plus size={14} />
               </button>
             </div>
+            {onToggleBloque ? (
+              <div className="zoom-controls">
+                <button
+                  type="button"
+                  className={`zoom-toggle${showBloque ? ' is-on' : ''}`}
+                  onClick={onToggleBloque}
+                  aria-pressed={showBloque}
+                  title={showBloque ? 'Ocultar nombre del bloque' : 'Mostrar nombre del bloque'}
+                >
+                  Bloque
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
         <div className="year-grid-wrap" ref={wrapRef}>
@@ -302,7 +366,7 @@ export function GrillaAnual({
           <thead>
             <tr>
               <th className="ficha-col" rowSpan={2}>
-                Ficha
+                {modo === 'actividades' ? 'Actividad' : 'Ficha'}
               </th>
               {visibleTrimestres.map((t, i) => (
                 <th
@@ -327,33 +391,67 @@ export function GrillaAnual({
             </tr>
           </thead>
           <tbody>
-            {fichasOrdenadas.map((ficha, index) => {
-              const bloque = bloqueMap[ficha.grupoId] ?? {
-                id: ficha.grupoId,
-                nombre: 'Sin bloque',
-                color: 'teal',
-                createdAt: 0,
-                updatedAt: 0,
-              }
-              return (
-                <FichaRow
-                  key={ficha.id}
-                  ficha={ficha}
-                  bloque={bloque}
-                  index={index}
-                  monthIndexes={monthIndexes}
-                  start={start}
-                  currentMonth={currentMonth}
-                  byFichaMonth={byFichaMonth}
-                  encargado={ficha.encargadoId ? encargadoMap[ficha.encargadoId] : undefined}
-                  showBloque={showBloque}
-                  showMeta={detail >= 1}
-                  showFrecuencia={detail >= 2}
-                  correctivaOcc={correctivaOcc}
-                  correctivaFicha={correctivaFicha}
-                />
-              )
-            })}
+            {modo === 'fichas'
+              ? fichasOrdenadas.map((ficha, index) => {
+                  const bloque = bloqueMap[ficha.grupoId] ?? {
+                    id: ficha.grupoId,
+                    nombre: 'Sin bloque',
+                    color: 'teal',
+                    createdAt: 0,
+                    updatedAt: 0,
+                  }
+                  return (
+                    <FichaRow
+                      key={ficha.id}
+                      ficha={ficha}
+                      bloque={bloque}
+                      index={index}
+                      monthIndexes={monthIndexes}
+                      start={start}
+                      currentMonth={currentMonth}
+                      byFichaMonth={byFichaMonth}
+                      encargado={ficha.encargadoId ? encargadoMap[ficha.encargadoId] : undefined}
+                      showBloque={showBloque}
+                      showMeta={detail >= 1}
+                      showFrecuencia={detail >= 2}
+                      correctivaOcc={correctivaOcc}
+                      correctivaFicha={correctivaFicha}
+                    />
+                  )
+                })
+              : null}
+            {modo === 'actividades'
+              ? actividadesOrdenadas.map((actividad, index) => (
+                  <ActividadRow
+                    key={actividad.id}
+                    actividad={actividad}
+                    index={index}
+                    monthIndexes={monthIndexes}
+                    start={start}
+                    currentMonth={currentMonth}
+                    byActividadMonth={byActividadMonth}
+                    encargado={actividad.encargadoId ? encargadoMap[actividad.encargadoId] : undefined}
+                    showBloque={showBloque}
+                    showMeta={detail >= 1}
+                    showFrecuencia={detail >= 2}
+                  />
+                ))
+              : null}
+            {modo === 'actividades'
+              ? correctivasFechadas.map((accion, index) => (
+                  <CorrectivaRow
+                    key={accion.id}
+                    accion={accion}
+                    ficha={fichaById[accion.fichaId]}
+                    index={actividadesOrdenadas.length + index}
+                    monthIndexes={monthIndexes}
+                    start={start}
+                    currentMonth={currentMonth}
+                    year={year}
+                    showMeta={detail >= 1}
+                  />
+                ))
+              : null}
           </tbody>
         </table>
         </div>
@@ -433,6 +531,134 @@ function FichaRow({
                     {SIMBOLO_CORRECTIVA}
                   </span>
                 ) : null}
+              </span>
+            </Link>
+          </td>
+        )
+      })}
+    </tr>
+  )
+}
+
+function ActividadRow({
+  actividad,
+  index,
+  monthIndexes,
+  start,
+  currentMonth,
+  byActividadMonth,
+  encargado,
+  showBloque,
+  showMeta,
+  showFrecuencia,
+}: {
+  actividad: Actividad
+  index: number
+  monthIndexes: number[]
+  start: number
+  currentMonth: number
+  byActividadMonth: Map<string, Evento[]>
+  encargado?: Encargado
+  showBloque: boolean
+  showMeta: boolean
+  showFrecuencia: boolean
+}) {
+  return (
+    <tr className={`ficha-row${index % 2 ? ' is-alt' : ''}`}>
+      <th className="ficha-col" scope="row">
+        <Link to={`/actividades/${actividad.id}`}>
+          <ActividadTitle actividad={actividad} />
+        </Link>
+        {showBloque ? (
+          <span className="ficha-meta">
+            <TipoBadge tipo={actividad.tipo} />
+          </span>
+        ) : null}
+        {showMeta ? (
+          <span className="ficha-meta">{encargado?.nombre ?? 'Sin encargado'}</span>
+        ) : null}
+        {showFrecuencia ? (
+          <span className="ficha-meta">{frecuenciaLabel(actividad.frecuencia)}</span>
+        ) : null}
+      </th>
+      {monthIndexes.map((month) => {
+        const evt = pickOcc(byActividadMonth.get(`${actividad.id}:${month}`) ?? [])
+        const cls = `month-col ${monthClass(month, start, currentMonth)}`.trim()
+        if (!evt) return <td key={month} className={cls} />
+        const title = [
+          labelEstado(evt.estado),
+          esExtraordinaria(evt) ? 'Extraordinaria' : '',
+        ]
+          .filter(Boolean)
+          .join(' · ')
+        return (
+          <td key={month} className={cls}>
+            <Link
+              className={`grid-cell ${evt.estado}`}
+              to={`/eventos/${evt.id}`}
+              title={title}
+              aria-label={title}
+            >
+              <span className="cell-syms">
+                <span aria-hidden>{simboloEstado(evt.estado)}</span>
+              </span>
+            </Link>
+          </td>
+        )
+      })}
+    </tr>
+  )
+}
+
+function CorrectivaRow({
+  accion,
+  ficha,
+  index,
+  monthIndexes,
+  start,
+  currentMonth,
+  year,
+  showMeta,
+}: {
+  accion: AccionCorrectiva
+  ficha?: Ficha
+  index: number
+  monthIndexes: number[]
+  start: number
+  currentMonth: number
+  year: number
+  showMeta: boolean
+}) {
+  const fecha = accion.fechaObjetivo ?? ''
+  const month = fecha.startsWith(String(year)) ? Number(fecha.slice(5, 7)) - 1 : -1
+  const estado = estadoAgendaCorrectiva(accion)
+  const href = accion.ocurrenciaId ? `/ocurrencias/${accion.ocurrenciaId}` : `/fichas/${accion.fichaId}`
+  return (
+    <tr className={`ficha-row${index % 2 ? ' is-alt' : ''}`}>
+      <th className="ficha-col" scope="row">
+        <Link to={href}>{accion.texto}</Link>
+        <span className="ficha-meta">{tipoAccionLabel('correctiva')}</span>
+        {showMeta ? (
+          <span className="ficha-meta">{ficha ? fichaTitulo(ficha) : 'Sin ficha'}</span>
+        ) : null}
+      </th>
+      {monthIndexes.map((m) => {
+        const cls = `month-col ${monthClass(m, start, currentMonth)}`.trim()
+        if (m !== month) return <td key={m} className={cls} />
+        const title = [labelEstado(estado), tipoAccionLabel('correctiva')].join(' · ')
+        return (
+          <td key={m} className={cls}>
+            <Link
+              className={`grid-cell ${estado} has-correctiva`}
+              to={href}
+              title={title}
+              aria-label={title}
+            >
+              <span className="cell-syms">
+                <span aria-hidden>{simboloEstado(estado)}</span>
+                <span className="cell-correctiva" aria-hidden>
+                  {SIMBOLO_CORRECTIVA}
+                </span>
               </span>
             </Link>
           </td>

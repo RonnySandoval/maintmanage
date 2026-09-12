@@ -1,4 +1,5 @@
 import { db } from './index'
+import { refreshEventoEstados, syncAllActividades } from './activities'
 import {
   esOcurrenciaProgramada,
   type EstadoOcurrencia,
@@ -38,7 +39,9 @@ export async function syncOcurrenciasForFicha(ficha: Ficha): Promise<void> {
     ids.length === 0
       ? []
       : await db.ejecuciones.where('ocurrenciaId').anyOf(ids).toArray()
-  const executedOccIds = new Set(ejecuciones.map((e) => e.ocurrenciaId))
+  const executedOccIds = new Set(
+    ejecuciones.map((e) => e.ocurrenciaId).filter((id): id is string => Boolean(id)),
+  )
   const frozenDates = new Set(
     existing.filter((o) => executedOccIds.has(o.id)).map((o) => o.fechaProgramada),
   )
@@ -82,7 +85,9 @@ export async function refreshEstados(): Promise<void> {
     precisionByFicha[f.id] = f.fechaPrecision === 'dia' ? 'dia' : 'mes'
   }
   const ejecuciones = await db.ejecuciones.toArray()
-  const executed = new Set(ejecuciones.map((e) => e.ocurrenciaId))
+  const executed = new Set(
+    ejecuciones.map((e) => e.ocurrenciaId).filter((id): id is string => Boolean(id)),
+  )
   const updates: Ocurrencia[] = []
   for (const o of occs) {
     if (o.estadoFijado) continue
@@ -97,6 +102,7 @@ export async function refreshEstados(): Promise<void> {
     }
   }
   if (updates.length) await db.ocurrencias.bulkPut(updates)
+  await refreshEventoEstados()
 }
 
 export async function ensureHorizon(): Promise<void> {
@@ -104,6 +110,7 @@ export async function ensureHorizon(): Promise<void> {
   for (const ficha of fichas) {
     await syncOcurrenciasForFicha(ficha)
   }
+  await syncAllActividades()
   await refreshEstados()
 }
 

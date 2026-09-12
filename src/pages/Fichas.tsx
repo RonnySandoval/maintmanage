@@ -1,11 +1,12 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ClipboardList, Layers, Plus, Search, SlidersHorizontal, Users } from 'lucide-react'
+import { ClipboardList, Layers, Plus, Search, SlidersHorizontal, Users, Wrench } from 'lucide-react'
 import { db } from '../db'
 import { frecuenciaLabel, mesesDeFrecuencia } from '../db/types'
 import { bloqueColorVar } from '../lib/colors'
 import { compareFichasByNumero, congregacionDe, congregacionLabel } from '../lib/fichas'
+import { ActividadesPanel } from '../components/ActividadesPanel'
 import { BloquesPanel } from '../components/BloquesPanel'
 import { EncargadosPanel } from '../components/EncargadosPanel'
 import { FichaTitle } from '../components/FichaTitle'
@@ -14,13 +15,13 @@ import { EmptyState } from '../components/ui'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
 import type { Ficha } from '../db/types'
 
-type FichasTab = 'fichas' | 'encargados' | 'bloques'
+type FichasTab = 'fichas' | 'actividades' | 'encargados' | 'bloques'
 type GroupBy = 'bloque' | 'encargado' | 'congregacion'
 type SortCol = 'ficha' | 'bloque' | 'encargado' | 'periodo'
 type SortDir = 'asc' | 'desc'
 
 function tabFromParam(value: string | null): FichasTab {
-  if (value === 'encargados' || value === 'bloques') return value
+  if (value === 'actividades' || value === 'encargados' || value === 'bloques') return value
   return 'fichas'
 }
 
@@ -44,6 +45,7 @@ export function FichasPage() {
   const bloqueId = params.get('bloque') ?? ''
   const encargadoId = params.get('encargado') ?? ''
   const q = params.get('q') ?? ''
+  const [searchText, setSearchText] = useState(q)
   const groupBy = groupFromParam(params.get('agrupar'))
   const sortCol = sortColFromParam(params.get('col'))
   const sortDir = sortDirFromParam(params.get('dir'))
@@ -77,8 +79,17 @@ export function FichasPage() {
     setParams(next, { replace: true })
   }
 
+  useEffect(() => {
+    setSearchText(q)
+  }, [q])
+
   function setFilter(key: string, value: string) {
     patch({ [key]: value || undefined })
+  }
+
+  function onSearchChange(value: string) {
+    setSearchText(value)
+    setFilter('q', value)
   }
 
   function setGroup(next: GroupBy) {
@@ -185,24 +196,6 @@ export function FichasPage() {
     if (tab !== 'fichas') return []
     return [
       {
-        id: 'buscar',
-        label: 'Buscar',
-        icon: Search,
-        active: Boolean(q),
-        content: (
-          <div className="field" style={{ margin: 0 }}>
-            <label htmlFor="fichas-q">Nombre o número</label>
-            <input
-              id="fichas-q"
-              className="input"
-              placeholder="Buscar"
-              value={q}
-              onChange={(e) => setFilter('q', e.target.value)}
-            />
-          </div>
-        ),
-      },
-      {
         id: 'filtrar',
         label: 'Filtrar',
         icon: SlidersHorizontal,
@@ -276,12 +269,22 @@ export function FichasPage() {
         ),
       },
     ]
-  }, [tab, q, bloqueId, encargadoId, groupBy, bloques, encargados])
+  }, [tab, bloqueId, encargadoId, groupBy, bloques, encargados])
 
   return (
     <div>
-      {filterTools.length ? <FilterDrawerSlot title="Fichas" tools={filterTools} /> : null}
-      <div className="seg-toggle tabs-3" role="tablist" aria-label="Fichas, encargados o bloques">
+      {filterTools.length ? (
+        <FilterDrawerSlot
+          title="Fichas"
+          tools={filterTools}
+          canClear={Boolean(q || bloqueId || encargadoId || groupBy !== 'bloque')}
+          onClear={() => {
+            setSearchText('')
+            patch({ q: undefined, bloque: undefined, encargado: undefined, agrupar: undefined })
+          }}
+        />
+      ) : null}
+      <div className="seg-toggle tabs-4" role="tablist" aria-label="Fichas, actividades, encargados o bloques">
         <button
           type="button"
           role="tab"
@@ -291,6 +294,16 @@ export function FichasPage() {
         >
           <ClipboardList size={16} />
           Fichas
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'actividades'}
+          className={tab === 'actividades' ? 'active' : ''}
+          onClick={() => setTab('actividades')}
+        >
+          <Wrench size={16} />
+          Actividades
         </button>
         <button
           type="button"
@@ -314,6 +327,7 @@ export function FichasPage() {
         </button>
       </div>
 
+      {tab === 'actividades' ? <ActividadesPanel /> : null}
       {tab === 'encargados' ? <EncargadosPanel /> : null}
       {tab === 'bloques' ? <BloquesPanel /> : null}
       {tab !== 'fichas' ? null : (
@@ -329,6 +343,23 @@ export function FichasPage() {
               </Link>
             </div>
           </div>
+
+          {fichas.length > 0 ? (
+            <label className="search-field" htmlFor="fichas-q">
+              <Search size={16} aria-hidden />
+              <input
+                id="fichas-q"
+                className="input"
+                type="search"
+                placeholder="Buscar por número o nombre"
+                value={searchText}
+                onChange={(e) => onSearchChange(e.target.value)}
+                autoComplete="off"
+                enterKeyHint="search"
+                inputMode="search"
+              />
+            </label>
+          ) : null}
 
           {fichas.length === 0 ? (
             <EmptyState

@@ -18,22 +18,28 @@ import {
   prioridadOf,
   prioridadRank,
   tipoAccionOf,
+  tipoActividadColor,
   type AccionCorrectiva,
+  type Actividad,
   type EstadoCorrectiva,
   type Ejecucion,
   type Encargado,
+  type Evento,
   type Ficha,
   type Ocurrencia,
 } from '../db/types'
 import { bloqueColorVar } from '../lib/colors'
 import { formatDate, formatFechaProgramada } from '../lib/dates'
+import { actividadTitulo } from '../lib/actividades'
 import { fichaTitulo } from '../lib/fichas'
+import { ActividadTitle } from '../components/ActividadTitle'
 import { FichaTitle } from '../components/FichaTitle'
 import { PrioridadMark } from '../components/PrioridadMark'
 import { EjecucionModal } from '../components/EjecucionForm'
 import { ShareMenu } from '../components/ShareMenu'
-import { EmptyState, ExtraBadge, StatusBadge } from '../components/ui'
+import { EmptyState, ExtraBadge, StatusBadge, TipoBadge } from '../components/ui'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
+import { useTiposActividad } from '../hooks/useTiposActividad'
 
 type AccGroup = 'lista' | 'fecha' | 'prioridad' | 'estado' | 'ficha'
 type AccSort = 'fecha' | 'prioridad' | 'reciente'
@@ -112,7 +118,13 @@ export function HistoricosPage() {
       const rows = await db.ocurrencias.where('estado').equals('ejecutada').toArray()
       return rows.sort((a, b) => b.fechaProgramada.localeCompare(a.fechaProgramada))
     }) ?? []
+  const eventos =
+    useLiveQuery(async () => {
+      const rows = await db.eventos.where('estado').equals('ejecutada').toArray()
+      return rows.sort((a, b) => b.fechaProgramada.localeCompare(a.fechaProgramada))
+    }) ?? []
   const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
+  const actividades = useLiveQuery(() => db.actividades.toArray()) ?? []
   const bloques = useLiveQuery(() => db.grupos.toArray()) ?? []
   const encargados = useLiveQuery(() => db.encargados.toArray()) ?? []
   const ejecuciones = useLiveQuery(() => db.ejecuciones.toArray()) ?? []
@@ -123,13 +135,29 @@ export function HistoricosPage() {
     }) ?? []
 
   const fichaMap = useMemo(() => Object.fromEntries(fichas.map((f) => [f.id, f])), [fichas])
+  const actividadMap = useMemo(
+    () => Object.fromEntries(actividades.map((a) => [a.id, a])),
+    [actividades],
+  )
   const bloqueMap = useMemo(() => Object.fromEntries(bloques.map((b) => [b.id, b])), [bloques])
   const encargadoMap = useMemo(
     () => Object.fromEntries(encargados.map((e) => [e.id, e])),
     [encargados],
   )
   const ejecucionMap = useMemo(
-    () => Object.fromEntries(ejecuciones.map((e) => [e.ocurrenciaId, e])),
+    () =>
+      Object.fromEntries(
+        ejecuciones
+          .filter((e) => e.ocurrenciaId)
+          .map((e) => [e.ocurrenciaId as string, e]),
+      ),
+    [ejecuciones],
+  )
+  const ejecucionEventoMap = useMemo(
+    () =>
+      Object.fromEntries(
+        ejecuciones.filter((e) => e.eventoId).map((e) => [e.eventoId as string, e]),
+      ),
     [ejecuciones],
   )
 
@@ -151,11 +179,23 @@ export function HistoricosPage() {
     byFicha.set(o.fichaId, list)
   }
 
-  const byFecha = new Map<string, typeof ocurrencias>()
+  const byFechaOcc = new Map<string, typeof ocurrencias>()
   for (const o of ocurrencias) {
-    const list = byFecha.get(o.fechaProgramada) ?? []
+    const list = byFechaOcc.get(o.fechaProgramada) ?? []
     list.push(o)
-    byFecha.set(o.fechaProgramada, list)
+    byFechaOcc.set(o.fechaProgramada, list)
+  }
+  const byActividad = new Map<string, typeof eventos>()
+  for (const e of eventos) {
+    const list = byActividad.get(e.actividadId) ?? []
+    list.push(e)
+    byActividad.set(e.actividadId, list)
+  }
+  const byFechaEvt = new Map<string, typeof eventos>()
+  for (const e of eventos) {
+    const list = byFechaEvt.get(e.fechaProgramada) ?? []
+    list.push(e)
+    byFechaEvt.set(e.fechaProgramada, list)
   }
 
   const fichasOrdenadas = [...byFicha.keys()].sort((a, b) => {
@@ -165,7 +205,15 @@ export function HistoricosPage() {
     return fichaTitulo(fa).localeCompare(fichaTitulo(fb), 'es')
   })
 
-  const fechasOrdenadas = [...byFecha.keys()].sort((a, b) => b.localeCompare(a))
+  const fechasOrdenadas = [
+    ...new Set([...byFechaOcc.keys(), ...byFechaEvt.keys()]),
+  ].sort((a, b) => b.localeCompare(a))
+  const actividadesOrdenadas = [...byActividad.keys()].sort((a, b) => {
+    const aa = actividadMap[a]
+    const ab = actividadMap[b]
+    if (!aa || !ab) return 0
+    return actividadTitulo(aa).localeCompare(actividadTitulo(ab), 'es')
+  })
 
   const accionesFiltradas = sortAcciones(
     acciones.filter((a) => !estadoAcc || a.estado === estadoAcc),
@@ -277,12 +325,12 @@ export function HistoricosPage() {
     ]
   }, [tab, estadoAcc, groupAcc, sortAcc, groupBy])
 
-  if (!ocurrencias.length && !acciones.length) {
+  if (!ocurrencias.length && !eventos.length && !acciones.length) {
     return (
       <EmptyState
         icon={<History size={36} />}
         title="Sin histórico"
-        text="Cuando ejecutes fichas o registres acciones correctivas, aparecerán aquí."
+        text="Cuando ejecutes fichas, actividades o registres acciones correctivas, aparecerán aquí."
       />
     )
   }
@@ -296,6 +344,20 @@ export function HistoricosPage() {
       <FilterDrawerSlot
         title={tab === 'acciones' ? 'Correctivas' : 'Ejecutadas'}
         tools={filterTools}
+        canClear={
+          tab === 'acciones'
+            ? Boolean(estadoAcc || groupAcc !== 'lista' || sortAcc !== 'fecha')
+            : groupBy !== 'ficha'
+        }
+        onClear={() => {
+          if (tab === 'acciones') {
+            setEstadoAcc('')
+            setGroupAcc('lista')
+            setSortAcc('fecha')
+            return
+          }
+          setGroupBy('ficha')
+        }}
       />
       <div className="seg-toggle" role="tablist" aria-label="Histórico">
         <button
@@ -320,9 +382,9 @@ export function HistoricosPage() {
 
       {tab === 'ocurrencias' ? (
         <>
-          {ocurrencias.length === 0 ? (
+          {ocurrencias.length === 0 && eventos.length === 0 ? (
             <div className="table-card">
-              <p className="table-empty">Aún no hay fichas ejecutadas.</p>
+              <p className="table-empty">Aún no hay inspecciones ni actividades ejecutadas.</p>
             </div>
           ) : groupBy === 'ficha' ? (
             <div className="table-card">
@@ -359,21 +421,52 @@ export function HistoricosPage() {
                   </section>
                 )
               })}
+              {actividadesOrdenadas.map((actId) => {
+                const act = actividadMap[actId]
+                const rows = (byActividad.get(actId) ?? []).sort((a, b) =>
+                  b.fechaProgramada.localeCompare(a.fechaProgramada),
+                )
+                return (
+                  <section key={actId}>
+                    <div className="table-section">
+                      <ActividadTitle actividad={act} />
+                    </div>
+                    {rows.map((e) => (
+                      <EjecutadaRow
+                        key={e.id}
+                        evento={e}
+                        actividad={act}
+                        encargado={act ? encargadoMap[act.encargadoId ?? ''] : undefined}
+                        ejecucion={ejecucionEventoMap[e.id]}
+                        variant="fecha"
+                        acciones={[]}
+                        open={openOcc === e.id}
+                        onToggle={() => toggleOcc(e.id)}
+                      />
+                    ))}
+                  </section>
+                )
+              })}
             </div>
           ) : (
             <div className="table-card">
               <div className="table-head table-cols-hist-occ">
                 <span className="table-bar" aria-hidden />
-                <span>Ficha</span>
+                <span>Ítem</span>
                 <span className="sr-only">Detalle</span>
               </div>
               {fechasOrdenadas.map((day) => {
-                const rows = byFecha.get(day) ?? []
-                const precision = fichaMap[rows[0]?.fichaId ?? '']?.fechaPrecision === 'dia' ? 'dia' : 'mes'
+                const occRows = byFechaOcc.get(day) ?? []
+                const evtRows = byFechaEvt.get(day) ?? []
+                const precision =
+                  fichaMap[occRows[0]?.fichaId ?? '']?.fechaPrecision === 'dia' ||
+                  actividadMap[evtRows[0]?.actividadId ?? '']?.fechaPrecision === 'dia'
+                    ? 'dia'
+                    : 'mes'
                 return (
                   <section key={day}>
                     <div className="table-section">{formatFechaProgramada(day, precision)}</div>
-                    {rows.map((o) => {
+                    {occRows.map((o) => {
                       const ficha = fichaMap[o.fichaId]
                       const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
                       return (
@@ -388,6 +481,22 @@ export function HistoricosPage() {
                           acciones={accionesPorOcc.get(o.id) ?? []}
                           open={openOcc === o.id}
                           onToggle={() => toggleOcc(o.id)}
+                        />
+                      )
+                    })}
+                    {evtRows.map((e) => {
+                      const act = actividadMap[e.actividadId]
+                      return (
+                        <EjecutadaRow
+                          key={e.id}
+                          evento={e}
+                          actividad={act}
+                          encargado={act ? encargadoMap[act.encargadoId ?? ''] : undefined}
+                          ejecucion={ejecucionEventoMap[e.id]}
+                          variant="ficha"
+                          acciones={[]}
+                          open={openOcc === e.id}
+                          onToggle={() => toggleOcc(e.id)}
                         />
                       )
                     })}
@@ -457,7 +566,9 @@ export function HistoricosPage() {
 
 function EjecutadaRow({
   occ,
+  evento,
   ficha,
+  actividad,
   color,
   encargado,
   ejecucion,
@@ -466,8 +577,10 @@ function EjecutadaRow({
   open,
   onToggle,
 }: {
-  occ: Ocurrencia
+  occ?: Ocurrencia
+  evento?: Evento
   ficha?: Ficha
+  actividad?: Actividad
   color?: string
   encargado?: Encargado
   ejecucion?: Ejecucion
@@ -476,11 +589,19 @@ function EjecutadaRow({
   open: boolean
   onToggle: () => void
 }) {
+  const tipos = useTiposActividad()
   const [editOpen, setEditOpen] = useState(false)
-  const precision = ficha?.fechaPrecision === 'dia' ? 'dia' : 'mes'
+  const item = occ ?? evento
+  if (!item) return null
+  const href = occ ? `/ocurrencias/${occ.id}` : `/eventos/${evento?.id}`
+  const precision =
+    (ficha?.fechaPrecision ?? actividad?.fechaPrecision) === 'dia' ? 'dia' : 'mes'
+  const barColor = actividad ? tipoActividadColor(actividad.tipo, tipos) : color
+  const shareTitle = ficha ? fichaTitulo(ficha) : actividad ? actividadTitulo(actividad) : 'Ejecución'
   const shareText = [
     ficha ? `Ficha: ${fichaTitulo(ficha)}` : '',
-    `Programada: ${occ.fechaProgramada}`,
+    actividad ? `Actividad: ${actividadTitulo(actividad)}` : '',
+    `Programada: ${item.fechaProgramada}`,
     ejecucion?.fechaReal ? `Realizada: ${ejecucion.fechaReal}` : '',
     ejecucion?.realizadoPor ? `Realizado por: ${ejecucion.realizadoPor}` : '',
     encargado ? `Encargado: ${encargado.nombre}` : '',
@@ -492,17 +613,20 @@ function EjecutadaRow({
   return (
     <div className={`hist-occ-item${open ? ' is-open' : ''}`}>
       <div className="table-row table-cols-hist-occ">
-        <span className="table-bar" style={{ background: bloqueColorVar(color) }} />
-        <Link className="table-cell hist-occ-main" to={`/ocurrencias/${occ.id}`}>
+        <span className="table-bar" style={{ background: bloqueColorVar(barColor) }} />
+        <Link className="table-cell hist-occ-main" to={href}>
           {variant === 'fecha' ? (
             <span className="occ-meta">
-              {formatFechaProgramada(occ.fechaProgramada, precision)}
-              {esExtraordinaria(occ) ? <ExtraBadge /> : null}
+              {formatFechaProgramada(item.fechaProgramada, precision)}
+              {esExtraordinaria(item) ? <ExtraBadge /> : null}
+              {actividad ? <TipoBadge tipo={actividad.tipo} /> : null}
             </span>
           ) : (
             <span className="occ-meta">
-              <FichaTitle ficha={ficha} color={color} />
-              {esExtraordinaria(occ) ? <ExtraBadge /> : null}
+              {ficha ? <FichaTitle ficha={ficha} color={color} /> : null}
+              {actividad ? <ActividadTitle actividad={actividad} /> : null}
+              {esExtraordinaria(item) ? <ExtraBadge /> : null}
+              {actividad ? <TipoBadge tipo={actividad.tipo} /> : null}
             </span>
           )}
         </Link>
@@ -526,7 +650,7 @@ function EjecutadaRow({
             <div className="row-spread" style={{ marginBottom: 6 }}>
               <strong>Ejecución</strong>
               <span className="row" style={{ gap: 2 }}>
-                {ficha ? (
+                {ficha || actividad ? (
                   <>
                     <button
                       type="button"
@@ -537,7 +661,7 @@ function EjecutadaRow({
                     >
                       <Pencil size={16} />
                     </button>
-                    <ShareMenu title={fichaTitulo(ficha)} text={shareText} iconOnly />
+                    <ShareMenu title={shareTitle} text={shareText} iconOnly />
                   </>
                 ) : null}
               </span>
@@ -560,7 +684,7 @@ function EjecutadaRow({
           </div>
           {acciones.length ? (
             acciones.map((a) => (
-              <Link key={a.id} className="hist-occ-accion" to={`/ocurrencias/${occ.id}`}>
+              <Link key={a.id} className="hist-occ-accion" to={href}>
                 <PrioridadMark prioridad={prioridadOf(a)} />
                 <span className="grow">{a.texto}</span>
                 <span className={`badge badge-${a.estado}`}>
@@ -575,11 +699,19 @@ function EjecutadaRow({
           )}
         </div>
       ) : null}
-      {ficha ? (
+      {ficha && occ ? (
         <EjecucionModal
           open={editOpen}
           ocurrenciaId={occ.id}
           fichaId={ficha.id}
+          onClose={() => setEditOpen(false)}
+        />
+      ) : null}
+      {actividad && evento ? (
+        <EjecucionModal
+          open={editOpen}
+          eventoId={evento.id}
+          actividadId={actividad.id}
           onClose={() => setEditOpen(false)}
         />
       ) : null}

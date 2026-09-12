@@ -27,7 +27,7 @@ export function fileKind(mime: string, nombre: string): 'image' | 'pdf' | 'word'
 
 export async function saveAdjuntos(
   files: File[],
-  opts: { tipo: TipoAdjunto; fichaId?: string; ejecucionId?: string },
+  opts: { tipo: TipoAdjunto; fichaId?: string; actividadId?: string; ejecucionId?: string },
 ): Promise<void> {
   const now = Date.now()
   await db.adjuntos.bulkAdd(
@@ -37,6 +37,7 @@ export async function saveAdjuntos(
       mimeType: file.type || 'application/octet-stream',
       nombre: file.name,
       fichaId: opts.fichaId,
+      actividadId: opts.actividadId,
       ejecucionId: opts.ejecucionId,
       tipo: opts.tipo,
       createdAt: now,

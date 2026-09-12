@@ -1,7 +1,16 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CalendarDays, ClipboardList } from 'lucide-react'
+import {
+  CalendarClock,
+  CalendarDays,
+  CircleCheck,
+  ClipboardList,
+  Clock,
+  ShieldAlert,
+  TriangleAlert,
+  Wrench,
+} from 'lucide-react'
 import { db } from '../db'
 import { bloqueColorVar } from '../lib/colors'
 import { formatDate, inCurrentQuarter, quarterLabel } from '../lib/dates'
@@ -11,14 +20,17 @@ import {
   prioridadOf,
   tipoAccionLabel,
   tipoAccionOf,
+  tipoActividadColor,
 } from '../db/types'
 import { CountUp } from '../components/CountUp'
-import { EmptyState, ExtraBadge, StatusBadge } from '../components/ui'
+import { EmptyState, ExtraBadge, StatusBadge, TipoBadge } from '../components/ui'
+import { ActividadTitle } from '../components/ActividadTitle'
 import { PrioridadMark } from '../components/PrioridadMark'
 import { FichaTitle } from '../components/FichaTitle'
 import { RestorePanel } from '../components/RestorePanel'
 import { isRestoreSkipped, skipRestore } from '../lib/restoreSkip'
 import { useSettled } from '../hooks/useSettled'
+import { useTiposActividad } from '../hooks/useTiposActividad'
 
 type DashCounts = {
   vencidas: number
@@ -29,10 +41,11 @@ type DashCounts = {
   progreso: number
   correctivasHechas: number
   correctivasTotal: number
+  actividades: number
 }
 
 function packCounts(c: DashCounts): string {
-  return `${c.vencidas}:${c.programadas}:${c.pendientes}:${c.ejecutadas}:${c.total}:${c.progreso}:${c.correctivasHechas}:${c.correctivasTotal}`
+  return `${c.vencidas}:${c.programadas}:${c.pendientes}:${c.ejecutadas}:${c.total}:${c.progreso}:${c.correctivasHechas}:${c.correctivasTotal}:${c.actividades}`
 }
 
 function unpackCounts(token: string): DashCounts {
@@ -45,6 +58,7 @@ function unpackCounts(token: string): DashCounts {
     progreso,
     correctivasHechas,
     correctivasTotal,
+    actividades,
   ] = token.split(':').map(Number)
   return {
     vencidas,
@@ -55,12 +69,15 @@ function unpackCounts(token: string): DashCounts {
     progreso,
     correctivasHechas,
     correctivasTotal,
+    actividades,
   }
 }
 
 export function DashboardPage() {
   const ocurrencias = useLiveQuery(() => db.ocurrencias.toArray())
+  const eventos = useLiveQuery(() => db.eventos.toArray())
   const fichas = useLiveQuery(() => db.fichas.toArray())
+  const actividades = useLiveQuery(() => db.actividades.toArray())
   const bloques = useLiveQuery(() => db.grupos.toArray()) ?? []
   const acciones = useLiveQuery(() => db.accionesCorrectivas.toArray()) ?? []
   const extraCounts = useLiveQuery(async () => ({
@@ -68,14 +85,25 @@ export function DashboardPage() {
     adjuntos: await db.adjuntos.count(),
     ejecuciones: await db.ejecuciones.count(),
   }))
+  const tipos = useTiposActividad()
   const [skipRestoreUi, setSkipRestoreUi] = useState(isRestoreSkipped)
-  const loaded = ocurrencias !== undefined && fichas !== undefined
+  const loaded =
+    ocurrencias !== undefined &&
+    fichas !== undefined &&
+    eventos !== undefined &&
+    actividades !== undefined
   const occs = ocurrencias ?? []
+  const evts = eventos ?? []
   const fichasList = fichas ?? []
+  const actividadesList = actividades ?? []
 
   const fichaMap = useMemo(
     () => Object.fromEntries(fichasList.map((f) => [f.id, f])),
     [fichasList],
+  )
+  const actividadMap = useMemo(
+    () => Object.fromEntries(actividadesList.map((a) => [a.id, a])),
+    [actividadesList],
   )
   const bloqueMap = useMemo(
     () => Object.fromEntries(bloques.map((b) => [b.id, b])),
@@ -83,7 +111,9 @@ export function DashboardPage() {
   )
 
   const trimestre = quarterLabel()
-  const delTrimestre = occs.filter((o) => inCurrentQuarter(o.fechaProgramada))
+  const occsTrimestre = occs.filter((o) => inCurrentQuarter(o.fechaProgramada))
+  const evtsTrimestre = evts.filter((e) => inCurrentQuarter(e.fechaProgramada))
+  const delTrimestre = occsTrimestre
   const occById = useMemo(
     () => Object.fromEntries(occs.map((o) => [o.id, o])),
     [occs],
@@ -111,6 +141,7 @@ export function DashboardPage() {
           ),
     correctivasHechas: correctivasTrimestre.filter((a) => a.estado === 'ejecutada').length,
     correctivasTotal: correctivasTrimestre.length,
+    actividades: actividadesList.length,
   }
   const skipTransientEmpty = loaded && fichasList.length > 0 && occs.length === 0
   const settledToken = useSettled(
@@ -121,18 +152,28 @@ export function DashboardPage() {
   const counts = settledToken ? unpackCounts(settledToken) : null
   const ready = counts !== null
 
-  const agenda = [...delTrimestre].sort((a, b) => a.fechaProgramada.localeCompare(b.fechaProgramada))
+  const agendaOcc = [...occsTrimestre].sort((a, b) =>
+    a.fechaProgramada.localeCompare(b.fechaProgramada),
+  )
+  const agendaEvt = [...evtsTrimestre].sort((a, b) =>
+    a.fechaProgramada.localeCompare(b.fechaProgramada),
+  )
+  const agenda = [
+    ...agendaOcc.map((o) => ({ kind: 'occ' as const, fecha: o.fechaProgramada, o })),
+    ...agendaEvt.map((e) => ({ kind: 'evt' as const, fecha: e.fechaProgramada, e })),
+  ].sort((a, b) => a.fecha.localeCompare(b.fecha))
 
   const totallyEmpty =
     loaded &&
     extraCounts !== undefined &&
     fichasList.length === 0 &&
+    actividadesList.length === 0 &&
     bloques.length === 0 &&
     extraCounts.encargados === 0 &&
     extraCounts.adjuntos === 0 &&
     extraCounts.ejecuciones === 0
 
-  if (loaded && fichasList.length === 0) {
+  if (loaded && fichasList.length === 0 && actividadesList.length === 0) {
     return (
       <div className="stack">
         {totallyEmpty && !skipRestoreUi ? (
@@ -145,8 +186,8 @@ export function DashboardPage() {
         ) : null}
         <EmptyState
           icon={<ClipboardList size={36} />}
-          title="Aún no hay fichas"
-          text="Crea bloques, encargados y fichas de mantenimiento para ver el cronograma aquí."
+          title="Aún no hay fichas ni actividades"
+          text="Crea bloques, encargados, fichas de inspección o actividades sueltas (reparación, compra, limpieza…)."
           action={
             <div className="row" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
               <Link className="btn btn-add" to="/fichas?tab=bloques">
@@ -154,6 +195,9 @@ export function DashboardPage() {
               </Link>
               <Link className="btn btn-add" to="/fichas/nueva">
                 Crear primera ficha
+              </Link>
+              <Link className="btn btn-add" to="/actividades/nueva">
+                Crear actividad
               </Link>
             </div>
           }
@@ -170,7 +214,11 @@ export function DashboardPage() {
         <p className="dash-sub">
           {ready ? (
             <>
-              {counts.total} actividad{counts.total === 1 ? '' : 'es'} · {counts.progreso}% ejecutado
+              {counts.total} inspección{counts.total === 1 ? '' : 'es'}
+              {counts.actividades
+                ? ` · ${counts.actividades} actividad${counts.actividades === 1 ? '' : 'es'}`
+                : ''}{' '}
+              · {counts.progreso}% ejecutado
             </>
           ) : (
             'Calculando trimestre…'
@@ -180,31 +228,55 @@ export function DashboardPage() {
 
       <div className="kpis">
         <Link className="card kpi card-click tone-vencida" to="/cronograma?estado=vencida">
-          <div className="label">Vencidas</div>
+          <div className="kpi-head">
+            <TriangleAlert size={16} aria-hidden />
+            <div className="label">Vencidas</div>
+          </div>
           <div className="value">
             {ready ? <CountUp value={counts.vencidas} ready /> : <span className="count-wait">—</span>}
           </div>
         </Link>
         <Link className="card kpi card-click tone-proxima" to="/cronograma?estado=proxima">
-          <div className="label">Programadas</div>
+          <div className="kpi-head">
+            <CalendarClock size={16} aria-hidden />
+            <div className="label">Programadas</div>
+          </div>
           <div className="value">
             {ready ? <CountUp value={counts.programadas} ready /> : <span className="count-wait">—</span>}
           </div>
         </Link>
         <Link className="card kpi card-click tone-pendiente" to="/cronograma?estado=pendiente">
-          <div className="label">Pendientes</div>
+          <div className="kpi-head">
+            <Clock size={16} aria-hidden />
+            <div className="label">Pendientes</div>
+          </div>
           <div className="value">
             {ready ? <CountUp value={counts.pendientes} ready /> : <span className="count-wait">—</span>}
           </div>
         </Link>
         <Link className="card kpi card-click tone-ejecutada" to="/cronograma?estado=ejecutada">
-          <div className="label">Ejecutadas</div>
+          <div className="kpi-head">
+            <CircleCheck size={16} aria-hidden />
+            <div className="label">Ejecutadas</div>
+          </div>
           <div className="value">
             {ready ? <CountUp value={counts.ejecutadas} ready /> : <span className="count-wait">—</span>}
           </div>
         </Link>
+        <Link className="card kpi card-click tone-actividad" to="/cronograma?ambito=actividades">
+          <div className="kpi-head">
+            <Wrench size={16} aria-hidden />
+            <div className="label">Actividades</div>
+          </div>
+          <div className="value">
+            {ready ? <CountUp value={counts.actividades} ready /> : <span className="count-wait">—</span>}
+          </div>
+        </Link>
         <Link className="card kpi card-click tone-correctiva" to="/historicos">
-          <div className="label">Acciones correctivas</div>
+          <div className="kpi-head">
+            <ShieldAlert size={16} aria-hidden />
+            <div className="label">Acciones correctivas</div>
+          </div>
           <div className="value kpi-frac">
             {ready ? (
               <>
@@ -239,23 +311,59 @@ export function DashboardPage() {
         <div className="card muted">No hay actividades en este trimestre.</div>
       ) : (
         <div className="list">
-          {agenda.map((o) => {
-            const ficha = fichaMap[o.fichaId]
-            const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
+          {agenda.map((item) => {
+            if (item.kind === 'occ') {
+              const o = item.o
+              const ficha = fichaMap[o.fichaId]
+              const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
+              return (
+                <Link
+                  key={`occ-${o.id}`}
+                  className="card card-click item dash-item"
+                  to={`/ocurrencias/${o.id}`}
+                >
+                  <span className="bar" style={{ background: bloqueColorVar(bloque?.color) }} />
+                  <div className="grow">
+                    <div className="row-spread">
+                      <strong>
+                        <FichaTitle ficha={ficha} color={bloque?.color} />
+                      </strong>
+                      <StatusBadge estado={o.estado} />
+                    </div>
+                    <div className="muted occ-meta">
+                      {formatDate(o.fechaProgramada)}
+                      {bloque ? ` · ${bloque.nombre}` : ''}
+                      {esExtraordinaria(o) ? <ExtraBadge /> : null}
+                    </div>
+                  </div>
+                </Link>
+              )
+            }
+            const e = item.e
+            const act = actividadMap[e.actividadId]
+            if (!act) return null
             return (
-              <Link key={o.id} className="card card-click item dash-item" to={`/ocurrencias/${o.id}`}>
-                <span className="bar" style={{ background: bloqueColorVar(bloque?.color) }} />
+              <Link
+                key={`evt-${e.id}`}
+                className="card card-click item dash-item"
+                to={`/eventos/${e.id}`}
+              >
+                <span
+                  className="bar"
+                  style={{ background: bloqueColorVar(tipoActividadColor(act.tipo, tipos)) }}
+                />
                 <div className="grow">
                   <div className="row-spread">
                     <strong>
-                      <FichaTitle ficha={ficha} color={bloque?.color} />
+                      <ActividadTitle actividad={act} />
                     </strong>
-                    <StatusBadge estado={o.estado} />
+                    <StatusBadge estado={e.estado} />
                   </div>
                   <div className="muted occ-meta">
-                    {formatDate(o.fechaProgramada)}
-                    {bloque ? ` · ${bloque.nombre}` : ''}
-                    {esExtraordinaria(o) ? <ExtraBadge /> : null}
+                    {formatDate(e.fechaProgramada)}
+                    {' · '}
+                    <TipoBadge tipo={act.tipo} />
+                    {esExtraordinaria(e) ? <ExtraBadge /> : null}
                   </div>
                 </div>
               </Link>

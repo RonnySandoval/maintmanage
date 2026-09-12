@@ -1,16 +1,35 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, List, Search, SlidersHorizontal } from 'lucide-react'
 import { db } from '../db'
-import { ESTADOS, esExtraordinaria, type EstadoOcurrencia } from '../db/types'
+import {
+  ESTADOS,
+  esExtraordinaria,
+  tipoAccionLabel,
+  tipoAccionOf,
+  tipoActividadColor,
+  tipoActividadLabel,
+  type EstadoOcurrencia,
+} from '../db/types'
 import { bloqueColorVar } from '../lib/colors'
 import { formatFechaProgramada, formatDateLong } from '../lib/dates'
 import { compareFichasByNumero, fichaTitulo } from '../lib/fichas'
-import { EmptyState, ExtraBadge, LeyendaSimbolos, StatusBadge } from '../components/ui'
+import { compareActividadesByTitulo } from '../lib/actividades'
+import { EmptyState, ExtraBadge, LeyendaSimbolos, StatusBadge, TipoBadge } from '../components/ui'
 import { SIMBOLOS_ESTADO } from '../lib/simbolos'
-import { GrillaAnual } from '../components/GrillaAnual'
+import { estadoAgendaCorrectiva, GrillaAnual } from '../components/GrillaAnual'
 import { FichaTitle } from '../components/FichaTitle'
+import { ActividadTitle } from '../components/ActividadTitle'
+import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
+import { useTiposActividad } from '../hooks/useTiposActividad'
+
+type ListaItem =
+  | { kind: 'occ'; id: string; fecha: string; occId: string; fichaId: string }
+  | { kind: 'evt'; id: string; fecha: string; eventoId: string; actividadId: string }
+  | { kind: 'acc'; id: string; fecha: string; accionId: string; fichaId: string }
+
+type Ambito = 'fichas' | 'actividades'
 
 export function CronogramaPage() {
   const [params, setParams] = useSearchParams()
@@ -18,50 +37,91 @@ export function CronogramaPage() {
   const bloqueId = params.get('bloque') ?? params.get('grupo') ?? ''
   const encargadoId = params.get('encargado') ?? ''
   const fichaId = params.get('ficha') ?? ''
+  const tipoId = params.get('tipo') ?? ''
   const fecha = params.get('fecha') ?? ''
   const q = params.get('q') ?? ''
+  const [searchText, setSearchText] = useState(q)
   const vista = params.get('vista') === 'lista' ? 'lista' : 'grilla'
+  const ambito: Ambito = params.get('ambito') === 'actividades' ? 'actividades' : 'fichas'
   const year = Number(params.get('anio')) || new Date().getFullYear()
   const showBloque = params.get('verBloque') !== '0'
 
   const ocurrencias = useLiveQuery(() => db.ocurrencias.orderBy('fechaProgramada').toArray()) ?? []
+  const eventos = useLiveQuery(() => db.eventos.orderBy('fechaProgramada').toArray()) ?? []
   const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
+  const actividades = useLiveQuery(() => db.actividades.toArray()) ?? []
   const bloques = useLiveQuery(() => db.grupos.orderBy('nombre').toArray()) ?? []
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
   const acciones = useLiveQuery(() => db.accionesCorrectivas.toArray()) ?? []
+  const tipos = useTiposActividad()
 
-  const fichaMap = useMemo(
-    () => Object.fromEntries(fichas.map((f) => [f.id, f])),
-    [fichas],
+  const fichaMap = useMemo(() => Object.fromEntries(fichas.map((f) => [f.id, f])), [fichas])
+  const actividadMap = useMemo(
+    () => Object.fromEntries(actividades.map((a) => [a.id, a])),
+    [actividades],
   )
-  const bloqueMap = useMemo(
-    () => Object.fromEntries(bloques.map((b) => [b.id, b])),
-    [bloques],
-  )
+  const bloqueMap = useMemo(() => Object.fromEntries(bloques.map((b) => [b.id, b])), [bloques])
   const encargadoMap = useMemo(
     () => Object.fromEntries(encargados.map((e) => [e.id, e])),
     [encargados],
   )
 
   function set(key: string, value: string) {
-    const next = new URLSearchParams(params)
-    if (value) next.set(key, value)
-    else next.delete(key)
-    if (key === 'bloque') next.delete('grupo')
-    setParams(next, { replace: true })
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current)
+        if (value) next.set(key, value)
+        else next.delete(key)
+        if (key === 'bloque') next.delete('grupo')
+        next.delete('actividad')
+        return next
+      },
+      { replace: true },
+    )
   }
 
+  useEffect(() => {
+    setSearchText(q)
+  }, [q])
+
+  function onSearchChange(value: string) {
+    setSearchText(value)
+    set('q', value)
+  }
+
+  function clearFilters() {
+    setSearchText('')
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current)
+        for (const key of ['q', 'estado', 'bloque', 'grupo', 'encargado', 'ficha', 'tipo', 'actividad', 'fecha']) {
+          next.delete(key)
+        }
+        return next
+      },
+      { replace: true },
+    )
+  }
+
+  const qLower = q.toLowerCase()
   const fichasFiltradas = fichas.filter((ficha) => {
     if (bloqueId && ficha.grupoId !== bloqueId) return false
     if (encargadoId && ficha.encargadoId !== encargadoId) return false
     if (fichaId && ficha.id !== fichaId) return false
-    if (q && !`${ficha.numero} ${ficha.nombre}`.toLowerCase().includes(q.toLowerCase())) {
+    if (q && !`${ficha.numero} ${ficha.nombre}`.toLowerCase().includes(qLower)) return false
+    return true
+  })
+
+  const actividadesFiltradas = actividades.filter((act) => {
+    if (tipoId && act.tipo !== tipoId) return false
+    if (encargadoId && act.encargadoId !== encargadoId) return false
+    if (q && !`${act.titulo} ${tipoActividadLabel(act.tipo, tipos)}`.toLowerCase().includes(qLower)) {
       return false
     }
     return true
   })
 
-  const filtered = ocurrencias.filter((o) => {
+  const filteredOcc = ocurrencias.filter((o) => {
     const ficha = fichaMap[o.fichaId]
     if (!ficha) return false
     if (!fichasFiltradas.some((f) => f.id === ficha.id)) return false
@@ -70,28 +130,186 @@ export function CronogramaPage() {
     return true
   })
 
-  const fichasOrdenadas = [...fichas].sort(compareFichasByNumero)
+  const filteredEvt = eventos.filter((e) => {
+    const act = actividadMap[e.actividadId]
+    if (!act) return false
+    if (!actividadesFiltradas.some((a) => a.id === act.id)) return false
+    if (estado && e.estado !== estado) return false
+    if (fecha && e.fechaProgramada !== fecha) return false
+    return true
+  })
 
-  const grouped = new Map<string, typeof filtered>()
-  for (const o of filtered) {
-    const list = grouped.get(o.fechaProgramada) ?? []
-    list.push(o)
-    grouped.set(o.fechaProgramada, list)
+  const correctivasFechadas = acciones.filter((a) => {
+    if (tipoAccionOf(a) !== 'correctiva' || !a.fechaObjetivo) return false
+    const ficha = fichaMap[a.fichaId]
+    if (encargadoId && ficha?.encargadoId !== encargadoId) return false
+    if (tipoId) return false
+    if (q) {
+      const hay = `${a.texto} ${ficha ? `${ficha.numero} ${ficha.nombre}` : ''}`.toLowerCase()
+      if (!hay.includes(qLower)) return false
+    }
+    if (estado && estadoAgendaCorrectiva(a) !== estado) return false
+    if (fecha && a.fechaObjetivo !== fecha) return false
+    return true
+  })
+
+  const fichasOrdenadas = useMemo(() => [...fichas].sort(compareFichasByNumero), [fichas])
+
+  const filterTools = useMemo<FilterTool[]>(
+    () => [
+      {
+        id: 'filtrar',
+        label: 'Filtrar',
+        icon: SlidersHorizontal,
+        active:
+          ambito === 'fichas'
+            ? Boolean(bloqueId || encargadoId || fichaId)
+            : Boolean(encargadoId || tipoId),
+        content: (
+          <div className="stack" style={{ gap: '0.7rem' }}>
+            {ambito === 'fichas' ? (
+              <>
+                <div className="field" style={{ margin: 0 }}>
+                  <label htmlFor="crono-bloque">Bloque</label>
+                  <select
+                    id="crono-bloque"
+                    className="select"
+                    value={bloqueId}
+                    onChange={(e) => set('bloque', e.target.value)}
+                  >
+                    <option value="">Todos</option>
+                    {bloques.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label htmlFor="crono-ficha">Ficha</label>
+                  <select
+                    id="crono-ficha"
+                    className="select"
+                    value={fichaId}
+                    onChange={(e) => set('ficha', e.target.value)}
+                  >
+                    <option value="">Todas</option>
+                    {fichasOrdenadas.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {fichaTitulo(f)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            ) : (
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor="crono-tipo">Tipo de actividad</label>
+                <select
+                  id="crono-tipo"
+                  className="select"
+                  value={tipoId}
+                  onChange={(e) => set('tipo', e.target.value)}
+                >
+                  <option value="">Todos</option>
+                  {tipos.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="crono-encargado">Encargado</label>
+              <select
+                id="crono-encargado"
+                className="select"
+                value={encargadoId}
+                onChange={(e) => set('encargado', e.target.value)}
+              >
+                <option value="">Todos</option>
+                {encargados.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        ),
+      },
+    ],
+    [ambito, bloqueId, encargadoId, fichaId, tipoId, bloques, encargados, fichasOrdenadas, tipos],
+  )
+
+  const listaItems: ListaItem[] =
+    ambito === 'fichas'
+      ? filteredOcc.map((o) => ({
+          kind: 'occ' as const,
+          id: o.id,
+          fecha: o.fechaProgramada,
+          occId: o.id,
+          fichaId: o.fichaId,
+        }))
+      : [
+          ...filteredEvt.map((e) => ({
+            kind: 'evt' as const,
+            id: e.id,
+            fecha: e.fechaProgramada,
+            eventoId: e.id,
+            actividadId: e.actividadId,
+          })),
+          ...correctivasFechadas.map((a) => ({
+            kind: 'acc' as const,
+            id: a.id,
+            fecha: a.fechaObjetivo as string,
+            accionId: a.id,
+            fichaId: a.fichaId,
+          })),
+        ]
+
+  const grouped = new Map<string, ListaItem[]>()
+  for (const item of listaItems) {
+    const list = grouped.get(item.fecha) ?? []
+    list.push(item)
+    grouped.set(item.fecha, list)
   }
   for (const list of grouped.values()) {
-    list.sort((a, b) => compareFichasByNumero(fichaMap[a.fichaId], fichaMap[b.fichaId]))
+    list.sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === 'occ' ? -1 : 1
+      if (a.kind === 'occ' && b.kind === 'occ') {
+        return compareFichasByNumero(fichaMap[a.fichaId], fichaMap[b.fichaId])
+      }
+      if (a.kind === 'evt' && b.kind === 'evt') {
+        return compareActividadesByTitulo(actividadMap[a.actividadId], actividadMap[b.actividadId])
+      }
+      if (a.kind === 'acc' && b.kind === 'acc') {
+        return compareFichasByNumero(fichaMap[a.fichaId], fichaMap[b.fichaId])
+      }
+      if (a.kind === 'evt') return -1
+      if (b.kind === 'evt') return 1
+      return 0
+    })
   }
 
-  if (!fichas.length) {
+  const sinDatos =
+    !fichas.length && !actividades.length && !acciones.some((a) => tipoAccionOf(a) === 'correctiva' && a.fechaObjetivo)
+  if (sinDatos) {
     return (
       <EmptyState
         icon={<CalendarDays size={36} />}
         title="Sin cronograma"
-        text="Cuando existan fichas con periodo, aquí verás las fechas programadas."
+        text="Cuando existan fichas o actividades, aquí verás las fechas programadas."
         action={
-          <Link className="btn btn-add" to="/fichas/nueva">
-            Nueva ficha
-          </Link>
+          <div className="row" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link className="btn btn-add" to="/fichas/nueva">
+              Nueva ficha
+            </Link>
+            <Link className="btn btn-add" to="/actividades/nueva">
+              Nueva actividad
+            </Link>
+          </div>
         }
       />
     )
@@ -99,18 +317,45 @@ export function CronogramaPage() {
 
   return (
     <div>
+      <FilterDrawerSlot
+        title="Cronograma"
+        tools={filterTools}
+        canClear={Boolean(q || estado || bloqueId || encargadoId || fichaId || tipoId || fecha)}
+        onClear={clearFilters}
+      />
       <div className="crono-toolbar">
-        <div className="row" style={{ flexWrap: 'wrap', gap: '0.4rem' }}>
-          <div className="seg-toggle compact" role="tablist" aria-label="Vista del cronograma">
+        <div className="row crono-toolbar-toggles">
+          <div className="seg-toggle compact" role="tablist" aria-label="Cronograma de fichas o actividades">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={ambito === 'fichas'}
+              className={ambito === 'fichas' ? 'active' : ''}
+              onClick={() => set('ambito', '')}
+            >
+              Ficha
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={ambito === 'actividades'}
+              className={ambito === 'actividades' ? 'active' : ''}
+              onClick={() => set('ambito', 'actividades')}
+            >
+              Actividad
+            </button>
+          </div>
+          <div className="seg-toggle compact icon-only" role="tablist" aria-label="Vista del cronograma">
             <button
               type="button"
               role="tab"
               aria-selected={vista === 'grilla'}
               className={vista === 'grilla' ? 'active' : ''}
               onClick={() => set('vista', '')}
+              aria-label="Grilla"
+              title="Grilla"
             >
-              <LayoutGrid size={14} />
-              Grilla
+              <LayoutGrid size={16} />
             </button>
             <button
               type="button"
@@ -118,20 +363,12 @@ export function CronogramaPage() {
               aria-selected={vista === 'lista'}
               className={vista === 'lista' ? 'active' : ''}
               onClick={() => set('vista', 'lista')}
+              aria-label="Lista"
+              title="Lista"
             >
-              <List size={14} />
-              Lista
+              <List size={16} />
             </button>
           </div>
-          <button
-            type="button"
-            className={`chip compact${showBloque ? ' active' : ''}`}
-            onClick={() => set('verBloque', showBloque ? '0' : '')}
-            aria-pressed={showBloque}
-            title={showBloque ? 'Ocultar nombre del bloque' : 'Mostrar nombre del bloque'}
-          >
-            Bloque
-          </button>
         </div>
         {vista === 'grilla' ? (
           <div className="year-stepper">
@@ -157,11 +394,7 @@ export function CronogramaPage() {
       </div>
 
       <div className="estado-toggle" role="group" aria-label="Estado">
-        <button
-          type="button"
-          className={!estado ? 'active' : ''}
-          onClick={() => set('estado', '')}
-        >
+        <button type="button" className={!estado ? 'active' : ''} onClick={() => set('estado', '')}>
           <span className="sym" aria-hidden>
             ∗
           </span>
@@ -182,54 +415,44 @@ export function CronogramaPage() {
         ))}
       </div>
 
-      <div className="filters compact">
+      <label className="search-field search-field-full" htmlFor="crono-q">
+        <Search size={16} aria-hidden />
         <input
+          id="crono-q"
           className="input"
-          placeholder="Buscar"
-          value={q}
-          onChange={(e) => set('q', e.target.value)}
+          type="search"
+          placeholder={ambito === 'fichas' ? 'Buscar ficha' : 'Buscar actividad o correctiva'}
+          value={searchText}
+          onChange={(e) => onSearchChange(e.target.value)}
+          autoComplete="off"
+          enterKeyHint="search"
+          inputMode="search"
         />
-        <select className="select" value={bloqueId} onChange={(e) => set('bloque', e.target.value)}>
-          <option value="">Bloque</option>
-          {bloques.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.nombre}
-            </option>
-          ))}
-        </select>
-        <select
-          className="select"
-          value={encargadoId}
-          onChange={(e) => set('encargado', e.target.value)}
-        >
-          <option value="">Encargado</option>
-          {encargados.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.nombre}
-            </option>
-          ))}
-        </select>
-        <select className="select" value={fichaId} onChange={(e) => set('ficha', e.target.value)}>
-          <option value="">Ficha</option>
-          {fichasOrdenadas.map((f) => (
-            <option key={f.id} value={f.id}>
-              {fichaTitulo(f)}
-            </option>
-          ))}
-        </select>
-      </div>
+      </label>
 
       {vista === 'grilla' ? (
         <GrillaAnual
           year={year}
-          fichas={fichasFiltradas}
+          modo={ambito}
+          fichas={ambito === 'fichas' ? fichasFiltradas : fichas}
+          actividades={ambito === 'actividades' ? actividadesFiltradas : []}
           bloques={bloques}
           encargados={encargados}
-          ocurrencias={estado || fecha ? filtered : ocurrencias.filter((o) =>
-            fichasFiltradas.some((f) => f.id === o.fichaId),
-          )}
-          acciones={acciones}
+          ocurrencias={
+            estado || fecha
+              ? filteredOcc
+              : ocurrencias.filter((o) => fichasFiltradas.some((f) => f.id === o.fichaId))
+          }
+          eventos={
+            estado || fecha
+              ? filteredEvt
+              : eventos.filter((e) => actividadesFiltradas.some((a) => a.id === e.actividadId))
+          }
+          acciones={ambito === 'actividades' ? correctivasFechadas : acciones}
           showBloque={showBloque}
+          onToggleBloque={
+            ambito === 'fichas' ? () => set('verBloque', showBloque ? '0' : '') : undefined
+          }
         />
       ) : (
         <>
@@ -242,62 +465,162 @@ export function CronogramaPage() {
             </p>
           ) : null}
 
-          {filtered.length === 0 ? (
+          {listaItems.length === 0 ? (
             <div className="table-card">
-              <p className="table-empty">No hay ocurrencias con esos filtros.</p>
+              <p className="table-empty">
+                {ambito === 'fichas'
+                  ? 'No hay inspecciones con esos filtros.'
+                  : 'No hay actividades ni correctivas con esos filtros.'}
+              </p>
             </div>
           ) : (
             <div className="table-card">
+              {ambito === 'fichas' ? (
+                <div className="row" style={{ justifyContent: 'flex-end', margin: '0.35rem 0.5rem' }}>
+                  <button
+                    type="button"
+                    className={`chip compact${showBloque ? ' active' : ''}`}
+                    onClick={() => set('verBloque', showBloque ? '0' : '')}
+                    aria-pressed={showBloque}
+                  >
+                    Bloque
+                  </button>
+                </div>
+              ) : null}
               <div className={`table-head table-cols-crono${showBloque ? '' : ' no-bloque'}`}>
                 <span className="table-bar" aria-hidden />
-                <span>Ficha</span>
-                {showBloque ? <span className="col-md">Bloque</span> : null}
+                <span>{ambito === 'fichas' ? 'Ficha' : 'Actividad'}</span>
+                {showBloque ? (
+                  <span className="col-md">{ambito === 'fichas' ? 'Bloque' : 'Tipo'}</span>
+                ) : null}
                 <span className="col-md">Encargado</span>
                 <span>Estado</span>
               </div>
-              {[...grouped.entries()].map(([day, items]) => (
-                <section key={day}>
-                  <div className="table-section">
-                    {formatFechaProgramada(
-                      day,
-                      fichaMap[items[0]?.fichaId ?? '']?.fechaPrecision === 'dia' ? 'dia' : 'mes',
-                    )}
-                  </div>
-                  {items.map((o) => {
-                    const ficha = fichaMap[o.fichaId]
-                    const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
-                    const encargado = ficha ? encargadoMap[ficha.encargadoId ?? ''] : undefined
-                    return (
-                      <Link
-                        key={o.id}
-                        className={`table-row table-cols-crono${showBloque ? '' : ' no-bloque'}`}
-                        to={`/ocurrencias/${o.id}`}
-                      >
-                        <span
-                          className="table-bar"
-                          style={{ background: bloqueColorVar(bloque?.color) }}
-                        />
-                        <span className="table-cell">
-                          <span className="occ-meta">
-                            <FichaTitle ficha={ficha} color={bloque?.color} />
-                            {esExtraordinaria(o) ? <ExtraBadge /> : null}
+              {[...grouped.entries()].map(([day, items]) => {
+                const firstOcc = items.find((i) => i.kind === 'occ')
+                const firstEvt = items.find((i) => i.kind === 'evt')
+                const firstAcc = items.find((i) => i.kind === 'acc')
+                const precision =
+                  (firstOcc && fichaMap[firstOcc.fichaId]?.fechaPrecision === 'dia') ||
+                  (firstEvt && actividadMap[firstEvt.actividadId]?.fechaPrecision === 'dia') ||
+                  firstAcc
+                    ? 'dia'
+                    : 'mes'
+                return (
+                  <section key={day}>
+                    <div className="table-section">{formatFechaProgramada(day, precision)}</div>
+                    {items.map((item) => {
+                      if (item.kind === 'occ') {
+                        const occ = filteredOcc.find((o) => o.id === item.occId)
+                        const ficha = fichaMap[item.fichaId]
+                        const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
+                        const encargado = ficha ? encargadoMap[ficha.encargadoId ?? ''] : undefined
+                        if (!occ) return null
+                        return (
+                          <Link
+                            key={item.id}
+                            className={`table-row table-cols-crono${showBloque ? '' : ' no-bloque'}`}
+                            to={`/ocurrencias/${occ.id}`}
+                          >
+                            <span
+                              className="table-bar"
+                              style={{ background: bloqueColorVar(bloque?.color) }}
+                            />
+                            <span className="table-cell">
+                              <span className="occ-meta">
+                                <FichaTitle ficha={ficha} color={bloque?.color} />
+                                {esExtraordinaria(occ) ? <ExtraBadge /> : null}
+                              </span>
+                              <span className="muted col-sm-only">
+                                {showBloque && bloque?.nombre
+                                  ? `${bloque.nombre}${encargado ? ` · ${encargado.nombre}` : ''}`
+                                  : (encargado?.nombre ?? '')}
+                              </span>
+                            </span>
+                            {showBloque ? (
+                              <span className="col-md muted">{bloque?.nombre ?? '—'}</span>
+                            ) : null}
+                            <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
+                            <span className="table-nowrap">
+                              <StatusBadge estado={occ.estado} />
+                            </span>
+                          </Link>
+                        )
+                      }
+                      if (item.kind === 'evt') {
+                        const evt = filteredEvt.find((e) => e.id === item.eventoId)
+                        const act = actividadMap[item.actividadId]
+                        const encargado = act ? encargadoMap[act.encargadoId ?? ''] : undefined
+                        if (!evt || !act) return null
+                        return (
+                          <Link
+                            key={item.id}
+                            className={`table-row table-cols-crono${showBloque ? '' : ' no-bloque'}`}
+                            to={`/eventos/${evt.id}`}
+                          >
+                            <span
+                              className="table-bar"
+                              style={{ background: bloqueColorVar(tipoActividadColor(act.tipo, tipos)) }}
+                            />
+                            <span className="table-cell">
+                              <span className="occ-meta">
+                                <ActividadTitle actividad={act} />
+                                {esExtraordinaria(evt) ? <ExtraBadge /> : null}
+                              </span>
+                              <span className="muted col-sm-only">{encargado?.nombre ?? ''}</span>
+                            </span>
+                            {showBloque ? (
+                              <span className="col-md">
+                                <TipoBadge tipo={act.tipo} />
+                              </span>
+                            ) : null}
+                            <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
+                            <span className="table-nowrap">
+                              <StatusBadge estado={evt.estado} />
+                            </span>
+                          </Link>
+                        )
+                      }
+                      const accion = correctivasFechadas.find((a) => a.id === item.accionId)
+                      const ficha = fichaMap[item.fichaId]
+                      const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
+                      const encargado = ficha ? encargadoMap[ficha.encargadoId ?? ''] : undefined
+                      if (!accion) return null
+                      const href = accion.ocurrenciaId
+                        ? `/ocurrencias/${accion.ocurrenciaId}`
+                        : `/fichas/${accion.fichaId}`
+                      return (
+                        <Link
+                          key={item.id}
+                          className={`table-row table-cols-crono${showBloque ? '' : ' no-bloque'}`}
+                          to={href}
+                        >
+                          <span
+                            className="table-bar"
+                            style={{ background: bloqueColorVar(bloque?.color ?? 'rose') }}
+                          />
+                          <span className="table-cell">
+                            <span className="occ-meta">
+                              <strong>{accion.texto}</strong>
+                            </span>
+                            <span className="muted col-sm-only">
+                              {tipoAccionLabel('correctiva')}
+                              {ficha ? ` · ${fichaTitulo(ficha)}` : ''}
+                            </span>
                           </span>
-                          <span className="muted col-sm-only">
-                            {showBloque && bloque?.nombre
-                              ? `${bloque.nombre}${encargado ? ` · ${encargado.nombre}` : ''}`
-                              : (encargado?.nombre ?? '')}
+                          {showBloque ? (
+                            <span className="col-md muted">{tipoAccionLabel('correctiva')}</span>
+                          ) : null}
+                          <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
+                          <span className="table-nowrap">
+                            <StatusBadge estado={estadoAgendaCorrectiva(accion)} />
                           </span>
-                        </span>
-                        {showBloque ? <span className="col-md muted">{bloque?.nombre ?? '—'}</span> : null}
-                        <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
-                        <span className="table-nowrap">
-                          <StatusBadge estado={o.estado} />
-                        </span>
-                      </Link>
-                    )
-                  })}
-                </section>
-              ))}
+                        </Link>
+                      )
+                    })}
+                  </section>
+                )
+              })}
             </div>
           )}
           <LeyendaSimbolos />

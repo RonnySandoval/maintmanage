@@ -6,6 +6,7 @@ export function parentPath(pathname: string): string | null {
   const editar = path.match(/^\/fichas\/([^/]+)\/editar$/)
   if (editar) return `/fichas/${editar[1]}`
   if (path === '/fichas/nueva') return '/fichas'
+  if (path === '/inspecciones/nueva') return '/cronograma'
   if (/^\/fichas\/[^/]+$/.test(path)) return '/fichas'
   if (/^\/ocurrencias\/[^/]+$/.test(path)) return '/cronograma'
   return null

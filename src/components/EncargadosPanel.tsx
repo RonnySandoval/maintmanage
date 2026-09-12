@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Pencil, Trash2 } from 'lucide-react'
 import { db } from '../db'
@@ -8,14 +9,17 @@ import { CopyText } from './CopyText'
 import { CrearEncargadoForm } from './CrearEncargadoForm'
 
 export function EncargadosPanel() {
+  const [params] = useSearchParams()
+  const openNuevo = params.get('nuevo') === '1'
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
   const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
+  const actividades = useLiveQuery(() => db.actividades.toArray()) ?? []
   const [error, setError] = useState('')
   const [editEnc, setEditEnc] = useState<string | null>(null)
 
   async function removeEncargado(id: string) {
-    if (fichas.some((f) => f.encargadoId === id)) {
-      setError('No se puede borrar un encargado asignado a fichas.')
+    if (fichas.some((f) => f.encargadoId === id) || actividades.some((a) => a.encargadoId === id)) {
+      setError('No se puede borrar un encargado asignado a fichas o actividades.')
       return
     }
     await db.encargados.delete(id)
@@ -50,7 +54,7 @@ export function EncargadosPanel() {
     <section className="card">
       {error ? <p className="danger-text">{error}</p> : null}
       <h2 className="title-sm">Encargados</h2>
-      <CrearEncargadoForm accordion defaultOpen={false} />
+      <CrearEncargadoForm accordion defaultOpen={openNuevo} />
       <div className="table-card" style={{ marginTop: '1rem' }}>
         {encargados.length === 0 ? (
           <p className="table-empty">Aún no hay encargados.</p>

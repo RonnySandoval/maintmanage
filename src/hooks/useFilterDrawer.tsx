@@ -4,6 +4,7 @@ import {
   useContext,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -36,14 +37,23 @@ export type FilterTool = {
   active?: boolean
 }
 
+export type FilterSlot = {
+  title: string
+  tools: FilterTool[]
+  onClear?: () => void
+  canClear?: boolean
+}
+
 interface FilterDrawerContextValue {
   open: boolean
   available: boolean
   title: string
   tools: FilterTool[]
+  onClear?: () => void
+  canClear: boolean
   activeTool: string | null
   setActiveTool: (id: string | null) => void
-  setSlot: (slot: { title: string; tools: FilterTool[] } | null) => void
+  setSlot: (slot: FilterSlot | null) => void
   setOpen: (value: boolean) => void
   toggle: () => void
 }
@@ -52,7 +62,7 @@ const FilterDrawerContext = createContext<FilterDrawerContextValue | null>(null)
 
 export function FilterDrawerProvider({ children }: { children: ReactNode }) {
   const [preferOpen, setPreferOpen] = useState(readPreferOpen)
-  const [slot, setSlotState] = useState<{ title: string; tools: FilterTool[] } | null>(null)
+  const [slot, setSlotState] = useState<FilterSlot | null>(null)
   const [activeTool, setActiveTool] = useState<string | null>(null)
 
   const setOpen = useCallback((value: boolean) => {
@@ -70,7 +80,7 @@ export function FilterDrawerProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const setSlot = useCallback((next: { title: string; tools: FilterTool[] } | null) => {
+  const setSlot = useCallback((next: FilterSlot | null) => {
     setSlotState(next)
     setActiveTool((current) => {
       if (!current || !next?.tools.some((tool) => tool.id === current)) return null
@@ -84,6 +94,8 @@ export function FilterDrawerProvider({ children }: { children: ReactNode }) {
       available: Boolean(slot),
       title: slot?.title ?? 'Filtros',
       tools: slot?.tools ?? [],
+      onClear: slot?.onClear,
+      canClear: Boolean(slot?.canClear),
       activeTool,
       setActiveTool,
       setSlot,
@@ -105,16 +117,27 @@ export function useFilterDrawer() {
 export function FilterDrawerSlot({
   title = 'Filtros',
   tools,
+  onClear,
+  canClear,
 }: {
   title?: string
   tools: FilterTool[]
+  onClear?: () => void
+  canClear?: boolean
 }) {
   const { setSlot } = useFilterDrawer()
+  const onClearRef = useRef(onClear)
+  onClearRef.current = onClear
 
   useLayoutEffect(() => {
-    setSlot({ title, tools })
+    setSlot({
+      title,
+      tools,
+      canClear,
+      onClear: onClearRef.current ? () => onClearRef.current?.() : undefined,
+    })
     return () => setSlot(null)
-  }, [title, tools, setSlot])
+  }, [title, tools, canClear, setSlot])
 
   return null
 }

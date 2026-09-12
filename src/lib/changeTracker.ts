@@ -8,6 +8,8 @@ const TRACKED = [
   'ejecuciones',
   'accionesCorrectivas',
   'adjuntos',
+  'actividades',
+  'eventos',
 ] as const
 
 let suppressDataTouch = false

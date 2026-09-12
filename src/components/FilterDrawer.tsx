@@ -1,4 +1,4 @@
-import { PanelRight, PanelRightClose } from 'lucide-react'
+import { Ban, PanelRight, PanelRightClose } from 'lucide-react'
 import { useFilterDrawer } from '../hooks/useFilterDrawer'
 
 export function FilterDrawerToggle() {
@@ -19,7 +19,8 @@ export function FilterDrawerToggle() {
 }
 
 export function FilterDrawer() {
-  const { available, open, title, tools, activeTool, setActiveTool } = useFilterDrawer()
+  const { available, open, title, tools, onClear, canClear, activeTool, setActiveTool } =
+    useFilterDrawer()
   const current = tools.find((tool) => tool.id === activeTool)
 
   return (
@@ -66,14 +67,26 @@ export function FilterDrawer() {
         <div className="filter-flyout" role="dialog" aria-label={current.label}>
           <div className="filter-flyout-head">
             <strong>{current.label}</strong>
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="Cerrar"
-              onClick={() => setActiveTool(null)}
-            >
-              ×
-            </button>
+            <div className="filter-flyout-actions">
+              <button
+                type="button"
+                className={`icon-btn${canClear ? ' is-active' : ''}`}
+                aria-label="Borrar filtros"
+                title="Borrar filtros"
+                disabled={!onClear}
+                onClick={() => onClear?.()}
+              >
+                <Ban size={16} />
+              </button>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="Cerrar"
+                onClick={() => setActiveTool(null)}
+              >
+                ×
+              </button>
+            </div>
           </div>
           <div className="filter-flyout-body">{current.content}</div>
         </div>

@@ -24,7 +24,15 @@ export type TipoAccion = 'correctiva' | 'recomendacion'
 
 export type PrioridadAccion = 'alta' | 'media' | 'baja'
 
-export type TipoAdjunto = 'ficha' | 'ejecucion' | 'manual'
+export type TipoAdjunto = 'ficha' | 'ejecucion' | 'manual' | 'actividad'
+
+export type TipoActividad = string
+
+export interface TipoActividadDef {
+  id: string
+  label: string
+  color: string
+}
 
 export type OrigenOcurrencia = 'programada' | 'extraordinaria'
 
@@ -82,10 +90,36 @@ export interface Ocurrencia {
 
 export interface Ejecucion {
   id: string
-  ocurrenciaId: string
+  ocurrenciaId?: string
+  eventoId?: string
   fechaReal: string
   observaciones?: string
   realizadoPor?: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface Actividad {
+  id: string
+  tipo: TipoActividad
+  titulo: string
+  encargadoId?: string
+  frecuencia: Frecuencia
+  fechaInicio: string
+  fechaPrecision: FechaPrecision
+  notas?: string
+  fechasOmitidas?: string[]
+  createdAt: number
+  updatedAt: number
+}
+
+export interface Evento {
+  id: string
+  actividadId: string
+  fechaProgramada: string
+  estado: EstadoOcurrencia
+  origen?: OrigenOcurrencia
+  estadoFijado?: boolean
   createdAt: number
   updatedAt: number
 }
@@ -109,6 +143,7 @@ export interface Adjunto {
   mimeType: string
   nombre: string
   fichaId?: string
+  actividadId?: string
   ejecucionId?: string
   tipo: TipoAdjunto
   createdAt: number
@@ -126,6 +161,8 @@ export interface Ajustes {
   lastBackupAt?: number
   lastBackupKind?: 'folder' | 'download'
   backupFolderName?: string
+  /** Tipos de actividad añadidos por el usuario. */
+  tiposActividad?: TipoActividadDef[]
 }
 
 export const FRECUENCIAS: { id: Frecuencia; label: string; meses: number }[] = [
@@ -217,6 +254,57 @@ export function esOcurrenciaProgramada(o: Pick<Ocurrencia, 'origen'>): boolean {
 
 export function esExtraordinaria(o: Pick<Ocurrencia, 'origen'>): boolean {
   return o.origen === 'extraordinaria'
+}
+
+export const TIPOS_ACTIVIDAD: TipoActividadDef[] = [
+  { id: 'inspeccion', label: 'Inspección', color: 'teal' },
+  { id: 'reparacion', label: 'Reparación', color: 'orange' },
+  { id: 'compra', label: 'Compra', color: 'amber' },
+  { id: 'limpieza', label: 'Limpieza', color: 'green' },
+  { id: 'capacitacion', label: 'Capacitación', color: 'indigo' },
+  { id: 'otro', label: 'Otro', color: 'slate' },
+]
+
+const TIPO_COLORS = [
+  'orange',
+  'amber',
+  'green',
+  'indigo',
+  'slate',
+  'sky',
+  'violet',
+  'rose',
+  'teal',
+  'fuchsia',
+]
+
+export function tipoActividadOf(tipo?: string | null): TipoActividad {
+  const trimmed = tipo?.trim()
+  return trimmed || 'otro'
+}
+
+export function humanizeTipoActividad(id: string): string {
+  const text = id.replace(/[_-]+/g, ' ').trim()
+  if (!text) return 'Otro'
+  return text.replace(/\b\w/g, (ch) => ch.toUpperCase())
+}
+
+export function tipoActividadColor(tipo?: string | null, extras?: TipoActividadDef[]): string {
+  const id = tipoActividadOf(tipo)
+  const extra = extras?.find((t) => t.id === id)
+  if (extra?.color) return extra.color
+  const built = TIPOS_ACTIVIDAD.find((t) => t.id === id)
+  if (built) return built.color
+  let hash = 0
+  for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) | 0
+  return TIPO_COLORS[Math.abs(hash) % TIPO_COLORS.length]
+}
+
+export function tipoActividadLabel(tipo?: string | null, extras?: TipoActividadDef[]): string {
+  const id = tipoActividadOf(tipo)
+  const extra = extras?.find((t) => t.id === id)
+  if (extra?.label) return extra.label
+  return TIPOS_ACTIVIDAD.find((t) => t.id === id)?.label ?? humanizeTipoActividad(id)
 }
 
 export { BLOQUE_COLORS, GRUPO_COLORS } from '../lib/colors'

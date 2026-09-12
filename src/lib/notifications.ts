@@ -18,8 +18,14 @@ export async function notifyIfNeeded(): Promise<void> {
   const today = new Date().toISOString().slice(0, 10)
   if (ajustes.lastNotifiedDate === today) return
 
-  const vencidas = await db.ocurrencias.where('estado').equals('vencida').count()
-  const pendientes = await db.ocurrencias.where('estado').equals('pendiente').count()
+  const [vencidasOcc, pendientesOcc, vencidasEvt, pendientesEvt] = await Promise.all([
+    db.ocurrencias.where('estado').equals('vencida').count(),
+    db.ocurrencias.where('estado').equals('pendiente').count(),
+    db.eventos.where('estado').equals('vencida').count(),
+    db.eventos.where('estado').equals('pendiente').count(),
+  ])
+  const vencidas = vencidasOcc + vencidasEvt
+  const pendientes = pendientesOcc + pendientesEvt
   if (vencidas + pendientes === 0) return
 
   const parts: string[] = []

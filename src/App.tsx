@@ -4,13 +4,17 @@ import { Layout } from './components/Layout'
 import { ThemeProvider } from './hooks/useTheme'
 import { ensureHorizon } from './db/occurrences'
 import { notifyIfNeeded } from './lib/notifications'
+import { ActividadDetailPage } from './pages/ActividadDetail'
+import { ActividadFormPage } from './pages/ActividadForm'
 import { AjustesPage } from './pages/Ajustes'
 import { CronogramaPage } from './pages/Cronograma'
 import { DashboardPage } from './pages/Dashboard'
+import { EventoDetailPage } from './pages/EventoDetail'
 import { FichaDetailPage } from './pages/FichaDetail'
 import { FichaFormPage } from './pages/FichaForm'
 import { FichasPage } from './pages/Fichas'
 import { HistoricosPage } from './pages/Historicos'
+import { InspeccionFichaFormPage } from './pages/InspeccionFichaForm'
 import { OcurrenciaDetailPage } from './pages/OcurrenciaDetail'
 
 export default function App() {
@@ -42,6 +46,12 @@ export default function App() {
             <Route path="fichas/:id/editar" element={<FichaFormPage />} />
             <Route path="fichas/:id" element={<FichaDetailPage />} />
             <Route path="ocurrencias/:id" element={<OcurrenciaDetailPage />} />
+            <Route path="inspecciones/nueva" element={<InspeccionFichaFormPage />} />
+            <Route path="actividades" element={<Navigate to="/fichas?tab=actividades" replace />} />
+            <Route path="actividades/nueva" element={<ActividadFormPage />} />
+            <Route path="actividades/:id/editar" element={<ActividadFormPage />} />
+            <Route path="actividades/:id" element={<ActividadDetailPage />} />
+            <Route path="eventos/:id" element={<EventoDetailPage />} />
             <Route path="historicos" element={<HistoricosPage />} />
             <Route path="bloques" element={<Navigate to="/fichas?tab=bloques" replace />} />
             <Route path="maestros" element={<Navigate to="/fichas?tab=bloques" replace />} />

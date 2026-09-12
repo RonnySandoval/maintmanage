@@ -2,10 +2,12 @@ import Dexie, { type Table } from 'dexie'
 import { registerChangeHooks } from '../lib/changeTracker'
 import type {
   AccionCorrectiva,
+  Actividad,
   Adjunto,
   Ajustes,
   Encargado,
   Ejecucion,
+  Evento,
   Bloque,
   Ficha,
   Ocurrencia,
@@ -20,6 +22,8 @@ export class MaintDB extends Dexie {
   accionesCorrectivas!: Table<AccionCorrectiva, string>
   adjuntos!: Table<Adjunto, string>
   ajustes!: Table<Ajustes, string>
+  actividades!: Table<Actividad, string>
+  eventos!: Table<Evento, string>
 
   constructor() {
     super('maintmanage')
@@ -183,6 +187,18 @@ export class MaintDB extends Dexie {
             }
           })
       })
+    this.version(8).stores({
+      encargados: 'id, nombre',
+      grupos: 'id, nombre',
+      fichas: 'id, grupoId, encargadoId, nombre, numero',
+      ocurrencias: 'id, fichaId, fechaProgramada, estado, origen, [fichaId+fechaProgramada]',
+      ejecuciones: 'id, ocurrenciaId, eventoId',
+      accionesCorrectivas: 'id, fichaId, ocurrenciaId, estado, tipo, prioridad',
+      adjuntos: 'id, fichaId, ejecucionId, tipo, actividadId',
+      ajustes: 'id',
+      actividades: 'id, tipo, encargadoId, titulo',
+      eventos: 'id, actividadId, fechaProgramada, estado, origen, [actividadId+fechaProgramada]',
+    })
   }
 }
 

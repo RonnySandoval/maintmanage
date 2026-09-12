@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
+import { actividadTitulo } from '../lib/actividades'
 import { fichaTitulo } from '../lib/fichas'
 import { monthLabel } from '../lib/dates'
 import {
@@ -13,6 +14,7 @@ import {
   Settings,
 } from 'lucide-react'
 import { FilterDrawer, FilterDrawerToggle } from './FilterDrawer'
+import { NuevoFab } from './NuevoFab'
 import { ThemeQuickToggle } from './ThemeQuickToggle'
 import { FilterDrawerProvider } from '../hooks/useFilterDrawer'
 import { useAppHistory } from '../hooks/useAppHistory'
@@ -36,11 +38,20 @@ const TITLES: Record<string, string> = {
 
 function titleFor(pathname: string, search = ''): string {
   if (pathname.startsWith('/ocurrencias/')) return 'Ocurrencia'
+  if (pathname.startsWith('/eventos/')) return 'Evento'
+  if (pathname.startsWith('/inspecciones/nueva')) return 'Nueva inspección'
+  if (pathname.startsWith('/actividades/nueva')) {
+    const tipo = new URLSearchParams(search).get('tipo')
+    return tipo === 'inspeccion' ? 'Nueva inspección' : 'Nueva actividad'
+  }
+  if (pathname.startsWith('/actividades/') && pathname.endsWith('/editar')) return 'Editar actividad'
+  if (pathname.startsWith('/actividades/')) return 'Actividad'
   if (pathname.startsWith('/fichas/nueva')) return 'Nueva ficha'
   if (pathname.includes('/editar')) return 'Editar ficha'
   if (pathname.startsWith('/fichas/')) return 'Ficha'
   if (pathname === '/fichas') {
     const tab = new URLSearchParams(search).get('tab')
+    if (tab === 'actividades') return 'Actividades'
     if (tab === 'encargados') return 'Encargados'
     if (tab === 'bloques') return 'Bloques'
   }
@@ -49,13 +60,22 @@ function titleFor(pathname: string, search = ''): string {
 
 function PageHeading({ pathname, search }: { pathname: string; search: string }) {
   const occId = pathname.match(/^\/ocurrencias\/([^/]+)/)?.[1]
+  const eventoId = pathname.match(/^\/eventos\/([^/]+)/)?.[1]
   const occ = useLiveQuery(() => (occId ? db.ocurrencias.get(occId) : undefined), [occId])
   const ficha = useLiveQuery(
     () => (occ?.fichaId ? db.fichas.get(occ.fichaId) : undefined),
     [occ?.fichaId],
   )
+  const evento = useLiveQuery(() => (eventoId ? db.eventos.get(eventoId) : undefined), [eventoId])
+  const actividad = useLiveQuery(
+    () => (evento?.actividadId ? db.actividades.get(evento.actividadId) : undefined),
+    [evento?.actividadId],
+  )
   if (occId && ficha && occ) {
     return `${fichaTitulo(ficha)} · ${monthLabel(occ.fechaProgramada)}`
+  }
+  if (eventoId && actividad && evento) {
+    return `${actividadTitulo(actividad)} · ${monthLabel(evento.fechaProgramada)}`
   }
   return titleFor(pathname, search)
 }
@@ -156,6 +176,7 @@ function LayoutShell() {
           ) : null}
           <Outlet />
         </main>
+        <NuevoFab />
         <FilterDrawer />
       </div>
       <nav className="bottom-nav" aria-label="Principal">

@@ -5,10 +5,12 @@ import { clearFolderHandle, getFolderHandle, saveFolderHandle } from './folderHa
 import { db } from './index'
 import type {
   AccionCorrectiva,
+  Actividad,
   Adjunto,
   Ajustes,
   Encargado,
   Ejecucion,
+  Evento,
   Bloque,
   Ficha,
   Ocurrencia,
@@ -29,6 +31,8 @@ export interface BackupPayload {
   ocurrencias: Ocurrencia[]
   ejecuciones: Ejecucion[]
   accionesCorrectivas: AccionCorrectiva[]
+  actividades?: Actividad[]
+  eventos?: Evento[]
   ajustes: Ajustes[]
   adjuntosMeta: AdjuntoMeta[]
 }
@@ -38,14 +42,15 @@ export function canUseFolderBackup(): boolean {
 }
 
 export async function hasUserData(): Promise<boolean> {
-  const [fichas, encargados, grupos, adjuntos, ejecuciones] = await Promise.all([
+  const [fichas, encargados, grupos, adjuntos, ejecuciones, actividades] = await Promise.all([
     db.fichas.count(),
     db.encargados.count(),
     db.grupos.count(),
     db.adjuntos.count(),
     db.ejecuciones.count(),
+    db.actividades.count(),
   ])
-  return fichas + encargados + grupos + adjuntos + ejecuciones > 0
+  return fichas + encargados + grupos + adjuntos + ejecuciones + actividades > 0
 }
 
 export async function requestPersistentStorage(): Promise<boolean> {
@@ -70,12 +75,15 @@ export async function exportBackup(): Promise<{ blob: Blob; filename: string }> 
     ocurrencias: await db.ocurrencias.toArray(),
     ejecuciones: await db.ejecuciones.toArray(),
     accionesCorrectivas: await db.accionesCorrectivas.toArray(),
+    actividades: await db.actividades.toArray(),
+    eventos: await db.eventos.toArray(),
     ajustes: await db.ajustes.toArray(),
     adjuntosMeta: adjuntos.map((adjunto) => ({
       id: adjunto.id,
       mimeType: adjunto.mimeType,
       nombre: adjunto.nombre,
       fichaId: adjunto.fichaId,
+      actividadId: adjunto.actividadId,
       ejecucionId: adjunto.ejecucionId,
       tipo: adjunto.tipo,
       createdAt: adjunto.createdAt,
@@ -122,6 +130,8 @@ export async function importBackup(file: Blob, mode: 'replace' | 'merge'): Promi
       if (payload.accionesCorrectivas?.length) {
         await db.accionesCorrectivas.bulkPut(payload.accionesCorrectivas)
       }
+      if (payload.actividades?.length) await db.actividades.bulkPut(payload.actividades)
+      if (payload.eventos?.length) await db.eventos.bulkPut(payload.eventos)
       if (payload.ajustes?.length) await db.ajustes.bulkPut(payload.ajustes)
 
       for (const meta of payload.adjuntosMeta ?? []) {
