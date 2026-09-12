@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react'
 import type { AccionCorrectiva, Bloque, Encargado, EstadoOcurrencia, Ficha, Ocurrencia } from '../db/types'
 import { frecuenciaLabel, tipoAccionOf } from '../db/types'
-import { fichaTitulo } from '../lib/fichas'
+import { compareFichasByNumero } from '../lib/fichas'
 import { labelEstado, SIMBOLO_CORRECTIVA, simboloEstado } from '../lib/simbolos'
 import {
   monthsVisible,
@@ -15,7 +15,6 @@ import {
   ZOOM_IN_MAX,
   type ZoomLevel,
 } from '../hooks/useGridSpan'
-import { bloqueColorVar } from '../lib/colors'
 import { FichaTitle } from './FichaTitle'
 import { LeyendaSimbolos } from './ui'
 
@@ -62,6 +61,7 @@ export function GrillaAnual({
   encargados,
   ocurrencias,
   acciones,
+  showBloque = true,
 }: {
   year: number
   fichas: Ficha[]
@@ -69,6 +69,7 @@ export function GrillaAnual({
   encargados: Encargado[]
   ocurrencias: Ocurrencia[]
   acciones: AccionCorrectiva[]
+  showBloque?: boolean
 }) {
   const autoSpan = useGridSpan()
   const [manualZoom, setManualZoom] = useState<ZoomLevel | null>(null)
@@ -204,25 +205,7 @@ export function GrillaAnual({
 
   const encargadoMap = Object.fromEntries(encargados.map((e) => [e.id, e]))
   const bloqueMap = Object.fromEntries(bloques.map((b) => [b.id, b]))
-  const groups = new Map<string, Ficha[]>()
-  for (const ficha of fichas) {
-    const list = groups.get(ficha.grupoId) ?? []
-    list.push(ficha)
-    groups.set(ficha.grupoId, list)
-  }
-
-  const orderedBloques = [
-    ...bloques.filter((b) => groups.has(b.id)),
-    ...[...groups.keys()]
-      .filter((id) => !bloqueMap[id])
-      .map((id) => ({
-        id,
-        nombre: 'Sin bloque',
-        color: 'teal',
-        createdAt: 0,
-        updatedAt: 0,
-      })),
-  ]
+  const fichasOrdenadas = [...fichas].sort(compareFichasByNumero)
 
   const visibleTrimestres = TRIMESTRES.map((t) => ({
     ...t,
@@ -344,24 +327,26 @@ export function GrillaAnual({
             </tr>
           </thead>
           <tbody>
-            {orderedBloques.map((bloque) => {
-              const rows = (groups.get(bloque.id) ?? []).sort((a, b) => {
-                const na = Number.parseInt(a.numero, 10)
-                const nb = Number.parseInt(b.numero, 10)
-                if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb
-                return fichaTitulo(a).localeCompare(fichaTitulo(b), 'es')
-              })
-              if (!rows.length) return null
+            {fichasOrdenadas.map((ficha, index) => {
+              const bloque = bloqueMap[ficha.grupoId] ?? {
+                id: ficha.grupoId,
+                nombre: 'Sin bloque',
+                color: 'teal',
+                createdAt: 0,
+                updatedAt: 0,
+              }
               return (
-                <BloqueRows
-                  key={bloque.id}
+                <FichaRow
+                  key={ficha.id}
+                  ficha={ficha}
                   bloque={bloque}
-                  fichas={rows}
+                  index={index}
                   monthIndexes={monthIndexes}
                   start={start}
                   currentMonth={currentMonth}
                   byFichaMonth={byFichaMonth}
-                  encargadoMap={encargadoMap}
+                  encargado={ficha.encargadoId ? encargadoMap[ficha.encargadoId] : undefined}
+                  showBloque={showBloque}
                   showMeta={detail >= 1}
                   showFrecuencia={detail >= 2}
                   correctivaOcc={correctivaOcc}
@@ -378,85 +363,77 @@ export function GrillaAnual({
   )
 }
 
-function BloqueRows({
+function FichaRow({
+  ficha,
   bloque,
-  fichas,
+  index,
   monthIndexes,
   start,
   currentMonth,
   byFichaMonth,
-  encargadoMap,
+  encargado,
+  showBloque,
   showMeta,
   showFrecuencia,
   correctivaOcc,
   correctivaFicha,
 }: {
+  ficha: Ficha
   bloque: Bloque
-  fichas: Ficha[]
+  index: number
   monthIndexes: number[]
   start: number
   currentMonth: number
   byFichaMonth: Map<string, Ocurrencia[]>
-  encargadoMap: Record<string, Encargado>
+  encargado?: Encargado
+  showBloque: boolean
   showMeta: boolean
   showFrecuencia: boolean
   correctivaOcc: Set<string>
   correctivaFicha: Set<string>
 }) {
   return (
-    <>
-      <tr className="bloque-row">
-        <td colSpan={1 + monthIndexes.length} style={{ color: bloqueColorVar(bloque.color) }}>
-          <span className="color-dot" style={{ background: bloqueColorVar(bloque.color), margin: '0 8px 0 0' }} />
-          {bloque.nombre}
-        </td>
-      </tr>
-      {fichas.map((ficha, index) => {
-        const encargado = ficha.encargadoId ? encargadoMap[ficha.encargadoId] : undefined
+    <tr className={`ficha-row${index % 2 ? ' is-alt' : ''}`}>
+      <th className="ficha-col" scope="row">
+        <Link to={`/fichas/${ficha.id}`}>
+          <FichaTitle ficha={ficha} color={bloque.color} />
+        </Link>
+        {showBloque ? <span className="ficha-meta">{bloque.nombre}</span> : null}
+        {showMeta ? (
+          <span className="ficha-meta">{encargado?.nombre ?? 'Sin encargado'}</span>
+        ) : null}
+        {showFrecuencia ? (
+          <span className="ficha-meta">{frecuenciaLabel(ficha.frecuencia)}</span>
+        ) : null}
+      </th>
+      {monthIndexes.map((month) => {
+        const occ = pickOcc(byFichaMonth.get(`${ficha.id}:${month}`) ?? [])
+        const cls = `month-col ${monthClass(month, start, currentMonth)}`.trim()
+        if (!occ) return <td key={month} className={cls} />
+        const hasCorrectiva = correctivaOcc.has(occ.id) || correctivaFicha.has(ficha.id)
+        const title = hasCorrectiva
+          ? `${labelEstado(occ.estado)} · Con acción correctiva`
+          : labelEstado(occ.estado)
         return (
-          <tr key={ficha.id} className={`ficha-row${index % 2 ? ' is-alt' : ''}`}>
-            <th className="ficha-col" scope="row">
-              <Link to={`/fichas/${ficha.id}`}>
-                <FichaTitle ficha={ficha} color={bloque.color} />
-              </Link>
-              {showMeta ? (
-                <span className="ficha-meta">{encargado?.nombre ?? 'Sin encargado'}</span>
-              ) : null}
-              {showFrecuencia ? (
-                <span className="ficha-meta">{frecuenciaLabel(ficha.frecuencia)}</span>
-              ) : null}
-            </th>
-            {monthIndexes.map((month) => {
-              const occ = pickOcc(byFichaMonth.get(`${ficha.id}:${month}`) ?? [])
-              const cls = `month-col ${monthClass(month, start, currentMonth)}`.trim()
-              if (!occ) return <td key={month} className={cls} />
-              const hasCorrectiva = correctivaOcc.has(occ.id) || correctivaFicha.has(ficha.id)
-              const title = hasCorrectiva
-                ? `${labelEstado(occ.estado)} · Con acción correctiva`
-                : labelEstado(occ.estado)
-              return (
-                <td key={month} className={cls}>
-                  <Link
-                    className={`grid-cell ${occ.estado}${hasCorrectiva ? ' has-correctiva' : ''}`}
-                    to={`/ocurrencias/${occ.id}`}
-                    title={title}
-                    aria-label={title}
-                  >
-                    <span className="cell-syms">
-                      <span aria-hidden>{simboloEstado(occ.estado)}</span>
-                      {hasCorrectiva ? (
-                        <span className="cell-correctiva" aria-hidden>
-                          {SIMBOLO_CORRECTIVA}
-                        </span>
-                      ) : null}
-                    </span>
-                  </Link>
-                </td>
-              )
-            })}
-          </tr>
+          <td key={month} className={cls}>
+            <Link
+              className={`grid-cell ${occ.estado}${hasCorrectiva ? ' has-correctiva' : ''}`}
+              to={`/ocurrencias/${occ.id}`}
+              title={title}
+              aria-label={title}
+            >
+              <span className="cell-syms">
+                <span aria-hidden>{simboloEstado(occ.estado)}</span>
+                {hasCorrectiva ? (
+                  <span className="cell-correctiva" aria-hidden>
+                    {SIMBOLO_CORRECTIVA}
+                  </span>
+                ) : null}
+              </span>
+            </Link>
+          </td>
         )
       })}
-    </>
+    </tr>
   )
 }

@@ -6,7 +6,7 @@ import { db } from '../db'
 import { ESTADOS, type EstadoOcurrencia } from '../db/types'
 import { bloqueColorVar } from '../lib/colors'
 import { formatFechaProgramada, formatDateLong } from '../lib/dates'
-import { fichaTitulo } from '../lib/fichas'
+import { compareFichasByNumero, fichaTitulo } from '../lib/fichas'
 import { EmptyState, LeyendaSimbolos, StatusBadge } from '../components/ui'
 import { SIMBOLOS_ESTADO } from '../lib/simbolos'
 import { GrillaAnual } from '../components/GrillaAnual'
@@ -22,6 +22,7 @@ export function CronogramaPage() {
   const q = params.get('q') ?? ''
   const vista = params.get('vista') === 'lista' ? 'lista' : 'grilla'
   const year = Number(params.get('anio')) || new Date().getFullYear()
+  const showBloque = params.get('verBloque') !== '0'
 
   const ocurrencias = useLiveQuery(() => db.ocurrencias.orderBy('fechaProgramada').toArray()) ?? []
   const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
@@ -69,11 +70,16 @@ export function CronogramaPage() {
     return true
   })
 
+  const fichasOrdenadas = [...fichas].sort(compareFichasByNumero)
+
   const grouped = new Map<string, typeof filtered>()
   for (const o of filtered) {
     const list = grouped.get(o.fechaProgramada) ?? []
     list.push(o)
     grouped.set(o.fechaProgramada, list)
+  }
+  for (const list of grouped.values()) {
+    list.sort((a, b) => compareFichasByNumero(fichaMap[a.fichaId], fichaMap[b.fichaId]))
   }
 
   if (!fichas.length) {
@@ -94,26 +100,37 @@ export function CronogramaPage() {
   return (
     <div>
       <div className="crono-toolbar">
-        <div className="seg-toggle compact" role="tablist" aria-label="Vista del cronograma">
+        <div className="row" style={{ flexWrap: 'wrap', gap: '0.4rem' }}>
+          <div className="seg-toggle compact" role="tablist" aria-label="Vista del cronograma">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={vista === 'grilla'}
+              className={vista === 'grilla' ? 'active' : ''}
+              onClick={() => set('vista', '')}
+            >
+              <LayoutGrid size={14} />
+              Grilla
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={vista === 'lista'}
+              className={vista === 'lista' ? 'active' : ''}
+              onClick={() => set('vista', 'lista')}
+            >
+              <List size={14} />
+              Lista
+            </button>
+          </div>
           <button
             type="button"
-            role="tab"
-            aria-selected={vista === 'grilla'}
-            className={vista === 'grilla' ? 'active' : ''}
-            onClick={() => set('vista', '')}
+            className={`chip compact${showBloque ? ' active' : ''}`}
+            onClick={() => set('verBloque', showBloque ? '0' : '')}
+            aria-pressed={showBloque}
+            title={showBloque ? 'Ocultar nombre del bloque' : 'Mostrar nombre del bloque'}
           >
-            <LayoutGrid size={14} />
-            Grilla
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={vista === 'lista'}
-            className={vista === 'lista' ? 'active' : ''}
-            onClick={() => set('vista', 'lista')}
-          >
-            <List size={14} />
-            Lista
+            Bloque
           </button>
         </div>
         {vista === 'grilla' ? (
@@ -194,7 +211,7 @@ export function CronogramaPage() {
         </select>
         <select className="select" value={fichaId} onChange={(e) => set('ficha', e.target.value)}>
           <option value="">Ficha</option>
-          {fichas.map((f) => (
+          {fichasOrdenadas.map((f) => (
             <option key={f.id} value={f.id}>
               {fichaTitulo(f)}
             </option>
@@ -212,6 +229,7 @@ export function CronogramaPage() {
             fichasFiltradas.some((f) => f.id === o.fichaId),
           )}
           acciones={acciones}
+          showBloque={showBloque}
         />
       ) : (
         <>
@@ -230,10 +248,10 @@ export function CronogramaPage() {
             </div>
           ) : (
             <div className="table-card">
-              <div className="table-head table-cols-crono">
+              <div className={`table-head table-cols-crono${showBloque ? '' : ' no-bloque'}`}>
                 <span className="table-bar" aria-hidden />
                 <span>Ficha</span>
-                <span className="col-md">Bloque</span>
+                {showBloque ? <span className="col-md">Bloque</span> : null}
                 <span className="col-md">Encargado</span>
                 <span>Estado</span>
               </div>
@@ -252,7 +270,7 @@ export function CronogramaPage() {
                     return (
                       <Link
                         key={o.id}
-                        className="table-row table-cols-crono"
+                        className={`table-row table-cols-crono${showBloque ? '' : ' no-bloque'}`}
                         to={`/ocurrencias/${o.id}`}
                       >
                         <span
@@ -262,11 +280,12 @@ export function CronogramaPage() {
                         <span className="table-cell">
                           <FichaTitle ficha={ficha} color={bloque?.color} />
                           <span className="muted col-sm-only">
-                            {bloque?.nombre}
-                            {encargado ? ` · ${encargado.nombre}` : ''}
+                            {showBloque && bloque?.nombre
+                              ? `${bloque.nombre}${encargado ? ` · ${encargado.nombre}` : ''}`
+                              : (encargado?.nombre ?? '')}
                           </span>
                         </span>
-                        <span className="col-md muted">{bloque?.nombre ?? '—'}</span>
+                        {showBloque ? <span className="col-md muted">{bloque?.nombre ?? '—'}</span> : null}
                         <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
                         <span className="table-nowrap">
                           <StatusBadge estado={o.estado} />

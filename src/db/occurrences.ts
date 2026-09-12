@@ -15,13 +15,17 @@ export async function syncOcurrenciasForFicha(ficha: Ficha): Promise<void> {
     existing.filter((o) => executedOccIds.has(o.id)).map((o) => o.fechaProgramada),
   )
 
-  const toDelete = existing.filter((o) => !executedOccIds.has(o.id)).map((o) => o.id)
+  const wanted = generateDates(ficha.fechaInicio, ficha.frecuencia)
+  const wantedSet = new Set(wanted)
+  const existingDates = new Set(existing.map((o) => o.fechaProgramada))
+  const toDelete = existing
+    .filter((o) => !executedOccIds.has(o.id) && !wantedSet.has(o.fechaProgramada))
+    .map((o) => o.id)
   if (toDelete.length) await db.ocurrencias.bulkDelete(toDelete)
 
-  const wanted = generateDates(ficha.fechaInicio, ficha.frecuencia)
   const now = Date.now()
   const toAdd: Ocurrencia[] = wanted
-    .filter((fecha) => !frozenDates.has(fecha))
+    .filter((fecha) => !existingDates.has(fecha) && !frozenDates.has(fecha))
     .map((fecha) => ({
       id: createId(),
       fichaId: ficha.id,

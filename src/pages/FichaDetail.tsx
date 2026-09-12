@@ -55,13 +55,12 @@ export function FichaDetailPage() {
 
   const current = ficha
   const plantilla = adjuntos.filter((a) => a.tipo === 'ficha')
+  const telefonoEncargado = encargado?.telefonos || encargado?.contacto || ''
   const shareText = [
     `Ficha: ${fichaTitulo(current)}`,
     bloque ? `Bloque: ${bloque.nombre}` : '',
     encargado ? `Encargado: ${encargado.nombre}` : '',
-    (ficha.telefonos || encargado?.telefonos || encargado?.contacto)
-      ? `Teléfono(s): ${ficha.telefonos || encargado?.telefonos || encargado?.contacto}`
-      : '',
+    telefonoEncargado ? `Teléfono(s): ${telefonoEncargado}` : '',
     encargado?.congregacion ? `Congregación: ${encargado.congregacion}` : '',
     `Periodo: ${frecuenciaLabel(ficha.frecuencia)}`,
     ficha.notas ? `Notas: ${ficha.notas}` : '',
@@ -113,20 +112,15 @@ export function FichaDetailPage() {
             </button>
           </div>
         </div>
-        {ficha.telefonos || encargado?.telefonos || encargado?.contacto || encargado?.congregacion ? (
+        {telefonoEncargado || encargado?.congregacion ? (
           <p className="muted phone-line">
-            {ficha.telefonos || encargado?.telefonos || encargado?.contacto ? (
+            {telefonoEncargado ? (
               <>
-                Tel. {ficha.telefonos || encargado?.telefonos || encargado?.contacto}
-                <CopyText
-                  text={ficha.telefonos || encargado?.telefonos || encargado?.contacto || ''}
-                  label="Copiar teléfono"
-                />
+                Tel. {telefonoEncargado}
+                <CopyText text={telefonoEncargado} label="Copiar teléfono" />
               </>
             ) : null}
-            {encargado?.congregacion && (ficha.telefonos || encargado?.telefonos || encargado?.contacto)
-              ? ' · '
-              : ''}
+            {encargado?.congregacion && telefonoEncargado ? ' · ' : ''}
             {encargado?.congregacion ? `Congregación: ${encargado.congregacion}` : ''}
           </p>
         ) : null}

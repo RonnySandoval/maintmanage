@@ -1,11 +1,33 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Bell, Download, Monitor, Moon, Smartphone, Sun, Upload } from 'lucide-react'
+import {
+  Bell,
+  Download,
+  FolderOpen,
+  FolderX,
+  Monitor,
+  Moon,
+  Smartphone,
+  Sun,
+  Upload,
+} from 'lucide-react'
 import { db } from '../db'
-import { downloadBlob, exportBackup, importBackup } from '../db/backup'
+import {
+  canUseFolderBackup,
+  downloadBlob,
+  exportBackup,
+  hasUserData,
+  importBackup,
+  pickBackupFolder,
+  restoreFromFolder,
+  unlinkBackupFolder,
+  writeBackupToFolder,
+} from '../db/backup'
 import { ensureHorizon } from '../db/occurrences'
-import { formatBytes } from '../lib/dates'
+import { formatBytes, formatDateTime } from '../lib/dates'
+import { saveBackupNow } from '../lib/autoBackup'
 import { requestNotificaciones } from '../lib/notifications'
+import { RestorePanel } from '../components/RestorePanel'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { useTheme } from '../hooks/useTheme'
 import type { ThemeMode } from '../db/types'
@@ -33,6 +55,11 @@ export function AjustesPage() {
     )
   }
 
+  const folderOk = canUseFolderBackup()
+  const pendingChanges =
+    !!ajustes?.lastChangedAt &&
+    (!ajustes.lastBackupAt || ajustes.lastChangedAt > ajustes.lastBackupAt)
+
   async function exportNow() {
     setBusy(true)
     setMessage('')
@@ -45,6 +72,87 @@ export function AjustesPage() {
     } finally {
       setBusy(false)
     }
+  }
+
+  async function saveNow() {
+    setBusy(true)
+    setMessage('')
+    try {
+      const result = await saveBackupNow()
+      setMessage(
+        result.kind === 'folder'
+          ? `Copia actualizada en la carpeta «${ajustes?.backupFolderName || 'elegida'}» (${formatBytes(result.size)}).`
+          : `ZIP descargado (${formatBytes(result.size)}). Guárdalo en Drive, USB o WhatsApp.`,
+      )
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'No se pudo guardar la copia.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function chooseFolder() {
+    setBusy(true)
+    setMessage('')
+    try {
+      const handle = await pickBackupFolder()
+      if (await hasUserData()) {
+        const size = await writeBackupToFolder(handle)
+        setMessage(`Carpeta «${handle.name}» lista. Copia escrita (${formatBytes(size)}).`)
+      } else {
+        setMessage(`Carpeta «${handle.name}» lista. Las copias se escribirán aquí automáticamente.`)
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setMessage('')
+        return
+      }
+      setMessage(err instanceof Error ? err.message : 'No se pudo elegir la carpeta.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function restoreFolder(modeImport: 'replace' | 'merge') {
+    const ok = confirm(
+      modeImport === 'replace'
+        ? 'Esto REEMPLAZA todos los datos locales por los de la carpeta. ¿Continuar?'
+        : 'Se fusionarán registros por identificador. ¿Continuar?',
+    )
+    if (!ok) return
+    setBusy(true)
+    setMessage('')
+    try {
+      const handle = await pickBackupFolder()
+      await restoreFromFolder(handle, modeImport)
+      await ensureHorizon()
+      setMessage('Datos recuperados desde la carpeta de copias.')
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setMessage('')
+        return
+      }
+      setMessage(err instanceof Error ? err.message : 'No se pudo restaurar desde la carpeta.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function forgetFolder() {
+    setBusy(true)
+    try {
+      await unlinkBackupFolder()
+      setMessage('Ya no se escribirá en esa carpeta. Puedes volver a elegirla cuando quieras.')
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'No se pudo olvidar la carpeta.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function toggleAutoBackup() {
+    const next = ajustes?.autoBackup === false
+    await db.ajustes.update('app', { autoBackup: next })
   }
 
   async function importNow(file: File | undefined, modeImport: 'replace' | 'merge') {
@@ -156,19 +264,87 @@ export function AjustesPage() {
       </section>
 
       <section className="card">
-        <h2 className="title-sm">Copia entre PC y móvil</h2>
+        <h2 className="title-sm">Copia de seguridad</h2>
         <p className="muted">
-          Los datos viven en IndexedDB de este navegador. Exporta un ZIP y ábrelo en el otro
-          dispositivo (Drive, USB, correo o WhatsApp).
+          Al abrir la app se revisa si hay datos nuevos. Si pasaron 12 horas y cambió algo, se
+          actualiza la copia. En el PC elige una carpeta (OneDrive o Drive, si puedes) para que
+          sobreviva si borras la app. En el móvil guarda el ZIP fuera del navegador.
+        </p>
+        <ul className="backup-status">
+          <li>
+            Última copia:{' '}
+            <strong>
+              {ajustes?.lastBackupAt ? formatDateTime(ajustes.lastBackupAt) : 'aún no hay'}
+            </strong>
+            {ajustes?.lastBackupKind === 'folder' ? ' (carpeta)' : null}
+            {ajustes?.lastBackupKind === 'download' ? ' (ZIP descargado)' : null}
+          </li>
+          <li>
+            Carpeta:{' '}
+            <strong>
+              {ajustes?.backupFolderName ? `«${ajustes.backupFolderName}»` : 'ninguna'}
+            </strong>
+          </li>
+          <li>
+            Estado:{' '}
+            <strong>{pendingChanges ? 'hay cambios sin copiar' : 'al día'}</strong>
+          </li>
+        </ul>
+        <label className="backup-toggle">
+          <input
+            type="checkbox"
+            checked={ajustes?.autoBackup !== false}
+            onChange={() => void toggleAutoBackup()}
+          />
+          Copia automática (máximo 2 veces al día, solo si hay cambios)
+        </label>
+        <div className="row" style={{ flexWrap: 'wrap' }}>
+          {folderOk ? (
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void chooseFolder()}>
+              <FolderOpen size={16} />
+              {ajustes?.backupFolderName ? 'Cambiar carpeta' : 'Elegir carpeta de copias'}
+            </button>
+          ) : null}
+          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void saveNow()}>
+            <Download size={16} />
+            Guardar copia ahora
+          </button>
+          <button type="button" className="btn" disabled={busy} onClick={() => void exportNow()}>
+            <Download size={16} />
+            Descargar ZIP
+          </button>
+          {ajustes?.backupFolderName ? (
+            <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void forgetFolder()}>
+              <FolderX size={16} />
+              Dejar de usar la carpeta
+            </button>
+          ) : null}
+        </div>
+      </section>
+
+      <RestorePanel compact />
+
+      <section className="card">
+        <h2 className="title-sm">Importar en este dispositivo</h2>
+        <p className="muted">
+          Reemplazar deja este aparato igual que la copia. Fusionar añade registros; si el id
+          coincide, gana el archivo.
         </p>
         <div className="row" style={{ flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void exportNow()}>
-            <Download size={16} />
-            Exportar copia
-          </button>
+          {folderOk ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={busy}
+              onClick={() => void restoreFolder('replace')}
+            >
+              <FolderOpen size={16} />
+              Restaurar desde carpeta
+            </button>
+          ) : null}
           <label className="btn">
             <Upload size={16} />
-            Importar (reemplazar)
+            ZIP (reemplazar)
             <input
               className="sr-only"
               type="file"
@@ -182,7 +358,7 @@ export function AjustesPage() {
           </label>
           <label className="btn">
             <Upload size={16} />
-            Importar (fusionar)
+            ZIP (fusionar)
             <input
               className="sr-only"
               type="file"
@@ -206,9 +382,10 @@ export function AjustesPage() {
       <section className="card">
         <h2 className="title-sm">Acerca de</h2>
         <p className="muted">
-          MaintManage funciona sin servidor. GitHub Pages solo entrega la aplicación. Fotos y
-          documentos grandes ocupan cuota del navegador. Word se almacena; la vista previa rica no
-          está incluida. iOS comparte peor archivos que Android.
+          MaintManage funciona sin servidor. GitHub Pages solo entrega la aplicación. La copia de
+          seguridad vive en la carpeta o el ZIP que elijas, no en la web. Fotos y documentos
+          grandes ocupan cuota del navegador. Word se almacena; la vista previa rica no está
+          incluida. iOS comparte peor archivos que Android.
         </p>
       </section>
     </div>

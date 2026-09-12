@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent } from 'react'
-import { Plus } from 'lucide-react'
+import { ChevronDown, Plus } from 'lucide-react'
 import { db } from '../db'
 import { createId } from '../lib/ids'
 import { ColorPicker } from './ColorPicker'
@@ -7,13 +7,18 @@ import { ColorPicker } from './ColorPicker'
 export function CrearBloqueForm({
   onCreated,
   compact = false,
+  accordion = false,
+  defaultOpen = true,
 }: {
   onCreated?: (id: string) => void
   compact?: boolean
+  accordion?: boolean
+  defaultOpen?: boolean
 }) {
   const [nombre, setNombre] = useState('')
   const [color, setColor] = useState('teal')
   const [error, setError] = useState('')
+  const [open, setOpen] = useState(accordion ? defaultOpen : true)
 
   async function submit() {
     const name = nombre.trim()
@@ -43,13 +48,10 @@ export function CrearBloqueForm({
     void submit()
   }
 
-  return (
-    <div
-      className={`create-panel${compact ? ' compact-panel' : ''}`}
-      onKeyDown={onKeyDown}
-    >
-      <h3 className="title-sm">Crear bloque</h3>
-      {compact ? null : (
+  const body = (
+    <div onKeyDown={onKeyDown}>
+      {accordion ? null : <h3 className="title-sm">Crear bloque</h3>}
+      {compact || accordion ? null : (
         <p className="muted" style={{ marginTop: 0 }}>
           Un bloque agrupa fichas del mismo sector o sistema (p. ej. Edificio A, HVAC, Ascensores).
         </p>
@@ -70,6 +72,25 @@ export function CrearBloqueForm({
         <Plus size={16} />
         Crear bloque
       </button>
+    </div>
+  )
+
+  if (!accordion) {
+    return <div className={`create-panel${compact ? ' compact-panel' : ''}`}>{body}</div>
+  }
+
+  return (
+    <div className={`create-panel accordion-panel${compact ? ' compact-panel' : ''}${open ? '' : ' is-collapsed'}`}>
+      <button
+        type="button"
+        className="accordion-trigger"
+        aria-expanded={open}
+        onClick={() => setOpen((was) => !was)}
+      >
+        <span>Nuevo bloque</span>
+        <ChevronDown size={18} className={open ? 'is-open' : ''} />
+      </button>
+      {open ? <div className="accordion-body">{body}</div> : null}
     </div>
   )
 }

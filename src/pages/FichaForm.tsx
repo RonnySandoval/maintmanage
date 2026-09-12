@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, X } from 'lucide-react'
@@ -9,6 +9,7 @@ import { createId } from '../lib/ids'
 import { siguienteNumero } from '../lib/fichas'
 import { saveAdjuntos } from '../lib/files'
 import { refreshEstados, syncOcurrenciasForFicha } from '../db/occurrences'
+import { BloqueSelect } from '../components/BloqueSelect'
 import { CrearBloqueForm } from '../components/CrearBloqueForm'
 import { CrearEncargadoForm } from '../components/CrearEncargadoForm'
 import { FilePicker } from '../components/FilePicker'
@@ -26,12 +27,21 @@ export function FichaFormPage() {
   const bloques = useLiveQuery(() => db.grupos.orderBy('nombre').toArray()) ?? []
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
   const todasFichas = useLiveQuery(() => db.fichas.toArray()) ?? []
+  const dropdownHints = useMemo(
+    () => [
+      ...bloques.map((b) => b.nombre),
+      ...encargados.map((e) => e.nombre),
+      ...FRECUENCIAS.map((f) => f.label),
+      'Seleccionar…',
+      'Sin encargado',
+    ],
+    [bloques, encargados],
+  )
 
   const [numero, setNumero] = useState('')
   const [nombre, setNombre] = useState('')
   const [grupoId, setGrupoId] = useState('')
   const [encargadoId, setEncargadoId] = useState('')
-  const [telefonos, setTelefonos] = useState('')
   const [frecuencia, setFrecuencia] = useState<Frecuencia>('cada_1')
   const [fechaPrecision, setFechaPrecision] = useState<FechaPrecision>('mes')
   const [fechaInicio, setFechaInicio] = useState(`${currentMonthPrefix()}-01`)
@@ -49,7 +59,6 @@ export function FichaFormPage() {
       setNombre(ficha.nombre)
       setGrupoId(ficha.grupoId)
       setEncargadoId(ficha.encargadoId ?? '')
-      setTelefonos(ficha.telefonos ?? '')
       setFrecuencia(normalizeFrecuencia(ficha.frecuencia))
       setFechaPrecision(ficha.fechaPrecision === 'dia' ? 'dia' : 'mes')
       setFechaInicio(ficha.fechaInicio || `${currentMonthPrefix()}-01`)
@@ -92,7 +101,6 @@ export function FichaFormPage() {
         nombre: nombre.trim(),
         grupoId,
         encargadoId: encargadoId || undefined,
-        telefonos: telefonos.trim() || undefined,
         frecuencia,
         fechaInicio: inicio,
         fechaPrecision,
@@ -153,19 +161,13 @@ export function FichaFormPage() {
         <div className="field">
           <label htmlFor="bloque">Bloque</label>
           <div className="combo-row">
-            <select
+            <BloqueSelect
               id="bloque"
-              className="select"
               value={grupoId}
-              onChange={(e) => setGrupoId(e.target.value)}
-            >
-              <option value="">Seleccionar…</option>
-              {bloques.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.nombre}
-                </option>
-              ))}
-            </select>
+              bloques={bloques}
+              onChange={setGrupoId}
+              widthHints={dropdownHints}
+            />
             <button
               type="button"
               className={`btn btn-icon btn-add${showCrearBloque ? ' is-open' : ''}`}
@@ -234,17 +236,6 @@ export function FichaFormPage() {
             />
           </div>
         ) : null}
-
-        <div className="field span-2">
-          <label htmlFor="telefonos">Teléfono(s)</label>
-          <input
-            id="telefonos"
-            className="input"
-            value={telefonos}
-            onChange={(e) => setTelefonos(e.target.value)}
-            placeholder="Opcional"
-          />
-        </div>
 
         <div className="field">
           <label htmlFor="frecuencia">Periodo</label>

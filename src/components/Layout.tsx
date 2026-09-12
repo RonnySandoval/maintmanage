@@ -6,18 +6,17 @@ import {
   ClipboardList,
   History,
   LayoutDashboard,
-  Layers,
   Settings,
 } from 'lucide-react'
 import { ThemeQuickToggle } from './ThemeQuickToggle'
 import { useAppHistory } from '../hooks/useAppHistory'
+import { useAutoBackup } from '../hooks/useAutoBackup'
 
 const LINKS = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, end: true },
   { to: '/cronograma', label: 'Cronograma', icon: CalendarDays, end: false },
   { to: '/fichas', label: 'Fichas', icon: ClipboardList, end: false },
   { to: '/historicos', label: 'Histórico', icon: History, end: false },
-  { to: '/bloques', label: 'Bloques', icon: Layers, end: false },
   { to: '/ajustes', label: 'Ajustes', icon: Settings, end: false },
 ]
 
@@ -26,15 +25,19 @@ const TITLES: Record<string, string> = {
   '/cronograma': 'Cronograma',
   '/fichas': 'Fichas',
   '/historicos': 'Histórico',
-  '/bloques': 'Bloques',
   '/ajustes': 'Ajustes',
 }
 
-function titleFor(pathname: string): string {
+function titleFor(pathname: string, search = ''): string {
   if (pathname.startsWith('/ocurrencias/')) return 'Ocurrencia'
   if (pathname.startsWith('/fichas/nueva')) return 'Nueva ficha'
   if (pathname.includes('/editar')) return 'Editar ficha'
   if (pathname.startsWith('/fichas/')) return 'Ficha'
+  if (pathname === '/fichas') {
+    const tab = new URLSearchParams(search).get('tab')
+    if (tab === 'encargados') return 'Encargados'
+    if (tab === 'bloques') return 'Bloques'
+  }
   return TITLES[pathname] ?? 'MaintManage'
 }
 
@@ -62,6 +65,7 @@ function NavItems() {
 export function Layout() {
   const location = useLocation()
   const { canBack, canForward, back, forward } = useAppHistory()
+  const { banner, busy, saveNow, dismiss } = useAutoBackup()
 
   return (
     <div className="shell">
@@ -74,7 +78,7 @@ export function Layout() {
           <NavItems />
         </nav>
         <p className="muted" style={{ marginTop: 'auto', padding: '0.75rem', fontSize: '0.78rem' }}>
-          Datos locales en este dispositivo. Exporta una copia para usarlos en otro.
+          Copia automática en Ajustes. Así no se pierden al borrar la app.
         </p>
       </aside>
       <div className="content">
@@ -100,11 +104,24 @@ export function Layout() {
                 <ChevronRight size={20} />
               </button>
             </div>
-            <h1>{titleFor(location.pathname)}</h1>
+            <h1>{titleFor(location.pathname, location.search)}</h1>
           </div>
           <ThemeQuickToggle />
         </header>
         <main className="page">
+          {banner ? (
+            <div className="backup-banner" role="status">
+              <p>{banner}</p>
+              <div className="row" style={{ flexWrap: 'wrap' }}>
+                <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void saveNow()}>
+                  Guardar copia ahora
+                </button>
+                <button type="button" className="btn btn-ghost" disabled={busy} onClick={dismiss}>
+                  Más tarde
+                </button>
+              </div>
+            </div>
+          ) : null}
           <Outlet />
         </main>
       </div>

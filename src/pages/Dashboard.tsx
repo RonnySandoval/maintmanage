@@ -1,25 +1,57 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { CalendarDays, ClipboardList } from 'lucide-react'
 import { db } from '../db'
+import { bloqueColorVar } from '../lib/colors'
 import { formatDate, inCurrentQuarter, quarterLabel } from '../lib/dates'
 import { ESTADOS_CORRECTIVA, tipoAccionLabel, tipoAccionOf } from '../db/types'
+import { CountUp } from '../components/CountUp'
 import { EmptyState, StatusBadge } from '../components/ui'
 import { FichaTitle } from '../components/FichaTitle'
+import { RestorePanel } from '../components/RestorePanel'
+import { isRestoreSkipped, skipRestore } from '../lib/restoreSkip'
+import { useSettled } from '../hooks/useSettled'
+
+type DashCounts = {
+  vencidas: number
+  programadas: number
+  pendientes: number
+  ejecutadas: number
+  total: number
+  progreso: number
+}
+
+function packCounts(c: DashCounts): string {
+  return `${c.vencidas}:${c.programadas}:${c.pendientes}:${c.ejecutadas}:${c.total}:${c.progreso}`
+}
+
+function unpackCounts(token: string): DashCounts {
+  const [vencidas, programadas, pendientes, ejecutadas, total, progreso] = token.split(':').map(Number)
+  return { vencidas, programadas, pendientes, ejecutadas, total, progreso }
+}
 
 export function DashboardPage() {
-  const ocurrencias = useLiveQuery(() => db.ocurrencias.toArray()) ?? []
-  const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
+  const ocurrencias = useLiveQuery(() => db.ocurrencias.toArray())
+  const fichas = useLiveQuery(() => db.fichas.toArray())
   const bloques = useLiveQuery(() => db.grupos.toArray()) ?? []
   const acciones =
     useLiveQuery(() =>
       db.accionesCorrectivas.where('estado').anyOf(['pendiente', 'programada']).toArray(),
     ) ?? []
+  const extraCounts = useLiveQuery(async () => ({
+    encargados: await db.encargados.count(),
+    adjuntos: await db.adjuntos.count(),
+    ejecuciones: await db.ejecuciones.count(),
+  }))
+  const [skipRestoreUi, setSkipRestoreUi] = useState(isRestoreSkipped)
+  const loaded = ocurrencias !== undefined && fichas !== undefined
+  const occs = ocurrencias ?? []
+  const fichasList = fichas ?? []
 
   const fichaMap = useMemo(
-    () => Object.fromEntries(fichas.map((f) => [f.id, f])),
-    [fichas],
+    () => Object.fromEntries(fichasList.map((f) => [f.id, f])),
+    [fichasList],
   )
   const bloqueMap = useMemo(
     () => Object.fromEntries(bloques.map((b) => [b.id, b])),
@@ -27,35 +59,67 @@ export function DashboardPage() {
   )
 
   const trimestre = quarterLabel()
-  const delTrimestre = ocurrencias.filter((o) => inCurrentQuarter(o.fechaProgramada))
-  const vencidas = delTrimestre.filter((o) => o.estado === 'vencida')
-  const proximas = delTrimestre.filter((o) => o.estado === 'proxima')
-  const pendientes = delTrimestre.filter((o) => o.estado === 'pendiente')
-  const ejecutadas = delTrimestre.filter((o) => o.estado === 'ejecutada')
-  const progreso =
-    delTrimestre.length === 0
-      ? 0
-      : Math.round((ejecutadas.length / delTrimestre.length) * 100)
+  const delTrimestre = occs.filter((o) => inCurrentQuarter(o.fechaProgramada))
+  const rawCounts: DashCounts = {
+    vencidas: delTrimestre.filter((o) => o.estado === 'vencida').length,
+    programadas: delTrimestre.filter((o) => o.estado === 'proxima').length,
+    pendientes: delTrimestre.filter((o) => o.estado === 'pendiente').length,
+    ejecutadas: delTrimestre.filter((o) => o.estado === 'ejecutada').length,
+    total: delTrimestre.length,
+    progreso:
+      delTrimestre.length === 0
+        ? 0
+        : Math.round(
+            (delTrimestre.filter((o) => o.estado === 'ejecutada').length / delTrimestre.length) * 100,
+          ),
+  }
+  const skipTransientEmpty = loaded && fichasList.length > 0 && occs.length === 0
+  const settledToken = useSettled(
+    packCounts(rawCounts),
+    loaded && !skipTransientEmpty,
+    320,
+  )
+  const counts = settledToken ? unpackCounts(settledToken) : null
+  const ready = counts !== null
 
   const agenda = [...delTrimestre].sort((a, b) => a.fechaProgramada.localeCompare(b.fechaProgramada))
 
-  if (!fichas.length) {
+  const totallyEmpty =
+    loaded &&
+    extraCounts !== undefined &&
+    fichasList.length === 0 &&
+    bloques.length === 0 &&
+    extraCounts.encargados === 0 &&
+    extraCounts.adjuntos === 0 &&
+    extraCounts.ejecuciones === 0
+
+  if (loaded && fichasList.length === 0) {
     return (
-      <EmptyState
-        icon={<ClipboardList size={36} />}
-        title="Aún no hay fichas"
-        text="Crea bloques, encargados y fichas de mantenimiento para ver el cronograma aquí."
-        action={
-          <div className="row" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link className="btn btn-add" to="/bloques">
-              Crear bloque
-            </Link>
-            <Link className="btn btn-add" to="/fichas/nueva">
-              Crear primera ficha
-            </Link>
-          </div>
-        }
-      />
+      <div className="stack">
+        {totallyEmpty && !skipRestoreUi ? (
+          <RestorePanel
+            onSkip={() => {
+              skipRestore()
+              setSkipRestoreUi(true)
+            }}
+          />
+        ) : null}
+        <EmptyState
+          icon={<ClipboardList size={36} />}
+          title="Aún no hay fichas"
+          text="Crea bloques, encargados y fichas de mantenimiento para ver el cronograma aquí."
+          action={
+            <div className="row" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Link className="btn btn-add" to="/fichas?tab=bloques">
+                Crear bloque
+              </Link>
+              <Link className="btn btn-add" to="/fichas/nueva">
+                Crear primera ficha
+              </Link>
+            </div>
+          }
+        />
+      </div>
     )
   }
 
@@ -65,36 +129,50 @@ export function DashboardPage() {
         <p className="dash-kicker">Trimestre en curso</p>
         <h2 className="dash-title">{trimestre}</h2>
         <p className="dash-sub">
-          {delTrimestre.length} actividad{delTrimestre.length === 1 ? '' : 'es'} · {progreso}% ejecutado
+          {ready ? (
+            <>
+              {counts.total} actividad{counts.total === 1 ? '' : 'es'} · {counts.progreso}% ejecutado
+            </>
+          ) : (
+            'Calculando trimestre…'
+          )}
         </p>
       </header>
 
       <div className="kpis">
         <Link className="card kpi card-click tone-vencida" to="/cronograma?estado=vencida">
           <div className="label">Vencidas</div>
-          <div className="value">{vencidas.length}</div>
+          <div className="value">
+            {ready ? <CountUp value={counts.vencidas} ready /> : <span className="count-wait">—</span>}
+          </div>
         </Link>
         <Link className="card kpi card-click tone-proxima" to="/cronograma?estado=proxima">
           <div className="label">Programadas</div>
-          <div className="value">{proximas.length}</div>
+          <div className="value">
+            {ready ? <CountUp value={counts.programadas} ready /> : <span className="count-wait">—</span>}
+          </div>
         </Link>
         <Link className="card kpi card-click tone-pendiente" to="/cronograma?estado=pendiente">
           <div className="label">Pendientes</div>
-          <div className="value">{pendientes.length}</div>
+          <div className="value">
+            {ready ? <CountUp value={counts.pendientes} ready /> : <span className="count-wait">—</span>}
+          </div>
         </Link>
         <Link className="card kpi card-click tone-ejecutada" to="/cronograma?estado=ejecutada">
           <div className="label">Ejecutadas</div>
-          <div className="value">{ejecutadas.length}</div>
+          <div className="value">
+            {ready ? <CountUp value={counts.ejecutadas} ready /> : <span className="count-wait">—</span>}
+          </div>
         </Link>
       </div>
 
       <div className="card dash-progress">
         <div className="row-spread" style={{ marginBottom: '0.55rem' }}>
           <strong>Avance del trimestre</strong>
-          <span className="dash-pct">{progreso}%</span>
+          <span className="dash-pct">{ready ? `${counts.progreso}%` : '—'}</span>
         </div>
-        <div className="progress" aria-label={`Avance ${progreso} por ciento`}>
-          <span style={{ width: `${progreso}%` }} />
+        <div className="progress" aria-label={`Avance ${counts?.progreso ?? 0} por ciento`}>
+          <span style={{ width: `${ready ? counts.progreso : 0}%` }} />
         </div>
       </div>
 
@@ -111,7 +189,7 @@ export function DashboardPage() {
             const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
             return (
               <Link key={o.id} className="card card-click item dash-item" to={`/ocurrencias/${o.id}`}>
-                <span className="bar" style={{ background: bloque?.color ?? 'var(--accent)' }} />
+                <span className="bar" style={{ background: bloqueColorVar(bloque?.color) }} />
                 <div className="grow">
                   <div className="row-spread">
                     <strong>

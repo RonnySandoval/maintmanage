@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie'
+import { registerChangeHooks } from '../lib/changeTracker'
 import type {
   AccionCorrectiva,
   Adjunto,
@@ -146,6 +147,7 @@ export class MaintDB extends Dexie {
 }
 
 export const db = new MaintDB()
+registerChangeHooks(db)
 
 db.on('ready', async () => {
   const current = await db.ajustes.get('app')
@@ -154,6 +156,11 @@ db.on('ready', async () => {
       id: 'app',
       umbralProximaDias: 7,
       notificaciones: false,
+      autoBackup: true,
     })
+    return
+  }
+  if (current.autoBackup === undefined) {
+    await db.ajustes.update('app', { autoBackup: true })
   }
 })
