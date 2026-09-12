@@ -1,44 +1,81 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   Bell,
+  ChevronDown,
+  CircleHelp,
+  DatabaseBackup,
   Download,
   FolderOpen,
+  FolderInput,
   FolderX,
-  Monitor,
-  Moon,
+  Info,
   Smartphone,
-  Sun,
+  Type,
   Upload,
+  type LucideIcon,
 } from 'lucide-react'
 import { db } from '../db'
 import {
+  backupIntervalHoursOf,
+  backupIntervalMsOf,
   canUseFolderBackup,
+  DEFAULT_BACKUP_INTERVAL_HOURS,
   downloadBlob,
   exportBackup,
   hasUserData,
   importBackup,
+  MAX_BACKUP_INTERVAL_HOURS,
+  MIN_BACKUP_INTERVAL_HOURS,
+  nextBackupAtOf,
   pickBackupFolder,
   restoreFromFolder,
   unlinkBackupFolder,
   writeBackupToFolder,
 } from '../db/backup'
 import { ensureHorizon } from '../db/occurrences'
-import { formatBytes, formatDateTime } from '../lib/dates'
+import { formatBytes, formatDateTime, toDatetimeLocalValue } from '../lib/dates'
 import { saveBackupNow } from '../lib/autoBackup'
+import {
+  ALIAS_FIELDS,
+  DEFAULT_ALIASES,
+  label,
+  type AliasKey,
+  type AliasMap,
+  useAliases,
+} from '../lib/labels'
 import { requestNotificaciones } from '../lib/notifications'
 import { RestorePanel } from '../components/RestorePanel'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
-import { useTheme } from '../hooks/useTheme'
-import type { ThemeMode } from '../db/types'
+
+type AjustesTab = 'copia' | 'nombres' | 'avisos' | 'estados' | 'acerca'
+
+const AJUSTES_TABS: { id: AjustesTab; label: string; icon: LucideIcon }[] = [
+  { id: 'copia', label: 'Copia', icon: DatabaseBackup },
+  { id: 'nombres', label: 'Nombres', icon: Type },
+  { id: 'avisos', label: 'Avisos', icon: Bell },
+  { id: 'estados', label: 'Estados', icon: CircleHelp },
+  { id: 'acerca', label: 'Acerca', icon: Info },
+]
+
+function tabFromParam(value: string | null): AjustesTab {
+  if (value === 'nombres' || value === 'avisos' || value === 'estados' || value === 'acerca') {
+    return value
+  }
+  return 'copia'
+}
 
 export function AjustesPage() {
+  const [params, setParams] = useSearchParams()
+  const tab = tabFromParam(params.get('tab'))
   const ajustes = useLiveQuery(() => db.ajustes.get('app'))
-  const { mode, setTheme } = useTheme()
   const { canInstall, installed, install } = useInstallPrompt()
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [quota, setQuota] = useState<string>('')
+  const [aliasDrafts, setAliasDrafts] = useState<AliasMap>({})
+  const [aliasFocus, setAliasFocus] = useState<AliasKey | null>(null)
 
   async function loadQuota() {
     const est = await navigator.storage?.estimate()
@@ -55,6 +92,9 @@ export function AjustesPage() {
     )
   }
 
+  const aliases = useAliases()
+  const intervalHours = backupIntervalHoursOf(ajustes?.backupIntervalHours)
+  const nextBackupAt = nextBackupAtOf(ajustes)
   const folderOk = canUseFolderBackup()
   const pendingChanges =
     !!ajustes?.lastChangedAt &&
@@ -155,6 +195,34 @@ export function AjustesPage() {
     await db.ajustes.update('app', { autoBackup: next })
   }
 
+  async function saveIntervalHours(raw: string) {
+    const hours = backupIntervalHoursOf(Number(raw))
+    const last = ajustes?.lastBackupAt ?? Date.now()
+    await db.ajustes.update('app', {
+      backupIntervalHours: hours,
+      nextBackupAt: last + backupIntervalMsOf(hours),
+    })
+  }
+
+  async function saveNextBackup(raw: string) {
+    const ts = new Date(raw).getTime()
+    if (!Number.isFinite(ts)) return
+    await db.ajustes.update('app', { nextBackupAt: ts })
+  }
+
+  function aliasValue(key: AliasKey): string {
+    if (aliasFocus === key && aliasDrafts[key] !== undefined) return aliasDrafts[key] as string
+    return aliases[key] ?? DEFAULT_ALIASES[key]
+  }
+
+  async function saveAlias(key: AliasKey, value: string) {
+    const next = { ...(ajustes?.aliases ?? {}) }
+    const stored = value.trim()
+    if (!stored) delete next[key]
+    else next[key] = stored
+    await db.ajustes.update('app', { aliases: next })
+  }
+
   async function importNow(file: File | undefined, modeImport: 'replace' | 'merge') {
     if (!file) return
     const ok = confirm(
@@ -185,57 +253,43 @@ export function AjustesPage() {
     )
   }
 
-  const themes: { id: ThemeMode; label: string; icon: typeof Sun }[] = [
-    { id: 'light', label: 'Claro', icon: Sun },
-    { id: 'dark', label: 'Oscuro', icon: Moon },
-    { id: 'system', label: 'Sistema', icon: Monitor },
-  ]
+  function setTab(next: AjustesTab) {
+    const nextParams = new URLSearchParams(params)
+    if (next === 'copia') nextParams.delete('tab')
+    else nextParams.set('tab', next)
+    setParams(nextParams, { replace: true })
+  }
 
   return (
-    <div className="stack">
-      <section className="card">
-        <h2 className="title-sm">Apariencia</h2>
-        <div className="row" style={{ flexWrap: 'wrap' }}>
-          {themes.map((t) => {
-            const Icon = t.icon
-            return (
-              <button
-                key={t.id}
-                type="button"
-                className={`btn${mode === t.id ? ' btn-primary' : ''}`}
-                onClick={() => setTheme(t.id)}
-              >
-                <Icon size={16} />
-                {t.label}
-              </button>
-            )
-          })}
-        </div>
-      </section>
+    <div>
+      <div className="seg-toggle tabs-5" role="tablist" aria-label="Secciones de ajustes">
+        {AJUSTES_TABS.map((item) => {
+          const Icon = item.icon
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === item.id}
+              className={tab === item.id ? 'active' : ''}
+              onClick={() => setTab(item.id)}
+            >
+              <Icon size={16} />
+              {item.label}
+            </button>
+          )
+        })}
+      </div>
 
-      <section className="card">
-        <h2 className="title-sm">Estados de la ficha</h2>
-        <ul className="estado-help">
-          <li>
-            <strong>Pendiente</strong> — del mes actual y aún no ejecutada.
-          </li>
-          <li>
-            <strong>Programada</strong> — del trimestre, en un mes que todavía no llega.
-          </li>
-          <li>
-            <strong>Planificada</strong> — más allá del trimestre. Se ve en el cronograma, no en el dashboard.
-          </li>
-          <li>
-            <strong>Vencida</strong> — la fecha ya pasó y no se ejecutó.
-          </li>
-          <li>
-            <strong>Ejecutada</strong> — registrada como hecha.
-          </li>
-        </ul>
-      </section>
-
-      <section className="card">
-        <h2 className="title-sm">Recordatorios</h2>
+      {tab === 'avisos' ? (
+        <section className="card">
+          <h2 className="title-sm">
+            <span className="accordion-label">
+              <Bell size={16} />
+              Avisos e instalación
+            </span>
+          </h2>
+        <h3 className="title-sm">Recordatorios</h3>
         <p className="muted">
           Sin servidor no hay avisos con la app cerrada. Al abrirla (o volver a ella) se puede
           notificar si hay vencidas o pendientes del mes, una vez al día.
@@ -244,10 +298,9 @@ export function AjustesPage() {
           <Bell size={16} />
           {ajustes?.notificaciones ? 'Permiso concedido — volver a pedir' : 'Activar avisos al abrir'}
         </button>
-      </section>
-
-      <section className="card">
-        <h2 className="title-sm">Instalar en este dispositivo</h2>
+        <h3 className="title-sm" style={{ marginTop: '1rem' }}>
+          Instalar en este dispositivo
+        </h3>
         {installed ? (
           <p className="muted">La app ya está en modo instalado (PWA).</p>
         ) : canInstall ? (
@@ -261,15 +314,57 @@ export function AjustesPage() {
             PC: icono de instalar en la barra de direcciones, si el navegador lo ofrece.
           </p>
         )}
-      </section>
+        </section>
+      ) : null}
 
-      <section className="card">
-        <h2 className="title-sm">Copia de seguridad</h2>
+      {tab === 'copia' ? (
+        <section className="card">
+          <h2 className="title-sm">
+            <span className="accordion-label">
+              <DatabaseBackup size={16} />
+              Copia de seguridad
+            </span>
+          </h2>
         <p className="muted">
-          Al abrir la app se revisa si hay datos nuevos. Si pasaron 12 horas y cambió algo, se
+          Al abrir la app se revisa si hay datos nuevos. Si pasó el intervalo y cambió algo, se
           actualiza la copia. En el PC elige una carpeta (OneDrive o Drive, si puedes) para que
           sobreviva si borras la app. En el móvil guarda el ZIP fuera del navegador.
         </p>
+        <div className="backup-fields">
+          <div className="field">
+            <label htmlFor="backup-interval">Intervalo (horas)</label>
+            <input
+              id="backup-interval"
+              className="input"
+              type="number"
+              min={MIN_BACKUP_INTERVAL_HOURS}
+              max={MAX_BACKUP_INTERVAL_HOURS}
+              step={1}
+              defaultValue={intervalHours}
+              key={intervalHours}
+              onBlur={(e) => void saveIntervalHours(e.target.value)}
+            />
+            <p className="muted file-picker-hint">
+              Por defecto {DEFAULT_BACKUP_INTERVAL_HOURS} horas. Entre {MIN_BACKUP_INTERVAL_HOURS} y{' '}
+              {MAX_BACKUP_INTERVAL_HOURS}.
+            </p>
+          </div>
+          <div className="field">
+            <label htmlFor="backup-next">Próxima copia</label>
+            <input
+              id="backup-next"
+              className="input"
+              type="datetime-local"
+              value={toDatetimeLocalValue(nextBackupAt)}
+              onChange={(e) => void saveNextBackup(e.target.value)}
+            />
+            <p className="muted file-picker-hint">
+              {pendingChanges && nextBackupAt <= (ajustes?.lastChangedAt ?? nextBackupAt)
+                ? 'Hay cambios: se intentará al abrir la app.'
+                : `Programada para ${formatDateTime(nextBackupAt)}.`}
+            </p>
+          </div>
+        </div>
         <ul className="backup-status">
           <li>
             Última copia:{' '}
@@ -296,7 +391,7 @@ export function AjustesPage() {
             checked={ajustes?.autoBackup !== false}
             onChange={() => void toggleAutoBackup()}
           />
-          Copia automática (máximo 2 veces al día, solo si hay cambios)
+          Copia automática (según el intervalo, solo si hay cambios)
         </label>
         <div className="row" style={{ flexWrap: 'wrap' }}>
           {folderOk ? (
@@ -320,74 +415,208 @@ export function AjustesPage() {
             </button>
           ) : null}
         </div>
-      </section>
+        {message ? <div className="hint">{message}</div> : null}
 
-      <RestorePanel compact />
+        <SettingsAccordion
+          title="Importar y recuperar"
+          icon={FolderInput}
+          summary="ZIP, carpeta o fusionar"
+          nested
+        >
+          <RestorePanel compact embedded />
+          <h3 className="title-sm" style={{ marginTop: '1rem' }}>
+            Importar en este dispositivo
+          </h3>
+          <p className="muted">
+            Reemplazar deja este aparato igual que la copia. Fusionar añade registros; si el id
+            coincide, gana el archivo.
+          </p>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            {folderOk ? (
+              <button
+                type="button"
+                className="btn"
+                disabled={busy}
+                onClick={() => void restoreFolder('replace')}
+              >
+                <FolderOpen size={16} />
+                Restaurar desde carpeta
+              </button>
+            ) : null}
+            <label className="btn">
+              <Upload size={16} />
+              ZIP (reemplazar)
+              <input
+                className="sr-only"
+                type="file"
+                accept=".zip,application/zip"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  void importNow(file, 'replace')
+                }}
+              />
+            </label>
+            <label className="btn">
+              <Upload size={16} />
+              ZIP (fusionar)
+              <input
+                className="sr-only"
+                type="file"
+                accept=".zip,application/zip"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  void importNow(file, 'merge')
+                }}
+              />
+            </label>
+          </div>
+          <button type="button" className="btn btn-ghost" onClick={() => void loadQuota()}>
+            Ver espacio usado
+          </button>
+          {quota ? <p className="muted">{quota}</p> : null}
+        </SettingsAccordion>
+        </section>
+      ) : null}
 
-      <section className="card">
-        <h2 className="title-sm">Importar en este dispositivo</h2>
+      {tab === 'nombres' ? (
+        <section className="card">
+          <h2 className="title-sm">
+            <span className="accordion-label">
+              <Type size={16} />
+              Nombres en la app
+            </span>
+          </h2>
         <p className="muted">
-          Reemplazar deja este aparato igual que la copia. Fusionar añade registros; si el id
-          coincide, gana el archivo.
+          Cambia cómo se ven el {label('trimestre', aliases)}, las acciones y los tipos de
+          actividad. Se respeta mayúsculas y minúsculas tal como las escribas. Déjalo vacío y
+          sal del campo para volver al nombre original.
         </p>
-        <div className="row" style={{ flexWrap: 'wrap' }}>
-          {folderOk ? (
-            <button
-              type="button"
-              className="btn"
-              disabled={busy}
-              onClick={() => void restoreFolder('replace')}
-            >
-              <FolderOpen size={16} />
-              Restaurar desde carpeta
-            </button>
-          ) : null}
-          <label className="btn">
-            <Upload size={16} />
-            ZIP (reemplazar)
-            <input
-              className="sr-only"
-              type="file"
-              accept=".zip,application/zip"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                e.target.value = ''
-                void importNow(file, 'replace')
-              }}
-            />
-          </label>
-          <label className="btn">
-            <Upload size={16} />
-            ZIP (fusionar)
-            <input
-              className="sr-only"
-              type="file"
-              accept=".zip,application/zip"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                e.target.value = ''
-                void importNow(file, 'merge')
-              }}
-            />
-          </label>
+        <div className="alias-grid">
+          {ALIAS_FIELDS.map((field) => (
+            <div key={field.id} className="field">
+              <label htmlFor={`alias-${field.id}`}>{DEFAULT_ALIASES[field.id]}</label>
+              <input
+                id={`alias-${field.id}`}
+                className="input"
+                value={aliasValue(field.id)}
+                placeholder={DEFAULT_ALIASES[field.id]}
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
+                onFocus={() => {
+                  setAliasFocus(field.id)
+                  setAliasDrafts((prev) => ({
+                    ...prev,
+                    [field.id]: aliases[field.id] ?? DEFAULT_ALIASES[field.id],
+                  }))
+                }}
+                onChange={(e) => {
+                  setAliasDrafts((prev) => ({ ...prev, [field.id]: e.target.value }))
+                }}
+                onBlur={() => {
+                  const raw = aliasDrafts[field.id]
+                  setAliasFocus(null)
+                  void saveAlias(field.id, raw ?? '')
+                }}
+              />
+              <p className="muted file-picker-hint">{field.hint}</p>
+            </div>
+          ))}
         </div>
-        <button type="button" className="btn btn-ghost" onClick={() => void loadQuota()}>
-          Ver espacio usado
-        </button>
-        {quota ? <p className="muted">{quota}</p> : null}
-      </section>
+        </section>
+      ) : null}
 
-      {message ? <div className="hint">{message}</div> : null}
+      {tab === 'estados' ? (
+        <section className="card">
+          <h2 className="title-sm">
+            <span className="accordion-label">
+              <CircleHelp size={16} />
+              Estados de la ficha
+            </span>
+          </h2>
+        <ul className="estado-help">
+          <li>
+            <strong>Pendiente</strong> — del mes actual y aún no ejecutada.
+          </li>
+          <li>
+            <strong>Programada</strong> — del {label('trimestre', aliases)}, en un mes que
+            todavía no llega.
+          </li>
+          <li>
+            <strong>Planificada</strong> — más allá del {label('trimestre', aliases)}. Se ve
+            en el cronograma, no en el dashboard.
+          </li>
+          <li>
+            <strong>Vencida</strong> — la fecha ya pasó y no se ejecutó.
+          </li>
+          <li>
+            <strong>Ejecutada</strong> — registrada como hecha.
+          </li>
+        </ul>
+        </section>
+      ) : null}
 
-      <section className="card">
-        <h2 className="title-sm">Acerca de</h2>
+      {tab === 'acerca' ? (
+        <section className="card">
+          <h2 className="title-sm">
+            <span className="accordion-label">
+              <Info size={16} />
+              Acerca de
+            </span>
+          </h2>
         <p className="muted">
           MaintManage funciona sin servidor. GitHub Pages solo entrega la aplicación. La copia de
           seguridad vive en la carpeta o el ZIP que elijas, no en la web. Fotos y documentos
           grandes ocupan cuota del navegador. Word se almacena; la vista previa rica no está
           incluida. iOS comparte peor archivos que Android.
         </p>
-      </section>
+        </section>
+      ) : null}
     </div>
+  )
+}
+
+function SettingsAccordion({
+  title,
+  icon: Icon,
+  summary,
+  defaultOpen = false,
+  nested = false,
+  children,
+}: {
+  title: string
+  icon?: LucideIcon
+  summary?: string
+  defaultOpen?: boolean
+  nested?: boolean
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <section className={`card accordion-panel${nested ? ' settings-nested' : ''}${open ? '' : ' is-collapsed'}`}>
+      <button
+        type="button"
+        className="accordion-trigger"
+        aria-expanded={open}
+        onClick={() => setOpen((was) => !was)}
+      >
+        <span className="accordion-label">
+          {Icon ? <Icon size={16} /> : null}
+          <span>
+            {title}
+            {!open && summary ? (
+              <span className="muted" style={{ fontWeight: 500 }}>
+                {' · '}
+                {summary}
+              </span>
+            ) : null}
+          </span>
+        </span>
+        <ChevronDown size={18} className={open ? 'is-open' : ''} />
+      </button>
+      {open ? <div className="accordion-body">{children}</div> : null}
+    </section>
   )
 }

@@ -12,7 +12,7 @@ export function ActividadTitle({
   className?: string
 }) {
   const tipos = useTiposActividad()
-  const text = actividad ? actividadTitulo(actividad) : 'Actividad'
+  const text = actividad ? actividadTitulo(actividad, tipos) : 'Actividad'
   const color = actividad ? tipoActividadColor(actividad.tipo, tipos) : undefined
   return (
     <span

@@ -15,6 +15,7 @@ import {
 import { bloqueColorVar } from '../lib/colors'
 import { formatFechaProgramada, formatDateLong } from '../lib/dates'
 import { compareFichasByNumero, fichaTitulo } from '../lib/fichas'
+import { accionHref } from '../lib/acciones'
 import { compareActividadesByTitulo } from '../lib/actividades'
 import { EmptyState, ExtraBadge, LeyendaSimbolos, StatusBadge, TipoBadge } from '../components/ui'
 import { SIMBOLOS_ESTADO } from '../lib/simbolos'
@@ -23,11 +24,12 @@ import { FichaTitle } from '../components/FichaTitle'
 import { ActividadTitle } from '../components/ActividadTitle'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
 import { useTiposActividad } from '../hooks/useTiposActividad'
+import { useAliases } from '../lib/labels'
 
 type ListaItem =
   | { kind: 'occ'; id: string; fecha: string; occId: string; fichaId: string }
   | { kind: 'evt'; id: string; fecha: string; eventoId: string; actividadId: string }
-  | { kind: 'acc'; id: string; fecha: string; accionId: string; fichaId: string }
+  | { kind: 'acc'; id: string; fecha: string; accionId: string; fichaId?: string; actividadId?: string }
 
 type Ambito = 'fichas' | 'actividades'
 
@@ -54,6 +56,7 @@ export function CronogramaPage() {
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
   const acciones = useLiveQuery(() => db.accionesCorrectivas.toArray()) ?? []
   const tipos = useTiposActividad()
+  const aliases = useAliases()
 
   const fichaMap = useMemo(() => Object.fromEntries(fichas.map((f) => [f.id, f])), [fichas])
   const actividadMap = useMemo(
@@ -141,11 +144,15 @@ export function CronogramaPage() {
 
   const correctivasFechadas = acciones.filter((a) => {
     if (tipoAccionOf(a) !== 'correctiva' || !a.fechaObjetivo) return false
-    const ficha = fichaMap[a.fichaId]
-    if (encargadoId && ficha?.encargadoId !== encargadoId) return false
-    if (tipoId) return false
+    const ficha = a.fichaId ? fichaMap[a.fichaId] : undefined
+    const act = a.actividadId ? actividadMap[a.actividadId] : undefined
+    if (encargadoId) {
+      const enc = act?.encargadoId ?? ficha?.encargadoId
+      if (enc !== encargadoId) return false
+    }
+    if (tipoId && (!act || act.tipo !== tipoId)) return false
     if (q) {
-      const hay = `${a.texto} ${ficha ? `${ficha.numero} ${ficha.nombre}` : ''}`.toLowerCase()
+      const hay = `${a.texto} ${ficha ? `${ficha.numero} ${ficha.nombre}` : ''} ${act?.titulo ?? ''}`.toLowerCase()
       if (!hay.includes(qLower)) return false
     }
     if (estado && estadoAgendaCorrectiva(a) !== estado) return false
@@ -266,6 +273,7 @@ export function CronogramaPage() {
             fecha: a.fechaObjetivo as string,
             accionId: a.id,
             fichaId: a.fichaId,
+            actividadId: a.actividadId,
           })),
         ]
 
@@ -285,7 +293,16 @@ export function CronogramaPage() {
         return compareActividadesByTitulo(actividadMap[a.actividadId], actividadMap[b.actividadId])
       }
       if (a.kind === 'acc' && b.kind === 'acc') {
-        return compareFichasByNumero(fichaMap[a.fichaId], fichaMap[b.fichaId])
+        if (a.actividadId || b.actividadId) {
+          return compareActividadesByTitulo(
+            a.actividadId ? actividadMap[a.actividadId] : undefined,
+            b.actividadId ? actividadMap[b.actividadId] : undefined,
+          )
+        }
+        return compareFichasByNumero(
+          a.fichaId ? fichaMap[a.fichaId] : undefined,
+          b.fichaId ? fichaMap[b.fichaId] : undefined,
+        )
       }
       if (a.kind === 'evt') return -1
       if (b.kind === 'evt') return 1
@@ -415,7 +432,7 @@ export function CronogramaPage() {
         ))}
       </div>
 
-      <label className="search-field search-field-full" htmlFor="crono-q">
+      <label className="search-field" htmlFor="crono-q">
         <Search size={16} aria-hidden />
         <input
           id="crono-q"
@@ -582,34 +599,41 @@ export function CronogramaPage() {
                         )
                       }
                       const accion = correctivasFechadas.find((a) => a.id === item.accionId)
-                      const ficha = fichaMap[item.fichaId]
+                      const ficha = item.fichaId ? fichaMap[item.fichaId] : undefined
+                      const act = item.actividadId ? actividadMap[item.actividadId] : undefined
                       const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
-                      const encargado = ficha ? encargadoMap[ficha.encargadoId ?? ''] : undefined
+                      const encargado = act
+                        ? encargadoMap[act.encargadoId ?? '']
+                        : ficha
+                          ? encargadoMap[ficha.encargadoId ?? '']
+                          : undefined
                       if (!accion) return null
-                      const href = accion.ocurrenciaId
-                        ? `/ocurrencias/${accion.ocurrenciaId}`
-                        : `/fichas/${accion.fichaId}`
+                      const parent = act ? act.titulo : ficha ? fichaTitulo(ficha) : ''
                       return (
                         <Link
                           key={item.id}
                           className={`table-row table-cols-crono${showBloque ? '' : ' no-bloque'}`}
-                          to={href}
+                          to={accionHref(accion)}
                         >
                           <span
                             className="table-bar"
-                            style={{ background: bloqueColorVar(bloque?.color ?? 'rose') }}
+                            style={{
+                              background: bloqueColorVar(
+                                act ? tipoActividadColor(act.tipo, tipos) : (bloque?.color ?? 'rose'),
+                              ),
+                            }}
                           />
                           <span className="table-cell">
                             <span className="occ-meta">
                               <strong>{accion.texto}</strong>
                             </span>
                             <span className="muted col-sm-only">
-                              {tipoAccionLabel('correctiva')}
-                              {ficha ? ` · ${fichaTitulo(ficha)}` : ''}
+                              {tipoAccionLabel('correctiva', aliases)}
+                              {parent ? ` · ${parent}` : ''}
                             </span>
                           </span>
                           {showBloque ? (
-                            <span className="col-md muted">{tipoAccionLabel('correctiva')}</span>
+                            <span className="col-md muted">{tipoAccionLabel('correctiva', aliases)}</span>
                           ) : null}
                           <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
                           <span className="table-nowrap">

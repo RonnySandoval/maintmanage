@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { ESTADOS, tipoActividadColor, tipoActividadLabel, type EstadoOcurrencia } from '../db/types'
 import { useTiposActividad } from '../hooks/useTiposActividad'
+import { label, useAliases } from '../lib/labels'
 import { bloqueColorVar } from '../lib/colors'
 import { SIMBOLOS_ESTADO, SIMBOLO_CORRECTIVA } from '../lib/simbolos'
 
@@ -44,6 +45,7 @@ export function StatusBadge({
 }
 
 export function LeyendaSimbolos() {
+  const aliases = useAliases()
   return (
     <div className="sym-legend" aria-label="Código de símbolos">
       {ESTADOS.map((estado) => {
@@ -61,7 +63,7 @@ export function LeyendaSimbolos() {
         <span className="sym" aria-hidden>
           {SIMBOLO_CORRECTIVA}
         </span>
-        Con acción correctiva
+        Con {label('accion_correctiva', aliases)}
       </span>
     </div>
   )

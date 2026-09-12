@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CalendarPlus, CalendarRange, Pencil, Trash2 } from 'lucide-react'
+import { CalendarPlus, CalendarRange, CircleCheck, Pencil, Trash2 } from 'lucide-react'
 import { db } from '../db'
 import {
   ESTADOS,
@@ -13,7 +13,7 @@ import {
 } from '../db/types'
 import { bloqueColorVar } from '../lib/colors'
 import { formatFechaProgramada, todayISO } from '../lib/dates'
-import { actividadTitulo } from '../lib/actividades'
+import { actividadTitulo, eventoVigente } from '../lib/actividades'
 import { saveAdjuntos } from '../lib/files'
 import { blobToFile } from '../lib/share'
 import {
@@ -25,6 +25,7 @@ import {
 import { AttachmentList, removeAdjunto } from '../components/AttachmentList'
 import { FilePicker } from '../components/FilePicker'
 import { ShareMenu } from '../components/ShareMenu'
+import { AccionesPanel } from '../components/AccionesPanel'
 import { ExtraBadge, Modal, StatusBadge, TipoBadge } from '../components/ui'
 import { useTiposActividad } from '../hooks/useTiposActividad'
 import { ActividadTitle } from '../components/ActividadTitle'
@@ -74,6 +75,7 @@ export function ActividadDetailPage() {
   }
 
   const current = actividad
+  const eventoActual = eventoVigente(eventos)
   const plantilla = adjuntos.filter((a) => a.tipo === 'actividad')
   const telefonoEncargado = encargado?.telefonos || encargado?.contacto || ''
   const precision = actividad.fechaPrecision === 'dia' ? 'dia' : 'mes'
@@ -172,7 +174,7 @@ export function ActividadDetailPage() {
             <h2 style={{ marginBottom: 4 }}>
               <ActividadTitle actividad={actividad} />
             </h2>
-            <p className="muted" style={{ margin: 0 }}>
+            <p className="muted occ-meta" style={{ margin: 0 }}>
               <span
                 className="color-dot"
                 style={{
@@ -187,31 +189,48 @@ export function ActividadDetailPage() {
               {` · ${frecuenciaLabel(actividad.frecuencia)}`}
             </p>
           </div>
-          <div className="row" style={{ flexWrap: 'wrap' }}>
-            <Link className="btn btn-edit" to={`/actividades/${actividad.id}/editar`}>
+          {eventoActual ? <StatusBadge estado={eventoActual.estado} /> : null}
+        </div>
+        {telefonoEncargado ? (
+          <p className="muted phone-line">
+            Tel. {telefonoEncargado}
+            <CopyText text={telefonoEncargado} label="Copiar teléfono" />
+          </p>
+        ) : null}
+        {encargado?.congregacion ? (
+          <p className="muted">Congregación: {encargado.congregacion}</p>
+        ) : null}
+        {actividad.notas ? <p>{actividad.notas}</p> : null}
+        <div className="card-toolbar">
+          <div className="row card-toolbar-actions">
+            {eventoActual ? (
+              <Link className="btn btn-primary" to={`/eventos/${eventoActual.id}?ejecutar=1`}>
+                <CircleCheck size={16} />
+                Ejecutar
+              </Link>
+            ) : null}
+            <ShareMenu title={actividadTitulo(actividad)} text={shareText} files={shareFiles} />
+          </div>
+          <div className="row">
+            <Link
+              className="icon-btn icon-btn-edit"
+              to={`/actividades/${actividad.id}/editar`}
+              aria-label="Editar"
+              title="Editar"
+            >
               <Pencil size={16} />
-              Editar
             </Link>
-            <button type="button" className="btn btn-danger" onClick={() => void remove()}>
+            <button
+              type="button"
+              className="icon-btn icon-btn-delete"
+              aria-label="Eliminar"
+              title="Eliminar"
+              onClick={() => void remove()}
+            >
               <Trash2 size={16} />
-              Eliminar
             </button>
           </div>
         </div>
-        {telefonoEncargado || encargado?.congregacion ? (
-          <p className="muted phone-line">
-            {telefonoEncargado ? (
-              <>
-                Tel. {telefonoEncargado}
-                <CopyText text={telefonoEncargado} label="Copiar teléfono" />
-              </>
-            ) : null}
-            {encargado?.congregacion && telefonoEncargado ? ' · ' : ''}
-            {encargado?.congregacion ? `Congregación: ${encargado.congregacion}` : ''}
-          </p>
-        ) : null}
-        {actividad.notas ? <p>{actividad.notas}</p> : null}
-        <ShareMenu title={actividadTitulo(actividad)} text={shareText} files={shareFiles} />
       </div>
 
       <div className="card">
@@ -264,6 +283,8 @@ export function ActividadDetailPage() {
           )}
         </div>
       </div>
+
+      <AccionesPanel actividadId={actividad.id} />
 
       <Modal open={modal === 'extra'} title="Añadir evento" onClose={() => setModal(null)}>
         <form onSubmit={(e) => void submitExtra(e)}>

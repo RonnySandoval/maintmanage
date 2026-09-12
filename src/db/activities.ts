@@ -220,13 +220,14 @@ export async function deleteActividadCascade(actividadId: string): Promise<void>
 
   await db.transaction(
     'rw',
-    [db.actividades, db.eventos, db.ejecuciones, db.adjuntos],
+    [db.actividades, db.eventos, db.ejecuciones, db.adjuntos, db.accionesCorrectivas],
     async () => {
       await db.actividades.delete(actividadId)
       await db.eventos.where('actividadId').equals(actividadId).delete()
       if (eventoIds.length) await db.ejecuciones.where('eventoId').anyOf(eventoIds).delete()
       await db.adjuntos.where('actividadId').equals(actividadId).delete()
       if (ejecIds.length) await db.adjuntos.where('ejecucionId').anyOf(ejecIds).delete()
+      await db.accionesCorrectivas.where('actividadId').equals(actividadId).delete()
     },
   )
 }

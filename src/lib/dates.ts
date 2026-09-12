@@ -102,9 +102,16 @@ export function quarterIndex(month: number): number {
   return Math.floor(month / 3)
 }
 
-export function quarterLabel(date = new Date()): string {
-  const labels = ['Primer trimestre', 'Segundo trimestre', 'Tercer trimestre', 'Cuarto trimestre']
+export function quarterLabel(date = new Date(), trimestreWord = 'trimestre'): string {
+  const word = trimestreWord.trim() || 'trimestre'
+  const labels = [`Primer ${word}`, `Segundo ${word}`, `Tercer ${word}`, `Cuarto ${word}`]
   return `${labels[quarterIndex(date.getMonth())]} ${date.getFullYear()}`
+}
+
+export function toDatetimeLocalValue(ts: number): string {
+  const d = new Date(ts)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 export function inCurrentQuarter(iso: string, date = new Date()): boolean {

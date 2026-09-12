@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ChevronDown, Trash2 } from 'lucide-react'
+import { ChevronDown, CircleCheck, Pencil, Trash2 } from 'lucide-react'
 import { db } from '../db'
 import { esExtraordinaria, esOcurrenciaProgramada, tipoActividadLabel } from '../db/types'
 import { formatFechaProgramada, monthLabel } from '../lib/dates'
@@ -9,6 +9,7 @@ import { actividadTitulo } from '../lib/actividades'
 import { blobToFile } from '../lib/share'
 import { deleteEvento } from '../db/activities'
 import { ShareMenu } from '../components/ShareMenu'
+import { AccionesPanel } from '../components/AccionesPanel'
 import { ExtraBadge, StatusBadge, TipoBadge } from '../components/ui'
 import { useTiposActividad } from '../hooks/useTiposActividad'
 import { ActividadTitle } from '../components/ActividadTitle'
@@ -51,9 +52,10 @@ export function EventoDetailPage() {
       [evento?.actividadId],
     ) ?? []
 
+  const [params] = useSearchParams()
   const tipos = useTiposActividad()
   const [removing, setRemoving] = useState(false)
-  const [ejecOpen, setEjecOpen] = useState(false)
+  const [ejecOpen, setEjecOpen] = useState(() => params.get('ejecutar') === '1')
 
   if (!id) return null
   if (evento === undefined) return <p className="muted">Cargando…</p>
@@ -134,11 +136,11 @@ export function EventoDetailPage() {
           </div>
           <StatusBadge estado={current.estado} />
         </div>
-        <ShareMenu title={actividadTitulo(currentActividad)} text={shareText} files={shareFiles} />
-        <div className="card-delete-corner">
+        <div className="card-toolbar">
+          <ShareMenu title={actividadTitulo(currentActividad)} text={shareText} files={shareFiles} />
           <button
             type="button"
-            className="icon-btn icon-btn-delete discreet"
+            className="icon-btn icon-btn-delete"
             aria-label={removing ? 'Eliminando…' : 'Eliminar evento'}
             title="Eliminar evento"
             onClick={() => void removeEvt()}
@@ -156,15 +158,18 @@ export function EventoDetailPage() {
           aria-expanded={ejecOpen}
           onClick={() => setEjecOpen((was) => !was)}
         >
-          <span>
-            {ejecucion ? 'Editar ejecución' : 'Marcar como ejecutada'}
-            {ejecucion && !ejecOpen ? (
-              <span className="muted" style={{ fontWeight: 500 }}>
-                {' · '}
-                {ejecucion.fechaReal}
-                {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
-              </span>
-            ) : null}
+          <span className="accordion-label">
+            {ejecucion ? <Pencil size={16} /> : <CircleCheck size={16} />}
+            <span>
+              {ejecucion ? 'Editar ejecución' : 'Marcar como ejecutada'}
+              {ejecucion && !ejecOpen ? (
+                <span className="muted" style={{ fontWeight: 500 }}>
+                  {' · '}
+                  {ejecucion.fechaReal}
+                  {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
+                </span>
+              ) : null}
+            </span>
           </span>
           <ChevronDown size={18} className={ejecOpen ? 'is-open' : ''} />
         </button>
@@ -178,6 +183,12 @@ export function EventoDetailPage() {
           </div>
         ) : null}
       </div>
+
+      <AccionesPanel
+        actividadId={currentActividad.id}
+        eventoId={current.id}
+        onlyCorrectiva
+      />
     </div>
   )
 }

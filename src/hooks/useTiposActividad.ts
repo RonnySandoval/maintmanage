@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import type { TipoActividadDef } from '../db/types'
+import { applyTipoAliases } from '../lib/labels'
 import { mergeTiposActividad } from '../lib/tiposActividad'
 
 export function useTiposActividad(): TipoActividadDef[] {
@@ -13,7 +14,7 @@ export function useTiposActividad(): TipoActividadDef[] {
     }) ?? []
 
   return useMemo(
-    () => mergeTiposActividad(ajustes?.tiposActividad, usados),
-    [ajustes?.tiposActividad, usados],
+    () => applyTipoAliases(mergeTiposActividad(ajustes?.tiposActividad, usados), ajustes?.aliases),
+    [ajustes?.tiposActividad, ajustes?.aliases, usados],
   )
 }

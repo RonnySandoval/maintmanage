@@ -12,10 +12,12 @@ import { clearRestoreSkip } from '../lib/restoreSkip'
 
 export function RestorePanel({
   compact = false,
+  embedded = false,
   onRestored,
   onSkip,
 }: {
   compact?: boolean
+  embedded?: boolean
   onRestored?: () => void
   onSkip?: () => void
 }) {
@@ -70,9 +72,9 @@ export function RestorePanel({
     }
   }
 
-  return (
-    <section className={`card restore-panel${compact ? ' restore-panel-compact' : ''}`}>
-      <h2 className="title-sm">Recuperar datos</h2>
+  const body = (
+    <>
+      {embedded ? null : <h2 className="title-sm">Recuperar datos</h2>}
       <p className="muted">
         Si borraste la app o cambiaste de dispositivo, restaura desde la carpeta de copias o desde
         el ZIP. Todo se hace aquí, sin herramientas extra.
@@ -106,6 +108,14 @@ export function RestorePanel({
         ) : null}
       </div>
       {message ? <p className="hint" style={{ marginTop: '0.75rem' }}>{message}</p> : null}
+    </>
+  )
+
+  if (embedded) return <div className="restore-embedded">{body}</div>
+
+  return (
+    <section className={`card restore-panel${compact ? ' restore-panel-compact' : ''}`}>
+      {body}
     </section>
   )
 }

@@ -126,8 +126,10 @@ export interface Evento {
 
 export interface AccionCorrectiva {
   id: string
-  fichaId: string
+  fichaId?: string
   ocurrenciaId?: string
+  actividadId?: string
+  eventoId?: string
   tipo: TipoAccion
   texto: string
   estado: EstadoCorrectiva
@@ -163,6 +165,12 @@ export interface Ajustes {
   backupFolderName?: string
   /** Tipos de actividad añadidos por el usuario. */
   tiposActividad?: TipoActividadDef[]
+  /** Horas entre copias automáticas. Por defecto 12. */
+  backupIntervalHours?: number
+  /** Si está fijada, la copia automática espera a esta fecha. */
+  nextBackupAt?: number
+  /** Nombres visibles (trimestre, acción correctiva, tipos de actividad…). */
+  aliases?: Partial<Record<string, string>>
 }
 
 export const FRECUENCIAS: { id: Frecuencia; label: string; meses: number }[] = [
@@ -244,8 +252,18 @@ export function tipoAccionOf(
   return accion.fechaObjetivo ? 'correctiva' : 'recomendacion'
 }
 
-export function tipoAccionLabel(tipo: TipoAccion): string {
-  return tipo === 'recomendacion' ? 'Recomendación' : 'Acción correctiva'
+export function tipoAccionLabel(
+  tipo: TipoAccion,
+  aliases?: Partial<Record<string, string>> | null,
+): string {
+  if (tipo === 'recomendacion') {
+    return aliases?.recomendacion !== undefined && aliases.recomendacion !== ''
+      ? aliases.recomendacion
+      : 'Recomendación'
+  }
+  return aliases?.accion_correctiva !== undefined && aliases.accion_correctiva !== ''
+    ? aliases.accion_correctiva
+    : 'Acción correctiva'
 }
 
 export function esOcurrenciaProgramada(o: Pick<Ocurrencia, 'origen'>): boolean {

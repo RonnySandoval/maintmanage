@@ -242,8 +242,11 @@ export function ActividadFormPage() {
 
         <div className="field span-2">
           <label>Adjuntos</label>
-          <FilePicker onFiles={(list) => setFiles((prev) => [...prev, ...list])} />
-          {files.length ? <p className="muted">{files.length} archivo(s)</p> : null}
+          <FilePicker
+            files={files}
+            onFiles={(list) => setFiles((prev) => [...prev, ...list])}
+            onRemoveFile={(index) => setFiles((prev) => prev.filter((_, i) => i !== index))}
+          />
         </div>
       </div>
 

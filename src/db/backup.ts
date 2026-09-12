@@ -19,7 +19,28 @@ import type {
 type AdjuntoMeta = Omit<Adjunto, 'blob'>
 
 export const BACKUP_FILE_NAME = 'maintmanage-backup.zip'
-export const BACKUP_INTERVAL_MS = 12 * 60 * 60 * 1000
+export const DEFAULT_BACKUP_INTERVAL_HOURS = 12
+export const BACKUP_INTERVAL_MS = DEFAULT_BACKUP_INTERVAL_HOURS * 60 * 60 * 1000
+export const MIN_BACKUP_INTERVAL_HOURS = 1
+export const MAX_BACKUP_INTERVAL_HOURS = 168
+
+export function backupIntervalHoursOf(hours?: number | null): number {
+  if (typeof hours !== 'number' || !Number.isFinite(hours)) return DEFAULT_BACKUP_INTERVAL_HOURS
+  return Math.min(MAX_BACKUP_INTERVAL_HOURS, Math.max(MIN_BACKUP_INTERVAL_HOURS, Math.round(hours)))
+}
+
+export function backupIntervalMsOf(hours?: number | null): number {
+  return backupIntervalHoursOf(hours) * 60 * 60 * 1000
+}
+
+export function nextBackupAtOf(
+  ajustes?: Pick<Ajustes, 'lastBackupAt' | 'nextBackupAt' | 'backupIntervalHours'> | null,
+  now = Date.now(),
+): number {
+  if (ajustes?.nextBackupAt && ajustes.nextBackupAt > 0) return ajustes.nextBackupAt
+  if (ajustes?.lastBackupAt) return ajustes.lastBackupAt + backupIntervalMsOf(ajustes.backupIntervalHours)
+  return now
+}
 
 export interface BackupPayload {
   version: 1
@@ -42,15 +63,16 @@ export function canUseFolderBackup(): boolean {
 }
 
 export async function hasUserData(): Promise<boolean> {
-  const [fichas, encargados, grupos, adjuntos, ejecuciones, actividades] = await Promise.all([
+  const [fichas, encargados, grupos, adjuntos, ejecuciones, actividades, eventos] = await Promise.all([
     db.fichas.count(),
     db.encargados.count(),
     db.grupos.count(),
     db.adjuntos.count(),
     db.ejecuciones.count(),
     db.actividades.count(),
+    db.eventos.count(),
   ])
-  return fichas + encargados + grupos + adjuntos + ejecuciones + actividades > 0
+  return fichas + encargados + grupos + adjuntos + ejecuciones + actividades + eventos > 0
 }
 
 export async function requestPersistentStorage(): Promise<boolean> {
@@ -152,6 +174,7 @@ export async function importBackup(file: Blob, mode: 'replace' | 'merge'): Promi
         lastBackupAt: now,
         lastChangedAt: now,
         autoBackup: current.autoBackup !== false,
+        nextBackupAt: now + backupIntervalMsOf(current.backupIntervalHours),
       })
     } else {
       await db.ajustes.put({
@@ -159,8 +182,10 @@ export async function importBackup(file: Blob, mode: 'replace' | 'merge'): Promi
         umbralProximaDias: 7,
         notificaciones: false,
         autoBackup: true,
+        backupIntervalHours: DEFAULT_BACKUP_INTERVAL_HOURS,
         lastBackupAt: now,
         lastChangedAt: now,
+        nextBackupAt: now + BACKUP_INTERVAL_MS,
       })
     }
   })
@@ -179,9 +204,11 @@ export function downloadBlob(blob: Blob, filename: string): void {
 
 export async function markBackupDone(kind: 'folder' | 'download'): Promise<void> {
   const now = Date.now()
+  const current = await db.ajustes.get('app')
   await db.ajustes.update('app', {
     lastBackupAt: now,
     lastBackupKind: kind,
+    nextBackupAt: now + backupIntervalMsOf(current?.backupIntervalHours),
   })
 }
 

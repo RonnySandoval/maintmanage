@@ -9,6 +9,7 @@ import {
   tipoAccionOf,
   type AccionCorrectiva,
 } from '../db/types'
+import { accionHref } from '../lib/acciones'
 import { compareActividadesByTitulo } from '../lib/actividades'
 import { computeEstado, todayISO } from '../lib/dates'
 import { compareFichasByNumero, fichaTitulo } from '../lib/fichas'
@@ -23,6 +24,7 @@ import {
   ZOOM_IN_MAX,
   type ZoomLevel,
 } from '../hooks/useGridSpan'
+import { useAliases } from '../lib/labels'
 import { ActividadTitle } from './ActividadTitle'
 import { FichaTitle } from './FichaTitle'
 import { LeyendaSimbolos, TipoBadge } from './ui'
@@ -231,7 +233,19 @@ export function GrillaAnual({
       .map((a) => a.ocurrenciaId as string),
   )
   const correctivaFicha = new Set(
-    acciones.filter((a) => tipoAccionOf(a) === 'correctiva' && !a.ocurrenciaId).map((a) => a.fichaId),
+    acciones
+      .filter((a) => tipoAccionOf(a) === 'correctiva' && !a.ocurrenciaId && a.fichaId)
+      .map((a) => a.fichaId as string),
+  )
+  const correctivaEvt = new Set(
+    acciones
+      .filter((a) => tipoAccionOf(a) === 'correctiva' && a.eventoId)
+      .map((a) => a.eventoId as string),
+  )
+  const correctivaActividad = new Set(
+    acciones
+      .filter((a) => tipoAccionOf(a) === 'correctiva' && !a.eventoId && a.actividadId)
+      .map((a) => a.actividadId as string),
   )
   const correctivasFechadas = acciones
     .filter((a) => tipoAccionOf(a) === 'correctiva' && Boolean(a.fechaObjetivo))
@@ -241,6 +255,7 @@ export function GrillaAnual({
       return a.texto.localeCompare(b.texto, 'es')
     })
   const fichaById = Object.fromEntries(fichas.map((f) => [f.id, f]))
+  const actividadById = Object.fromEntries(actividades.map((a) => [a.id, a]))
 
   const encargadoMap = Object.fromEntries(encargados.map((e) => [e.id, e]))
   const bloqueMap = Object.fromEntries(bloques.map((b) => [b.id, b]))
@@ -434,6 +449,8 @@ export function GrillaAnual({
                     showBloque={showBloque}
                     showMeta={detail >= 1}
                     showFrecuencia={detail >= 2}
+                    correctivaEvt={correctivaEvt}
+                    correctivaActividad={correctivaActividad}
                   />
                 ))
               : null}
@@ -442,7 +459,8 @@ export function GrillaAnual({
                   <CorrectivaRow
                     key={accion.id}
                     accion={accion}
-                    ficha={fichaById[accion.fichaId]}
+                    ficha={accion.fichaId ? fichaById[accion.fichaId] : undefined}
+                    actividad={accion.actividadId ? actividadById[accion.actividadId] : undefined}
                     index={actividadesOrdenadas.length + index}
                     monthIndexes={monthIndexes}
                     start={start}
@@ -551,6 +569,8 @@ function ActividadRow({
   showBloque,
   showMeta,
   showFrecuencia,
+  correctivaEvt,
+  correctivaActividad,
 }: {
   actividad: Actividad
   index: number
@@ -562,6 +582,8 @@ function ActividadRow({
   showBloque: boolean
   showMeta: boolean
   showFrecuencia: boolean
+  correctivaEvt: Set<string>
+  correctivaActividad: Set<string>
 }) {
   return (
     <tr className={`ficha-row${index % 2 ? ' is-alt' : ''}`}>
@@ -585,22 +607,29 @@ function ActividadRow({
         const evt = pickOcc(byActividadMonth.get(`${actividad.id}:${month}`) ?? [])
         const cls = `month-col ${monthClass(month, start, currentMonth)}`.trim()
         if (!evt) return <td key={month} className={cls} />
+        const hasCorrectiva = correctivaEvt.has(evt.id) || correctivaActividad.has(actividad.id)
         const title = [
           labelEstado(evt.estado),
           esExtraordinaria(evt) ? 'Extraordinaria' : '',
+          hasCorrectiva ? 'Con acción correctiva' : '',
         ]
           .filter(Boolean)
           .join(' · ')
         return (
           <td key={month} className={cls}>
             <Link
-              className={`grid-cell ${evt.estado}`}
+              className={`grid-cell ${evt.estado}${hasCorrectiva ? ' has-correctiva' : ''}`}
               to={`/eventos/${evt.id}`}
               title={title}
               aria-label={title}
             >
               <span className="cell-syms">
                 <span aria-hidden>{simboloEstado(evt.estado)}</span>
+                {hasCorrectiva ? (
+                  <span className="cell-correctiva" aria-hidden>
+                    {SIMBOLO_CORRECTIVA}
+                  </span>
+                ) : null}
               </span>
             </Link>
           </td>
@@ -613,6 +642,7 @@ function ActividadRow({
 function CorrectivaRow({
   accion,
   ficha,
+  actividad,
   index,
   monthIndexes,
   start,
@@ -622,6 +652,7 @@ function CorrectivaRow({
 }: {
   accion: AccionCorrectiva
   ficha?: Ficha
+  actividad?: Actividad
   index: number
   monthIndexes: number[]
   start: number
@@ -629,23 +660,23 @@ function CorrectivaRow({
   year: number
   showMeta: boolean
 }) {
+  const aliases = useAliases()
   const fecha = accion.fechaObjetivo ?? ''
   const month = fecha.startsWith(String(year)) ? Number(fecha.slice(5, 7)) - 1 : -1
   const estado = estadoAgendaCorrectiva(accion)
-  const href = accion.ocurrenciaId ? `/ocurrencias/${accion.ocurrenciaId}` : `/fichas/${accion.fichaId}`
+  const href = accionHref(accion)
+  const parent = actividad ? actividad.titulo : ficha ? fichaTitulo(ficha) : ''
   return (
     <tr className={`ficha-row${index % 2 ? ' is-alt' : ''}`}>
       <th className="ficha-col" scope="row">
         <Link to={href}>{accion.texto}</Link>
-        <span className="ficha-meta">{tipoAccionLabel('correctiva')}</span>
-        {showMeta ? (
-          <span className="ficha-meta">{ficha ? fichaTitulo(ficha) : 'Sin ficha'}</span>
-        ) : null}
+        <span className="ficha-meta">{tipoAccionLabel('correctiva', aliases)}</span>
+        {showMeta && parent ? <span className="ficha-meta">{parent}</span> : null}
       </th>
       {monthIndexes.map((m) => {
         const cls = `month-col ${monthClass(m, start, currentMonth)}`.trim()
         if (m !== month) return <td key={m} className={cls} />
-        const title = [labelEstado(estado), tipoAccionLabel('correctiva')].join(' · ')
+        const title = [labelEstado(estado), tipoAccionLabel('correctiva', aliases)].join(' · ')
         return (
           <td key={m} className={cls}>
             <Link

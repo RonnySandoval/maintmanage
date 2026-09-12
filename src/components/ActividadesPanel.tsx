@@ -7,11 +7,12 @@ import { frecuenciaLabel, mesesDeFrecuencia, tipoActividadLabel } from '../db/ty
 import { tipoActividadColor } from '../db/types'
 import { useTiposActividad } from '../hooks/useTiposActividad'
 import { bloqueColorVar } from '../lib/colors'
-import { compareActividadesByTitulo } from '../lib/actividades'
+import { compareActividadesByTitulo, estadoVigente } from '../lib/actividades'
+import { label, useAliases } from '../lib/labels'
 import { congregacionDe, congregacionLabel } from '../lib/fichas'
 import { ActividadTitle } from './ActividadTitle'
 import { SortHeader } from './SortHeader'
-import { EmptyState, TipoBadge } from './ui'
+import { EmptyState, StatusBadge, TipoBadge } from './ui'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
 import type { Actividad } from '../db/types'
 
@@ -44,12 +45,23 @@ export function ActividadesPanel() {
   const sortDir = sortDirFromParam(params.get('dir'))
 
   const actividades = useLiveQuery(() => db.actividades.toArray()) ?? []
+  const eventos = useLiveQuery(() => db.eventos.toArray()) ?? []
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
   const tipos = useTiposActividad()
+  const aliases = useAliases()
   const encargadoMap = useMemo(
     () => Object.fromEntries(encargados.map((e) => [e.id, e])),
     [encargados],
   )
+  const eventosByAct = useMemo(() => {
+    const map = new Map<string, typeof eventos>()
+    for (const e of eventos) {
+      const list = map.get(e.actividadId) ?? []
+      list.push(e)
+      map.set(e.actividadId, list)
+    }
+    return map
+  }, [eventos])
 
   function patch(updates: Record<string, string | undefined>) {
     const next = new URLSearchParams(params)
@@ -297,7 +309,7 @@ export function ActividadesPanel() {
         <EmptyState
           icon={<Wrench size={36} />}
           title="Sin actividades"
-          text="Reparaciones sueltas, compras, limpieza o capacitaciones. No necesitan ficha."
+          text={`${label('reparacion', aliases)}, ${label('compra', aliases)}, ${label('limpieza', aliases)} o ${label('capacitacion', aliases)}. No necesitan ficha.`}
           action={
             <Link className="btn btn-add" to="/actividades/nueva">
               Crear actividad
@@ -344,6 +356,7 @@ export function ActividadesPanel() {
               <div className="table-section">{group.label}</div>
               {group.rows.map((a) => {
                 const encargado = a.encargadoId ? encargadoMap[a.encargadoId] : undefined
+                const vigente = estadoVigente(eventosByAct.get(a.id) ?? [])
                 return (
                   <Link
                     key={a.id}
@@ -355,7 +368,10 @@ export function ActividadesPanel() {
                       style={{ background: bloqueColorVar(tipoActividadColor(a.tipo, tipos)) }}
                     />
                     <span className="table-cell">
-                      <ActividadTitle actividad={a} />
+                      <span className="row" style={{ flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
+                        <ActividadTitle actividad={a} />
+                        {vigente ? <StatusBadge estado={vigente} /> : null}
+                      </span>
                       <span className="muted col-sm-only">
                         {tipoActividadLabel(a.tipo, tipos)}
                         {encargado ? ` · ${encargado.nombre}` : ''}

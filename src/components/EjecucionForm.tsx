@@ -137,6 +137,7 @@ export function EjecucionForm({
       <div className="field">
         <label>Evidencia</label>
         <FilePicker
+          files={files}
           onFiles={(list) => {
             if (ejecucion) {
               void saveAdjuntos(list, {
@@ -149,8 +150,8 @@ export function EjecucionForm({
             }
             setFiles((prev) => [...prev, ...list])
           }}
+          onRemoveFile={(index) => setFiles((prev) => prev.filter((_, i) => i !== index))}
         />
-        {files.length ? <p className="muted">{files.length} archivo(s) por guardar</p> : null}
         {ejecucion ? (
           <div style={{ marginTop: '0.75rem' }}>
             <AttachmentList adjuntos={evidencia} onDelete={(adjId) => void removeAdjunto(adjId)} />

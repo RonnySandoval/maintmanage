@@ -30,6 +30,7 @@ import {
 } from '../db/types'
 import { bloqueColorVar } from '../lib/colors'
 import { formatDate, formatFechaProgramada } from '../lib/dates'
+import { accionHref } from '../lib/acciones'
 import { actividadTitulo } from '../lib/actividades'
 import { fichaTitulo } from '../lib/fichas'
 import { ActividadTitle } from '../components/ActividadTitle'
@@ -63,6 +64,7 @@ function groupAcciones(
   rows: AccionCorrectiva[],
   group: AccGroup,
   fichaMap: Record<string, Ficha>,
+  actividadMap: Record<string, Actividad>,
 ): { key: string; label: string; items: AccionCorrectiva[] }[] {
   if (group === 'lista') return [{ key: 'all', label: '', items: rows }]
 
@@ -86,8 +88,13 @@ function groupAcciones(
       const meta = ESTADOS_CORRECTIVA.find((s) => s.id === a.estado)
       push(a.estado, meta?.label ?? a.estado, a)
     } else {
-      const ficha = fichaMap[a.fichaId]
-      push(a.fichaId, ficha ? fichaTitulo(ficha) : 'Sin ficha', a)
+      if (a.actividadId) {
+        const act = actividadMap[a.actividadId]
+        push(`act:${a.actividadId}`, act ? actividadTitulo(act) : 'Actividad', a)
+      } else {
+        const ficha = a.fichaId ? fichaMap[a.fichaId] : undefined
+        push(`ficha:${a.fichaId ?? 'none'}`, ficha ? fichaTitulo(ficha) : 'Sin ficha', a)
+      }
     }
   }
 
@@ -171,6 +178,16 @@ export function HistoricosPage() {
     }
     return map
   }, [acciones])
+  const accionesPorEvento = useMemo(() => {
+    const map = new Map<string, AccionCorrectiva[]>()
+    for (const a of acciones) {
+      if (!a.eventoId) continue
+      const list = map.get(a.eventoId) ?? []
+      list.push(a)
+      map.set(a.eventoId, list)
+    }
+    return map
+  }, [acciones])
 
   const byFicha = new Map<string, typeof ocurrencias>()
   for (const o of ocurrencias) {
@@ -219,7 +236,7 @@ export function HistoricosPage() {
     acciones.filter((a) => !estadoAcc || a.estado === estadoAcc),
     sortAcc,
   )
-  const gruposAcc = groupAcciones(accionesFiltradas, groupAcc, fichaMap)
+  const gruposAcc = groupAcciones(accionesFiltradas, groupAcc, fichaMap, actividadMap)
 
   const filterTools = useMemo<FilterTool[]>(() => {
     if (tab === 'acciones') {
@@ -264,7 +281,7 @@ export function HistoricosPage() {
                   ['fecha', 'Fecha'],
                   ['prioridad', 'Prioridad'],
                   ['estado', 'Estado'],
-                  ['ficha', 'Ficha'],
+                  ['ficha', 'Origen'],
                 ] as const
               ).map(([id, label]) => (
                 <button
@@ -439,7 +456,7 @@ export function HistoricosPage() {
                         encargado={act ? encargadoMap[act.encargadoId ?? ''] : undefined}
                         ejecucion={ejecucionEventoMap[e.id]}
                         variant="fecha"
-                        acciones={[]}
+                        acciones={accionesPorEvento.get(e.id) ?? []}
                         open={openOcc === e.id}
                         onToggle={() => toggleOcc(e.id)}
                       />
@@ -494,7 +511,7 @@ export function HistoricosPage() {
                           encargado={act ? encargadoMap[act.encargadoId ?? ''] : undefined}
                           ejecucion={ejecucionEventoMap[e.id]}
                           variant="ficha"
-                          acciones={[]}
+                          acciones={accionesPorEvento.get(e.id) ?? []}
                           open={openOcc === e.id}
                           onToggle={() => toggleOcc(e.id)}
                         />
@@ -516,7 +533,7 @@ export function HistoricosPage() {
             <div className="table-card">
               <div className="table-head table-cols-hist-acc">
                 <span>Registro</span>
-                <span className="col-md">Ficha</span>
+                <span className="col-md">Origen</span>
                 <span className="col-md">Fecha</span>
                 <span className="col-md">Prioridad</span>
                 <span>Estado</span>
@@ -525,22 +542,27 @@ export function HistoricosPage() {
                 <section key={grupo.key}>
                   {grupo.label ? <div className="table-section">{grupo.label}</div> : null}
                   {grupo.items.map((a) => {
-                    const ficha = fichaMap[a.fichaId]
+                    const ficha = a.fichaId ? fichaMap[a.fichaId] : undefined
+                    const act = a.actividadId ? actividadMap[a.actividadId] : undefined
                     const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
-                    const to = a.ocurrenciaId ? `/ocurrencias/${a.ocurrenciaId}` : `/fichas/${a.fichaId}`
+                    const origen = act ? actividadTitulo(act) : ficha ? fichaTitulo(ficha) : ''
                     return (
-                      <Link key={a.id} className="table-row table-cols-hist-acc" to={to}>
+                      <Link key={a.id} className="table-row table-cols-hist-acc" to={accionHref(a)}>
                         <span className="table-cell">
                           <strong>{a.texto}</strong>
                           <span className="muted col-sm-only">
-                            {ficha ? fichaTitulo(ficha) : ''}
-                            {a.fechaObjetivo ? `${ficha ? ' · ' : ''}${formatDate(a.fechaObjetivo)}` : ''}
+                            {origen}
+                            {a.fechaObjetivo ? `${origen ? ' · ' : ''}${formatDate(a.fechaObjetivo)}` : ''}
                             {' · '}
                             <PrioridadMark prioridad={prioridadOf(a)} />
                           </span>
                         </span>
                         <span className="col-md">
-                          <FichaTitle ficha={ficha} color={bloque?.color} />
+                          {act ? (
+                            <ActividadTitle actividad={act} />
+                          ) : (
+                            <FichaTitle ficha={ficha} color={bloque?.color} />
+                          )}
                         </span>
                         <span className="col-md muted table-nowrap">
                           {a.fechaObjetivo ? formatDate(a.fechaObjetivo) : '—'}

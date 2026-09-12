@@ -55,6 +55,14 @@ function titleFor(pathname: string, search = ''): string {
     if (tab === 'encargados') return 'Encargados'
     if (tab === 'bloques') return 'Bloques'
   }
+  if (pathname === '/ajustes') {
+    const tab = new URLSearchParams(search).get('tab')
+    if (tab === 'nombres') return 'Nombres'
+    if (tab === 'avisos') return 'Avisos'
+    if (tab === 'estados') return 'Estados'
+    if (tab === 'acerca') return 'Acerca de'
+    return 'Copia de seguridad'
+  }
   return TITLES[pathname] ?? 'MaintManage'
 }
 

@@ -1,8 +1,19 @@
-import type { Actividad, TipoActividad } from '../db/types'
+import type { Actividad, EstadoOcurrencia, TipoActividad, TipoActividadDef } from '../db/types'
 import { tipoActividadLabel, tipoActividadOf } from '../db/types'
 
-export function actividadTitulo(actividad: Pick<Actividad, 'titulo' | 'tipo'>): string {
-  return actividad.titulo?.trim() || tipoActividadLabel(actividad.tipo)
+const ESTADO_RANK: Record<EstadoOcurrencia, number> = {
+  vencida: 0,
+  pendiente: 1,
+  proxima: 2,
+  planificada: 3,
+  ejecutada: 4,
+}
+
+export function actividadTitulo(
+  actividad: Pick<Actividad, 'titulo' | 'tipo'>,
+  extras?: TipoActividadDef[],
+): string {
+  return actividad.titulo?.trim() || tipoActividadLabel(actividad.tipo, extras)
 }
 
 export function compareActividadesByTitulo(
@@ -19,4 +30,21 @@ export function compareActividadesByTitulo(
 
 export function tipoActividadGroupLabel(tipo: TipoActividad | string): string {
   return tipoActividadLabel(tipo)
+}
+
+export function eventoVigente<T extends { estado: EstadoOcurrencia; fechaProgramada?: string }>(
+  eventos: T[],
+): T | undefined {
+  if (!eventos.length) return undefined
+  return [...eventos].sort((a, b) => {
+    const byEstado = ESTADO_RANK[a.estado] - ESTADO_RANK[b.estado]
+    if (byEstado) return byEstado
+    return (a.fechaProgramada ?? '').localeCompare(b.fechaProgramada ?? '')
+  })[0]
+}
+
+export function estadoVigente(
+  eventos: { estado: EstadoOcurrencia; fechaProgramada?: string }[],
+): EstadoOcurrencia | undefined {
+  return eventoVigente(eventos)?.estado
 }

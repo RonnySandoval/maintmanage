@@ -1,10 +1,10 @@
 import {
-  BACKUP_INTERVAL_MS,
   downloadBlob,
   exportBackup,
   getUsableBackupFolder,
   hasUserData,
   markBackupDone,
+  nextBackupAtOf,
   writeBackupToFolder,
 } from '../db/backup'
 import { db } from '../db'
@@ -22,9 +22,10 @@ function backupNeeded(
   now: number,
   lastBackupAt: number | undefined,
   lastChangedAt: number | undefined,
+  dueAt: number,
 ): boolean {
   if (!lastBackupAt) return true
-  if (now - lastBackupAt < BACKUP_INTERVAL_MS) return false
+  if (now < dueAt) return false
   if (lastChangedAt && lastChangedAt <= lastBackupAt) return false
   return true
 }
@@ -39,7 +40,8 @@ async function runAutoBackupUnlocked(): Promise<AutoBackupResult> {
   }
 
   const now = Date.now()
-  if (!backupNeeded(now, ajustes.lastBackupAt, ajustes.lastChangedAt)) {
+  const dueAt = nextBackupAtOf(ajustes, now)
+  if (!backupNeeded(now, ajustes.lastBackupAt, ajustes.lastChangedAt, dueAt)) {
     return { status: 'skipped' }
   }
 

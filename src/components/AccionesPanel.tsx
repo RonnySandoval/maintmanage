@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import {
@@ -15,28 +15,40 @@ import {
 } from '../db/types'
 import { createId } from '../lib/ids'
 import { formatDate } from '../lib/dates'
+import { accionLabel, accionesTitulo, useAliases } from '../lib/labels'
 import { PrioridadMark } from './PrioridadMark'
 
 export function AccionesPanel({
   fichaId,
+  actividadId,
   ocurrenciaId,
+  eventoId,
   onlyCorrectiva = false,
 }: {
-  fichaId: string
+  fichaId?: string
+  actividadId?: string
   ocurrenciaId?: string
+  eventoId?: string
   onlyCorrectiva?: boolean
 }) {
+  const aliases = useAliases()
   const acciones =
     useLiveQuery(async () => {
-      const rows = await db.accionesCorrectivas.where('fichaId').equals(fichaId).toArray()
-      const scoped = ocurrenciaId
-        ? rows.filter((a) => a.ocurrenciaId === ocurrenciaId)
-        : rows
+      const rows = fichaId
+        ? await db.accionesCorrectivas.where('fichaId').equals(fichaId).toArray()
+        : actividadId
+          ? await db.accionesCorrectivas.where('actividadId').equals(actividadId).toArray()
+          : []
+      const scoped = eventoId
+        ? rows.filter((a) => a.eventoId === eventoId)
+        : ocurrenciaId
+          ? rows.filter((a) => a.ocurrenciaId === ocurrenciaId)
+          : rows
       const typed = onlyCorrectiva
         ? scoped.filter((a) => tipoAccionOf(a) === 'correctiva')
         : scoped
       return typed.sort((a, b) => b.createdAt - a.createdAt)
-    }, [fichaId, ocurrenciaId, onlyCorrectiva]) ?? []
+    }, [fichaId, actividadId, ocurrenciaId, eventoId, onlyCorrectiva]) ?? []
 
   const [tipo, setTipo] = useState<TipoAccion>('correctiva')
   const [texto, setTexto] = useState('')
@@ -67,8 +79,10 @@ export function AccionesPanel({
     const now = Date.now()
     await db.accionesCorrectivas.add({
       id: createId(),
-      fichaId,
-      ocurrenciaId,
+      fichaId: fichaId || undefined,
+      ocurrenciaId: ocurrenciaId || undefined,
+      actividadId: actividadId || undefined,
+      eventoId: eventoId || undefined,
       tipo: nextTipo,
       texto: texto.trim(),
       estado,
@@ -90,7 +104,7 @@ export function AccionesPanel({
     if (editId === id) setEditId(null)
   }
 
-  const titulo = onlyCorrectiva ? 'Acciones correctivas' : 'Acciones y recomendaciones'
+  const titulo = accionesTitulo(onlyCorrectiva, aliases)
 
   return (
     <div className={`card accordion-panel${open ? '' : ' is-collapsed'}`}>
@@ -100,14 +114,17 @@ export function AccionesPanel({
         aria-expanded={open}
         onClick={() => setOpen((was) => !was)}
       >
-        <span>
-          {titulo}
-          {!open && acciones.length ? (
-            <span className="muted" style={{ fontWeight: 500 }}>
-              {' · '}
-              {acciones.length}
-            </span>
-          ) : null}
+        <span className="accordion-label">
+          <ListChecks size={16} />
+          <span>
+            {titulo}
+            {!open && acciones.length ? (
+              <span className="muted" style={{ fontWeight: 500 }}>
+                {' · '}
+                {acciones.length}
+              </span>
+            ) : null}
+          </span>
         </span>
         <ChevronDown size={18} className={open ? 'is-open' : ''} />
       </button>
@@ -121,20 +138,20 @@ export function AccionesPanel({
             className={`chip compact${tipo === 'correctiva' ? ' active' : ''}`}
             onClick={() => setTipo('correctiva')}
           >
-            Acción correctiva
+            {accionLabel('correctiva', aliases)}
           </button>
           <button
             type="button"
             className={`chip compact${tipo === 'recomendacion' ? ' active' : ''}`}
             onClick={() => setTipo('recomendacion')}
           >
-            Recomendación
+            {accionLabel('recomendacion', aliases)}
           </button>
         </div>
         )}
         <div className="field">
           <label htmlFor="accion-texto">
-            {tipo === 'recomendacion' ? 'Recomendación' : 'Acción correctiva'}
+            {accionLabel(tipo === 'recomendacion' ? 'recomendacion' : 'correctiva', aliases)}
           </label>
           <input
             id="accion-texto"
@@ -218,14 +235,14 @@ export function AccionesPanel({
                   className={`chip compact${filtroTipo === 'correctiva' ? ' active' : ''}`}
                   onClick={() => setFiltroTipo('correctiva')}
                 >
-                  Correctivas
+                  {accionLabel('correctiva', aliases)}
                 </button>
                 <button
                   type="button"
                   className={`chip compact${filtroTipo === 'recomendacion' ? ' active' : ''}`}
                   onClick={() => setFiltroTipo('recomendacion')}
                 >
-                  Recomendadas
+                  {accionLabel('recomendacion', aliases)}
                 </button>
               </div>
             )}
@@ -278,7 +295,7 @@ export function AccionesPanel({
                 <span className="table-cell">
                   <strong>{a.texto}</strong>
                   <span className="muted col-sm-only">
-                    {tipoAccionLabel(tipoAccionOf(a))}
+                    {tipoAccionLabel(tipoAccionOf(a), aliases)}
                     {tipoAccionOf(a) === 'correctiva' ? (
                       <>
                         {' · '}
@@ -288,7 +305,7 @@ export function AccionesPanel({
                     {a.fechaObjetivo ? ` · ${formatDate(a.fechaObjetivo)}` : ''}
                   </span>
                 </span>
-                <span className="col-md muted">{tipoAccionLabel(tipoAccionOf(a))}</span>
+                <span className="col-md muted">{tipoAccionLabel(tipoAccionOf(a), aliases)}</span>
                 <span className="col-md muted table-nowrap">
                   {a.fechaObjetivo ? formatDate(a.fechaObjetivo) : '—'}
                 </span>
@@ -337,6 +354,7 @@ function AccionEditor({
   onDone: () => void
   onlyCorrectiva?: boolean
 }) {
+  const aliases = useAliases()
   const [tipo, setTipo] = useState<TipoAccion>(tipoAccionOf(accion))
   const [texto, setTexto] = useState(accion.texto)
   const [estado, setEstado] = useState<EstadoCorrectiva>(accion.estado)
@@ -375,14 +393,14 @@ function AccionEditor({
           className={`chip compact${tipo === 'correctiva' ? ' active' : ''}`}
           onClick={() => setTipo('correctiva')}
         >
-          Acción correctiva
+          {accionLabel('correctiva', aliases)}
         </button>
         <button
           type="button"
           className={`chip compact${tipo === 'recomendacion' ? ' active' : ''}`}
           onClick={() => setTipo('recomendacion')}
         >
-          Recomendación
+          {accionLabel('recomendacion', aliases)}
         </button>
       </div>
       )}

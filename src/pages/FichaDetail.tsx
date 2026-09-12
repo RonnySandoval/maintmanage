@@ -166,7 +166,7 @@ export function FichaDetailPage() {
             <h2 style={{ marginBottom: 4 }}>
               <FichaTitle ficha={ficha} color={bloque?.color} />
             </h2>
-            <p className="muted" style={{ margin: 0 }}>
+            <p className="muted occ-meta" style={{ margin: 0 }}>
               <span
                 className="color-dot"
                 style={{
@@ -181,31 +181,39 @@ export function FichaDetailPage() {
               {` · ${frecuenciaLabel(ficha.frecuencia)}`}
             </p>
           </div>
-          <div className="row" style={{ flexWrap: 'wrap' }}>
-            <Link className="btn btn-edit" to={`/fichas/${ficha.id}/editar`}>
+        </div>
+        {telefonoEncargado ? (
+          <p className="muted phone-line">
+            Tel. {telefonoEncargado}
+            <CopyText text={telefonoEncargado} label="Copiar teléfono" />
+          </p>
+        ) : null}
+        {encargado?.congregacion ? (
+          <p className="muted">Congregación: {encargado.congregacion}</p>
+        ) : null}
+        {ficha.notas ? <p>{ficha.notas}</p> : null}
+        <div className="card-toolbar">
+          <ShareMenu title={fichaTitulo(ficha)} text={shareText} files={shareFiles} />
+          <div className="row">
+            <Link
+              className="icon-btn icon-btn-edit"
+              to={`/fichas/${ficha.id}/editar`}
+              aria-label="Editar"
+              title="Editar"
+            >
               <Pencil size={16} />
-              Editar
             </Link>
-            <button type="button" className="btn btn-danger" onClick={() => void remove()}>
+            <button
+              type="button"
+              className="icon-btn icon-btn-delete"
+              aria-label="Eliminar"
+              title="Eliminar"
+              onClick={() => void remove()}
+            >
               <Trash2 size={16} />
-              Eliminar
             </button>
           </div>
         </div>
-        {telefonoEncargado || encargado?.congregacion ? (
-          <p className="muted phone-line">
-            {telefonoEncargado ? (
-              <>
-                Tel. {telefonoEncargado}
-                <CopyText text={telefonoEncargado} label="Copiar teléfono" />
-              </>
-            ) : null}
-            {encargado?.congregacion && telefonoEncargado ? ' · ' : ''}
-            {encargado?.congregacion ? `Congregación: ${encargado.congregacion}` : ''}
-          </p>
-        ) : null}
-        {ficha.notas ? <p>{ficha.notas}</p> : null}
-        <ShareMenu title={fichaTitulo(ficha)} text={shareText} files={shareFiles} />
       </div>
 
       <div className="card">

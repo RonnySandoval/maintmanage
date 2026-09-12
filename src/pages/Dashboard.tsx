@@ -14,6 +14,7 @@ import {
 import { db } from '../db'
 import { bloqueColorVar } from '../lib/colors'
 import { formatDate, inCurrentQuarter, quarterLabel } from '../lib/dates'
+import { accionesTitulo, label, useAliases } from '../lib/labels'
 import {
   ESTADOS_CORRECTIVA,
   esExtraordinaria,
@@ -29,6 +30,7 @@ import { PrioridadMark } from '../components/PrioridadMark'
 import { FichaTitle } from '../components/FichaTitle'
 import { RestorePanel } from '../components/RestorePanel'
 import { isRestoreSkipped, skipRestore } from '../lib/restoreSkip'
+import { accionHref } from '../lib/acciones'
 import { useSettled } from '../hooks/useSettled'
 import { useTiposActividad } from '../hooks/useTiposActividad'
 
@@ -86,6 +88,7 @@ export function DashboardPage() {
     ejecuciones: await db.ejecuciones.count(),
   }))
   const tipos = useTiposActividad()
+  const aliases = useAliases()
   const [skipRestoreUi, setSkipRestoreUi] = useState(isRestoreSkipped)
   const loaded =
     ocurrencias !== undefined &&
@@ -110,7 +113,7 @@ export function DashboardPage() {
     [bloques],
   )
 
-  const trimestre = quarterLabel()
+  const trimestre = quarterLabel(new Date(), label('trimestre', aliases))
   const occsTrimestre = occs.filter((o) => inCurrentQuarter(o.fechaProgramada))
   const evtsTrimestre = evts.filter((e) => inCurrentQuarter(e.fechaProgramada))
   const delTrimestre = occsTrimestre
@@ -187,7 +190,7 @@ export function DashboardPage() {
         <EmptyState
           icon={<ClipboardList size={36} />}
           title="Aún no hay fichas ni actividades"
-          text="Crea bloques, encargados, fichas de inspección o actividades sueltas (reparación, compra, limpieza…)."
+          text={`Crea bloques, encargados, fichas de ${label('inspeccion', aliases)} o actividades sueltas (${label('reparacion', aliases)}, ${label('compra', aliases)}, ${label('limpieza', aliases)}…).`}
           action={
             <div className="row" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
               <Link className="btn btn-add" to="/fichas?tab=bloques">
@@ -209,7 +212,7 @@ export function DashboardPage() {
   return (
     <div className="dash">
       <header className="dash-hero">
-        <p className="dash-kicker">Trimestre en curso</p>
+        <p className="dash-kicker">{label('trimestre', aliases)} en curso</p>
         <h2 className="dash-title">{trimestre}</h2>
         <p className="dash-sub">
           {ready ? (
@@ -221,7 +224,7 @@ export function DashboardPage() {
               · {counts.progreso}% ejecutado
             </>
           ) : (
-            'Calculando trimestre…'
+            `Calculando ${label('trimestre', aliases)}…`
           )}
         </p>
       </header>
@@ -275,7 +278,7 @@ export function DashboardPage() {
         <Link className="card kpi card-click tone-correctiva" to="/historicos">
           <div className="kpi-head">
             <ShieldAlert size={16} aria-hidden />
-            <div className="label">Acciones correctivas</div>
+            <div className="label">{accionesTitulo(true, aliases)}</div>
           </div>
           <div className="value kpi-frac">
             {ready ? (
@@ -295,7 +298,7 @@ export function DashboardPage() {
 
       <div className="card dash-progress">
         <div className="row-spread" style={{ marginBottom: '0.55rem' }}>
-          <strong>Avance del trimestre</strong>
+          <strong>Avance del {label('trimestre', aliases)}</strong>
           <span className="dash-pct">{ready ? `${counts.progreso}%` : '—'}</span>
         </div>
         <div className="progress" aria-label={`Avance ${counts?.progreso ?? 0} por ciento`}>
@@ -308,7 +311,9 @@ export function DashboardPage() {
         <Link to="/cronograma">Ver cronograma</Link>
       </div>
       {agenda.length === 0 ? (
-        <div className="card muted">No hay actividades en este trimestre.</div>
+        <div className="card muted">
+          No hay actividades en este {label('trimestre', aliases)}.
+        </div>
       ) : (
         <div className="list">
           {agenda.map((item) => {
@@ -375,18 +380,19 @@ export function DashboardPage() {
       {accionesAbiertas.length > 0 ? (
         <div style={{ marginTop: '1.25rem' }}>
           <div className="page-head">
-            <h2 className="title-sm">Acciones y recomendaciones abiertas</h2>
+            <h2 className="title-sm">{accionesTitulo(false, aliases)} abiertas</h2>
             <Link to="/historicos">Ver histórico</Link>
           </div>
           <div className="list">
             {accionesAbiertas.slice(0, 5).map((a) => {
-              const ficha = fichaMap[a.fichaId]
+              const ficha = a.fichaId ? fichaMap[a.fichaId] : undefined
+              const act = a.actividadId ? actividadMap[a.actividadId] : undefined
               const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
               return (
                 <Link
                   key={a.id}
                   className="card card-click dash-item"
-                  to={a.ocurrenciaId ? `/ocurrencias/${a.ocurrenciaId}` : `/fichas/${a.fichaId}`}
+                  to={accionHref(a)}
                 >
                   <div className="row-spread">
                     <strong>{a.texto}</strong>
@@ -396,8 +402,12 @@ export function DashboardPage() {
                   </div>
                   <div className="muted occ-meta">
                     {tipoAccionOf(a) === 'correctiva' ? <PrioridadMark prioridad={prioridadOf(a)} /> : null}
-                    {tipoAccionLabel(tipoAccionOf(a))} ·{' '}
-                    <FichaTitle ficha={ficha} color={bloque?.color} />
+                    {tipoAccionLabel(tipoAccionOf(a), aliases)} ·{' '}
+                    {act ? (
+                      <ActividadTitle actividad={act} />
+                    ) : (
+                      <FichaTitle ficha={ficha} color={bloque?.color} />
+                    )}
                   </div>
                 </Link>
               )

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ChevronDown, Trash2 } from 'lucide-react'
+import { ChevronDown, CircleCheck, Pencil, Trash2 } from 'lucide-react'
 import { db } from '../db'
 import { esExtraordinaria, esOcurrenciaProgramada } from '../db/types'
 import { formatFechaProgramada, monthLabel } from '../lib/dates'
@@ -132,11 +132,11 @@ export function OcurrenciaDetailPage() {
           </div>
           <StatusBadge estado={ocurrencia.estado} />
         </div>
-        <ShareMenu title={fichaTitulo(currentFicha)} text={shareText} files={shareFiles} />
-        <div className="card-delete-corner">
+        <div className="card-toolbar">
+          <ShareMenu title={fichaTitulo(currentFicha)} text={shareText} files={shareFiles} />
           <button
             type="button"
-            className="icon-btn icon-btn-delete discreet"
+            className="icon-btn icon-btn-delete"
             aria-label={removing ? 'Eliminando…' : 'Eliminar inspección'}
             title="Eliminar inspección"
             onClick={() => void removeOcc()}
@@ -154,15 +154,18 @@ export function OcurrenciaDetailPage() {
           aria-expanded={ejecOpen}
           onClick={() => setEjecOpen((was) => !was)}
         >
-          <span>
-            {ejecucion ? 'Editar ejecución' : 'Marcar como ejecutada'}
-            {ejecucion && !ejecOpen ? (
-              <span className="muted" style={{ fontWeight: 500 }}>
-                {' · '}
-                {ejecucion.fechaReal}
-                {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
-              </span>
-            ) : null}
+          <span className="accordion-label">
+            {ejecucion ? <Pencil size={16} /> : <CircleCheck size={16} />}
+            <span>
+              {ejecucion ? 'Editar ejecución' : 'Marcar como ejecutada'}
+              {ejecucion && !ejecOpen ? (
+                <span className="muted" style={{ fontWeight: 500 }}>
+                  {' · '}
+                  {ejecucion.fechaReal}
+                  {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
+                </span>
+              ) : null}
+            </span>
           </span>
           <ChevronDown size={18} className={ejecOpen ? 'is-open' : ''} />
         </button>

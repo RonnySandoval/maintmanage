@@ -472,6 +472,8 @@ button.nuevo-fab-item {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 1rem;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .card + .card {
@@ -678,6 +680,33 @@ button.nuevo-fab-item {
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
+  min-width: 0;
+}
+
+.card .row-spread {
+  align-items: flex-start;
+}
+
+.card .row-spread > * {
+  min-width: 0;
+}
+
+.card h2,
+.card h3,
+.card p,
+.card .ficha-title {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.card .ficha-title {
+  white-space: normal;
+}
+
+.card .badge {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .grow {
@@ -889,7 +918,10 @@ button.nuevo-fab-item {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  margin: 0 3.25rem 0.75rem 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 0.75rem;
   padding: 0 0.7rem;
   min-height: 42px;
   background: var(--bg-elev);
@@ -898,11 +930,12 @@ button.nuevo-fab-item {
   color: var(--text-muted);
 }
 
-.search-field.search-field-full {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  margin-right: 0;
+.row > .search-field,
+.filters > .search-field {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  margin-bottom: 0;
 }
 
 .search-field:focus-within {
@@ -1154,16 +1187,28 @@ button.nuevo-fab-item {
   grid-template-columns: 1fr 1fr 1fr 1fr;
 }
 
+.seg-toggle.tabs-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .seg-toggle.tabs-3 button,
-.seg-toggle.tabs-4 button {
+.seg-toggle.tabs-4 button,
+.seg-toggle.tabs-5 button {
   padding: 0 0.35rem;
   font-size: 0.82rem;
 }
 
-.seg-toggle.tabs-4 button {
+.seg-toggle.tabs-4 button,
+.seg-toggle.tabs-5 button {
   gap: 0.25rem;
   font-size: 0.75rem;
   padding: 0 0.2rem;
+}
+
+@media (max-width: 520px) {
+  .seg-toggle.tabs-5 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .seg-toggle button {
@@ -1293,6 +1338,36 @@ button.nuevo-fab-item {
   display: flex;
   justify-content: flex-end;
   margin-top: 0.55rem;
+}
+
+.card-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.card-toolbar .row {
+  flex-wrap: nowrap;
+  gap: 0.15rem;
+}
+
+.card-toolbar-actions {
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.card-toolbar-actions .btn {
+  flex-shrink: 0;
+}
+
+.accordion-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
 }
 
 .icon-btn-delete.discreet {
@@ -2971,7 +3046,10 @@ a.table-row:focus-visible {
   align-items: center;
   gap: 0.15rem;
   min-width: 0;
-  white-space: nowrap;
+  max-width: 100%;
+  flex-wrap: wrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", "SF Mono", Consolas, monospace;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
@@ -3070,6 +3148,39 @@ a.table-row:focus-visible {
 
 .backup-toggle input {
   margin-top: 0.2rem;
+}
+
+.backup-fields,
+.alias-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.backup-fields .field,
+.alias-grid .field {
+  margin-bottom: 0;
+}
+
+.file-picker-hint {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+}
+
+.card.settings-nested {
+  margin-top: 0.9rem;
+  box-shadow: none;
+  border-style: dashed;
+}
+
+.accordion-body > .title-sm {
+  margin-top: 0.35rem;
+}
+
+.title-sm .accordion-label {
+  font: inherit;
+  color: inherit;
 }
 
 .restore-panel {
