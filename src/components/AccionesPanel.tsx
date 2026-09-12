@@ -356,7 +356,7 @@ function AccionEditor({
   const aliases = useAliases()
   const [tipo, setTipo] = useState<TipoAccion>(tipoAccionOf(accion))
   const [texto, setTexto] = useState(accion.texto)
-  const [estado, setEstado] = useState<EstadoCorrectiva>(accion.estado)
+  const estado = accion.estado
   const [fecha, setFecha] = useState(accion.fechaObjetivo || '')
   const [prioridad, setPrioridad] = useState<PrioridadAccion>(prioridadOf(accion))
   const [error, setError] = useState('')
