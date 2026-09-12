@@ -777,6 +777,65 @@ p {
   gap: 0.3rem;
 }
 
+.estado-toggle {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 0.4rem;
+  background: var(--bg-muted);
+  border-radius: 12px;
+}
+
+.estado-toggle button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.06rem;
+  min-width: 0;
+  min-height: 0;
+  padding: 0.22rem 0.08rem 0.18rem;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: clamp(0.52rem, 2.55vw, 0.68rem);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  cursor: pointer;
+}
+
+.estado-toggle .sym {
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.estado-toggle button > span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.estado-toggle button:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--bg-elev) 70%, transparent);
+}
+
+.estado-toggle button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.estado-toggle button.active {
+  background: var(--bg-elev);
+  box-shadow: var(--shadow);
+  color: var(--accent);
+}
+
 .chip.compact {
   min-height: 28px;
   padding: 0.12rem 0.55rem;
@@ -1336,6 +1395,7 @@ a.table-row:focus-visible {
 
 .page:has(.year-grid) {
   max-width: min(1280px, 100%);
+  padding-inline: 0.7rem;
 }
 
 .ficha-form.card {
@@ -1465,20 +1525,22 @@ a.table-row:focus-visible {
 }
 
 .grid-year-label {
-  font-size: 0.92rem;
-  padding-left: 0.15rem;
+  font-size: 0.8rem;
+  padding-left: 0.1rem;
+  white-space: nowrap;
 }
 
 .year-grid-chrome .grid-window {
-  flex: 1;
-  min-width: min(100%, 196px);
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .zoom-stack {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
-  gap: 0.35rem;
+  flex: 0 0 auto;
+  gap: 0.25rem;
   margin-left: auto;
 }
 
@@ -1488,27 +1550,35 @@ a.table-row:focus-visible {
   gap: 0;
   background: color-mix(in srgb, var(--bg-muted) 72%, var(--bg-elev));
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 2px;
+  border-radius: 9px;
+  padding: 1px;
 }
 
 .zoom-label {
-  font-size: 0.66rem;
+  font-size: 0.58rem;
   font-weight: 750;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--text-muted);
-  padding: 0 0.4rem 0 0.5rem;
+  padding: 0 0.18rem 0 0.28rem;
+}
+
+.zoom-split {
+  width: 1px;
+  height: 1.05rem;
+  margin: 0 0.12rem;
+  background: var(--border);
+  flex-shrink: 0;
 }
 
 .zoom-controls .btn {
-  width: 32px;
-  min-height: 32px;
+  width: 26px;
+  min-height: 26px;
   padding: 0;
   border: none;
   box-shadow: none;
   background: transparent;
-  border-radius: 8px;
+  border-radius: 7px;
 }
 
 .zoom-controls .btn:hover:not(:disabled) {
@@ -1520,19 +1590,24 @@ a.table-row:focus-visible {
 }
 
 .grid-window {
-  gap: 0.3rem;
+  gap: 0.12rem;
 }
 
 .grid-window strong {
   text-align: center;
-  font-size: 0.86rem;
+  font-size: 0.72rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .grid-window .btn {
-  min-height: 32px;
-  width: 32px;
+  min-height: 26px;
+  width: 26px;
   padding: 0;
-  border-radius: 8px;
+  border-radius: 7px;
+  flex-shrink: 0;
 }
 
 .ficha-num {
@@ -1607,6 +1682,10 @@ a.table-row:focus-visible {
     padding: 1.4rem 1.6rem 2rem;
   }
 
+  .page:has(.year-grid) {
+    padding-inline: 1.6rem;
+  }
+
   .page:has(.ficha-form) {
     padding-top: 1.1rem;
     padding-bottom: 2rem;
@@ -1649,11 +1728,11 @@ a.table-row:focus-visible {
 
 .year-grid-chrome {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.4rem 0.55rem;
-  padding: 0.42rem 0.5rem 0.42rem 0.6rem;
+  gap: 0.28rem 0.35rem;
+  padding: 0.26rem 0.32rem;
   border-bottom: 1px solid var(--border);
   background:
     linear-gradient(

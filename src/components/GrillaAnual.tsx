@@ -254,7 +254,7 @@ export function GrillaAnual({
                 onClick={() => step(-3)}
                 aria-label="Periodo anterior"
               >
-                <ChevronLeft size={18} />
+                <ChevronLeft size={16} />
               </button>
               <strong>{rangeLabel}</strong>
               <button
@@ -264,15 +264,15 @@ export function GrillaAnual({
                 onClick={() => step(3)}
                 aria-label="Periodo siguiente"
               >
-                <ChevronRight size={18} />
+                <ChevronRight size={16} />
               </button>
             </div>
           ) : (
             <strong className="grid-year-label">{year}</strong>
           )}
           <div className="zoom-stack">
-            <div className="zoom-controls" role="group" aria-label="Meses visibles">
-              <span className="zoom-label">Meses</span>
+            <div className="zoom-controls" role="group" aria-label="Zoom de meses y ficha">
+              <span className="zoom-label">Mes</span>
               <button
                 type="button"
                 className="btn"
@@ -280,7 +280,7 @@ export function GrillaAnual({
                 onClick={zoomOut}
                 aria-label="Ver más meses"
               >
-                <Minus size={16} />
+                <Minus size={14} />
               </button>
               <button
                 type="button"
@@ -289,10 +289,9 @@ export function GrillaAnual({
                 onClick={zoomIn}
                 aria-label="Ver menos meses"
               >
-                <Plus size={16} />
+                <Plus size={14} />
               </button>
-            </div>
-            <div className="zoom-controls" role="group" aria-label="Detalle de ficha">
+              <span className="zoom-split" aria-hidden />
               <span className="zoom-label">Ficha</span>
               <button
                 type="button"
@@ -301,7 +300,7 @@ export function GrillaAnual({
                 onClick={detailOut}
                 aria-label="Menos detalle de ficha"
               >
-                <Minus size={16} />
+                <Minus size={14} />
               </button>
               <button
                 type="button"
@@ -310,7 +309,7 @@ export function GrillaAnual({
                 onClick={detailIn}
                 aria-label="Más detalle de ficha"
               >
-                <Plus size={16} />
+                <Plus size={14} />
               </button>
             </div>
           </div>

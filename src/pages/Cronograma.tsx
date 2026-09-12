@@ -139,25 +139,28 @@ export function CronogramaPage() {
         ) : null}
       </div>
 
-      <div className="chip-row compact">
+      <div className="estado-toggle" role="group" aria-label="Estado">
         <button
           type="button"
-          className={`chip compact${!estado ? ' active' : ''}`}
+          className={!estado ? 'active' : ''}
           onClick={() => set('estado', '')}
         >
-          Todas
+          <span className="sym" aria-hidden>
+            ∗
+          </span>
+          <span>Todas</span>
         </button>
         {ESTADOS.map((e) => (
           <button
             key={e.id}
             type="button"
-            className={`chip compact${estado === e.id ? ' active' : ''}`}
+            className={estado === e.id ? 'active' : ''}
             onClick={() => set('estado', e.id)}
           >
             <span className="sym" aria-hidden>
               {SIMBOLOS_ESTADO[e.id].glyph}
             </span>
-            {e.label}
+            <span>{e.label}</span>
           </button>
         ))}
       </div>
