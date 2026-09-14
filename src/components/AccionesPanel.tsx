@@ -19,6 +19,7 @@ import { formatDate } from '../lib/dates'
 import { accionLabel, accionesTitulo, useAliases } from '../lib/labels'
 import { PrioridadMark } from './PrioridadMark'
 import { StatusBadge } from './ui'
+import { EntityCard } from './EntityCard'
 
 export function AccionesPanel({
   fichaId,
@@ -207,7 +208,7 @@ export function AccionesPanel({
         </button>
       </form>
 
-      <div className="table-card" style={{ marginTop: '0.9rem', boxShadow: 'none' }}>
+      <div style={{ marginTop: '0.9rem' }}>
         {acciones.length > 0 ? (
           <div className="acciones-filtros">
             {onlyCorrectiva ? null : (
@@ -265,77 +266,72 @@ export function AccionesPanel({
         ) : visibles.length === 0 ? (
           <p className="table-empty">Ninguna coincide con el filtro.</p>
         ) : (
-          <>
-            <div className="table-head table-cols-accion">
-              <span>Texto</span>
-              <span className="col-md">Tipo</span>
-              <span className="col-md">Fecha</span>
-              <span className="col-md">Prioridad</span>
-              <span>Estado</span>
-              <span className="table-actions"> </span>
-            </div>
+          <div className="stack" style={{ gap: '0.5rem' }}>
             {visibles.map((a) =>
             editId === a.id ? (
-              <div key={a.id} className="table-row is-editing">
+              <EntityCard key={a.id} compact nested title={<strong>{a.texto}</strong>}>
                 <AccionEditor accion={a} onDone={() => setEditId(null)} onlyCorrectiva={onlyCorrectiva} />
-              </div>
+              </EntityCard>
             ) : (
-              <div key={a.id} className="table-row table-cols-accion">
-                <span className="table-cell">
+              <EntityCard
+                key={a.id}
+                compact
+                nested
+                title={
                   <Link to={accionHref(a)}>
                     <strong>{a.texto}</strong>
                   </Link>
-                  <span className="muted col-sm-only">
-                    {tipoAccionLabel(tipoAccionOf(a), aliases)}
-                    {tipoAccionOf(a) === 'correctiva' ? (
-                      <>
-                        {' · '}
-                        <PrioridadMark prioridad={prioridadOf(a)} />
-                      </>
-                    ) : null}
-                    {a.fechaObjetivo ? ` · ${formatDate(a.fechaObjetivo)}` : ''}
-                  </span>
-                </span>
-                <span className="col-md muted">{tipoAccionLabel(tipoAccionOf(a), aliases)}</span>
-                <span className="col-md muted table-nowrap">
-                  {a.fechaObjetivo ? formatDate(a.fechaObjetivo) : '—'}
-                </span>
-                <span className="col-md">
-                  {tipoAccionOf(a) === 'correctiva' ? <PrioridadMark prioridad={prioridadOf(a)} /> : '—'}
-                </span>
-                <StatusBadge estado={estadoAgendaCorrectiva(a)} />
-                <span className="table-actions">
-                  {a.fechaObjetivo ? (
-                    <Link
-                      className="icon-btn"
-                      to={accionHref(a)}
-                      aria-label={a.estado === 'ejecutada' ? 'Ver ejecución' : 'Ejecutar'}
-                      title={a.estado === 'ejecutada' ? 'Ver ejecución' : 'Ejecutar'}
-                    >
-                      <CircleCheck size={16} />
-                    </Link>
+                }
+                badge={<StatusBadge estado={estadoAgendaCorrectiva(a)} />}
+                footer={
+                  <>
+                    <div className="row card-toolbar-actions">
+                      {a.fechaObjetivo ? (
+                        <Link
+                          className="icon-btn"
+                          to={accionHref(a)}
+                          aria-label={a.estado === 'ejecutada' ? 'Ver ejecución' : 'Ejecutar'}
+                          title={a.estado === 'ejecutada' ? 'Ver ejecución' : 'Ejecutar'}
+                        >
+                          <CircleCheck size={16} />
+                        </Link>
+                      ) : null}
+                    </div>
+                    <div className="row">
+                      <button
+                        type="button"
+                        className="icon-btn icon-btn-edit"
+                        aria-label="Editar"
+                        onClick={() => setEditId(a.id)}
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn icon-btn-delete"
+                        aria-label="Borrar"
+                        onClick={() => void remove(a.id)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </>
+                }
+              >
+                <p className="muted occ-meta">
+                  {tipoAccionLabel(tipoAccionOf(a), aliases)}
+                  {tipoAccionOf(a) === 'correctiva' ? (
+                    <>
+                      {' · '}
+                      <PrioridadMark prioridad={prioridadOf(a)} />
+                    </>
                   ) : null}
-                  <button
-                    type="button"
-                    className="icon-btn icon-btn-edit"
-                    aria-label="Editar"
-                    onClick={() => setEditId(a.id)}
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-btn icon-btn-delete"
-                    aria-label="Borrar"
-                    onClick={() => void remove(a.id)}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </span>
-              </div>
+                  {a.fechaObjetivo ? ` · ${formatDate(a.fechaObjetivo)}` : ''}
+                </p>
+              </EntityCard>
             ),
           )}
-          </>
+          </div>
         )}
       </div>
       </div>

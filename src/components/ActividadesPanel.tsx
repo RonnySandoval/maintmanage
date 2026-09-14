@@ -8,12 +8,11 @@ import {
   mesesDeFrecuencia,
   prioridadOf,
   tipoAccionOf,
-  tipoActividadColor,
   tipoActividadLabel,
 } from '../db/types'
 import { useTiposActividad } from '../hooks/useTiposActividad'
 import { accionHref, estadoAgendaCorrectiva } from '../lib/acciones'
-import { bloqueColorVar } from '../lib/colors'
+import { bloqueColorVar, kindActividadVar } from '../lib/colors'
 import { formatDate } from '../lib/dates'
 import { compareActividadesByTitulo, estadoVigente } from '../lib/actividades'
 import { accionLabel, label, useAliases } from '../lib/labels'
@@ -461,9 +460,7 @@ export function ActividadesPanel() {
                       <span
                         className="table-bar"
                         style={{
-                          background: bloqueColorVar(
-                            actividad ? tipoActividadColor(actividad.tipo, tipos) : 'rose',
-                          ),
+                          background: actividad ? kindActividadVar() : bloqueColorVar('rose'),
                         }}
                       />
                       <span className="table-cell">
@@ -497,16 +494,18 @@ export function ActividadesPanel() {
                   >
                     <span
                       className="table-bar"
-                      style={{ background: bloqueColorVar(tipoActividadColor(a.tipo, tipos)) }}
+                      style={{ background: kindActividadVar() }}
                     />
                     <span className="table-cell">
                       <span className="row" style={{ flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
                         <ActividadTitle actividad={a} />
+                        <span className="tipo-badge-inline">
+                          <TipoBadge tipo={a.tipo} />
+                        </span>
                         {vigente ? <StatusBadge estado={vigente} /> : null}
                       </span>
                       <span className="muted col-sm-only">
-                        {tipoActividadLabel(a.tipo, tipos)}
-                        {encargado ? ` · ${encargado.nombre}` : ''}
+                        {encargado ? encargado.nombre : ''}
                       </span>
                     </span>
                     <span className="col-md muted">

@@ -8,11 +8,10 @@ import {
   esExtraordinaria,
   tipoAccionLabel,
   tipoAccionOf,
-  tipoActividadColor,
   tipoActividadLabel,
   type EstadoOcurrencia,
 } from '../db/types'
-import { bloqueColorVar } from '../lib/colors'
+import { bloqueColorVar, kindActividadVar } from '../lib/colors'
 import { formatFechaProgramada, formatDateLong } from '../lib/dates'
 import { compareFichasByNumero, fichaTitulo } from '../lib/fichas'
 import { accionHref, estadoAgendaCorrectiva } from '../lib/acciones'
@@ -509,11 +508,11 @@ export function CronogramaPage() {
                   </button>
                 </div>
               ) : null}
-              <div className={`table-head table-cols-crono${showBloque ? '' : ' no-bloque'}`}>
+              <div className={`table-head table-cols-crono${ambito === 'fichas' && showBloque ? '' : ' no-bloque'}`}>
                 <span className="table-bar" aria-hidden />
                 <span>{ambito === 'fichas' ? 'Ficha' : 'Actividad'}</span>
-                {showBloque ? (
-                  <span className="col-md">{ambito === 'fichas' ? 'Bloque' : 'Tipo'}</span>
+                {ambito === 'fichas' && showBloque ? (
+                  <span className="col-md">Bloque</span>
                 ) : null}
                 <span className="col-md">Encargado</span>
                 <span>Estado</span>
@@ -541,7 +540,7 @@ export function CronogramaPage() {
                         return (
                           <Link
                             key={item.id}
-                            className={`table-row table-cols-crono${showBloque ? '' : ' no-bloque'}`}
+                            className={`table-row table-cols-crono${ambito === 'fichas' && showBloque ? '' : ' no-bloque'}`}
                             to={`/ocurrencias/${occ.id}`}
                           >
                             <span
@@ -577,25 +576,21 @@ export function CronogramaPage() {
                         return (
                           <Link
                             key={item.id}
-                            className={`table-row table-cols-crono${showBloque ? '' : ' no-bloque'}`}
+                            className="table-row table-cols-crono no-bloque"
                             to={`/eventos/${evt.id}`}
                           >
                             <span
                               className="table-bar"
-                              style={{ background: bloqueColorVar(tipoActividadColor(act.tipo, tipos)) }}
+                              style={{ background: kindActividadVar() }}
                             />
                             <span className="table-cell">
                               <span className="occ-meta">
                                 <ActividadTitle actividad={act} />
+                                <TipoBadge tipo={act.tipo} />
                                 {esExtraordinaria(evt) ? <ExtraBadge /> : null}
                               </span>
                               <span className="muted col-sm-only">{encargado?.nombre ?? ''}</span>
                             </span>
-                            {showBloque ? (
-                              <span className="col-md">
-                                <TipoBadge tipo={act.tipo} />
-                              </span>
-                            ) : null}
                             <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
                             <span className="table-nowrap">
                               <StatusBadge estado={evt.estado} />
@@ -617,29 +612,24 @@ export function CronogramaPage() {
                       return (
                         <Link
                           key={item.id}
-                          className={`table-row table-cols-crono${showBloque ? '' : ' no-bloque'}`}
+                          className="table-row table-cols-crono no-bloque"
                           to={accionHref(accion)}
                         >
                           <span
                             className="table-bar"
                             style={{
-                              background: bloqueColorVar(
-                                act ? tipoActividadColor(act.tipo, tipos) : (bloque?.color ?? 'rose'),
-                              ),
+                              background: act ? kindActividadVar() : bloqueColorVar(bloque?.color),
                             }}
                           />
                           <span className="table-cell">
                             <span className="occ-meta">
                               <strong>{accion.texto}</strong>
+                              <span className="badge badge-tipo">{tipoAccionLabel('correctiva', aliases)}</span>
                             </span>
                             <span className="muted col-sm-only">
-                              {tipoAccionLabel('correctiva', aliases)}
-                              {parent ? ` · ${parent}` : ''}
+                              {parent}
                             </span>
                           </span>
-                          {showBloque ? (
-                            <span className="col-md muted">{tipoAccionLabel('correctiva', aliases)}</span>
-                          ) : null}
                           <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
                           <span className="table-nowrap">
                             <StatusBadge estado={estadoAgendaCorrectiva(accion)} />

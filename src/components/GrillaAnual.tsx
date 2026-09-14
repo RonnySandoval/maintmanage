@@ -439,7 +439,6 @@ export function GrillaAnual({
                     currentMonth={currentMonth}
                     byActividadMonth={byActividadMonth}
                     encargado={actividad.encargadoId ? encargadoMap[actividad.encargadoId] : undefined}
-                    showBloque={showBloque}
                     showMeta={detail >= 1}
                     showFrecuencia={detail >= 2}
                     correctivaEvt={correctivaEvt}
@@ -555,7 +554,6 @@ function ActividadRow({
   currentMonth,
   byActividadMonth,
   encargado,
-  showBloque,
   showMeta,
   showFrecuencia,
   correctivaEvt,
@@ -567,7 +565,6 @@ function ActividadRow({
   currentMonth: number
   byActividadMonth: Map<string, Evento[]>
   encargado?: Encargado
-  showBloque: boolean
   showMeta: boolean
   showFrecuencia: boolean
   correctivaEvt: Set<string>
@@ -579,11 +576,9 @@ function ActividadRow({
         <Link to={`/actividades/${actividad.id}`}>
           <ActividadTitle actividad={actividad} />
         </Link>
-        {showBloque ? (
-          <span className="ficha-meta">
-            <TipoBadge tipo={actividad.tipo} />
-          </span>
-        ) : null}
+        <span className="ficha-meta">
+          <TipoBadge tipo={actividad.tipo} />
+        </span>
         {showMeta ? (
           <span className="ficha-meta">{encargado?.nombre ?? 'Sin encargado'}</span>
         ) : null}

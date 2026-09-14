@@ -1,7 +1,8 @@
 import type { Actividad } from '../db/types'
-import { tipoActividadColor } from '../db/types'
+import { tipoActividadLabel } from '../db/types'
 import { useTiposActividad } from '../hooks/useTiposActividad'
-import { bloqueColorVar } from '../lib/colors'
+import { kindActividadVar } from '../lib/colors'
+import { tipoActividadIcon } from '../lib/tipoIcons'
 import { actividadTitulo } from '../lib/actividades'
 
 export function ActividadTitle({
@@ -13,13 +14,16 @@ export function ActividadTitle({
 }) {
   const tipos = useTiposActividad()
   const text = actividad ? actividadTitulo(actividad, tipos) : 'Actividad'
-  const color = actividad ? tipoActividadColor(actividad.tipo, tipos) : undefined
+  const typeLabel = tipoActividadLabel(actividad?.tipo, tipos)
+  const Icon = tipoActividadIcon(actividad?.tipo)
   return (
     <span
-      className={`ficha-title${className ? ` ${className}` : ''}`}
-      style={color ? { color: bloqueColorVar(color) } : undefined}
+      className={`ficha-title actividad-title${className ? ` ${className}` : ''}`}
+      style={{ color: kindActividadVar() }}
+      title={typeLabel}
     >
-      {text}
+      <Icon className="tipo-icon" size={15} strokeWidth={2.25} aria-hidden />
+      <span className="actividad-title-text">{text}</span>
     </span>
   )
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ChevronDown, CircleCheck, Pencil, Trash2 } from 'lucide-react'
+import { CircleCheck, Pencil, Trash2 } from 'lucide-react'
 import { db } from '../db'
 import { esExtraordinaria, esOcurrenciaProgramada } from '../db/types'
 import { formatFechaProgramada, monthLabel } from '../lib/dates'
@@ -13,6 +13,7 @@ import { ExtraBadge, StatusBadge } from '../components/ui'
 import { FichaTitle } from '../components/FichaTitle'
 import { AccionesPanel } from '../components/AccionesPanel'
 import { EjecucionForm } from '../components/EjecucionForm'
+import { EntityCard } from '../components/EntityCard'
 
 export function OcurrenciaDetailPage() {
   const { id } = useParams()
@@ -110,75 +111,70 @@ export function OcurrenciaDetailPage() {
 
   return (
     <div className="stack">
-      <div className="card occ-head-card">
-        <div className="row-spread" style={{ marginBottom: 8, flexWrap: 'wrap' }}>
-          <div>
-            <h2 style={{ marginBottom: 4 }}>
-              <Link to={`/fichas/${currentFicha.id}`}>
-                <FichaTitle ficha={currentFicha} color={bloque?.color} />
-              </Link>
-            </h2>
-            <p className="occ-period">{periodo}</p>
-            <p className="muted occ-meta" style={{ marginBottom: 0 }}>
-              {formatFechaProgramada(
-                ocurrencia.fechaProgramada,
-                currentFicha.fechaPrecision === 'dia' ? 'dia' : 'mes',
-              )}
-              {bloque?.nombre ? ` · ${bloque.nombre}` : ''}
-              {encargado?.nombre ? ` · ${encargado.nombre}` : ''}
-              {esExtraordinaria(ocurrencia) ? <ExtraBadge /> : null}
-              {ocurrencia.estadoFijado ? <span>Fijado</span> : null}
-            </p>
-          </div>
-          <StatusBadge estado={ocurrencia.estado} />
-        </div>
-        <div className="card-toolbar">
-          <ShareMenu title={fichaTitulo(currentFicha)} text={shareText} files={shareFiles} />
-          <button
-            type="button"
-            className="icon-btn icon-btn-delete"
-            aria-label={removing ? 'Eliminando…' : 'Eliminar inspección'}
-            title="Eliminar inspección"
-            onClick={() => void removeOcc()}
-            disabled={removing}
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-      </div>
-
-      <div className={`card accordion-panel${ejecOpen ? '' : ' is-collapsed'}`}>
-        <button
-          type="button"
-          className="accordion-trigger"
-          aria-expanded={ejecOpen}
-          onClick={() => setEjecOpen((was) => !was)}
-        >
-          <span className="accordion-label">
-            {ejecucion ? <Pencil size={16} /> : <CircleCheck size={16} />}
-            <span>
-              {ejecucion ? 'Editar ejecución' : 'Marcar como ejecutada'}
-              {ejecucion && !ejecOpen ? (
-                <span className="muted" style={{ fontWeight: 500 }}>
-                  {' · '}
-                  {ejecucion.fechaReal}
-                  {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
-                </span>
-              ) : null}
-            </span>
-          </span>
-          <ChevronDown size={18} className={ejecOpen ? 'is-open' : ''} />
-        </button>
+      <EntityCard
+        className="occ-head-card"
+        title={
+          <h2>
+            <Link to={`/fichas/${currentFicha.id}`}>
+              <FichaTitle ficha={currentFicha} color={bloque?.color} />
+            </Link>
+          </h2>
+        }
+        badge={<StatusBadge estado={ocurrencia.estado} />}
+        footer={
+          <>
+            <div className="row card-toolbar-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setEjecOpen((was) => !was)}
+              >
+                {ejecucion ? <Pencil size={16} /> : <CircleCheck size={16} />}
+                {ejecucion
+                  ? ejecOpen
+                    ? 'Ocultar ejecución'
+                    : 'Editar ejecución'
+                  : 'Marcar como ejecutada'}
+              </button>
+              <ShareMenu title={fichaTitulo(currentFicha)} text={shareText} files={shareFiles} />
+            </div>
+            <button
+              type="button"
+              className="icon-btn icon-btn-delete"
+              aria-label={removing ? 'Eliminando…' : 'Eliminar inspección'}
+              title="Eliminar inspección"
+              onClick={() => void removeOcc()}
+              disabled={removing}
+            >
+              <Trash2 size={16} />
+            </button>
+          </>
+        }
+      >
+        <p className="occ-period">{periodo}</p>
+        <p className="muted occ-meta">
+          {formatFechaProgramada(
+            ocurrencia.fechaProgramada,
+            currentFicha.fechaPrecision === 'dia' ? 'dia' : 'mes',
+          )}
+          {bloque?.nombre ? ` · ${bloque.nombre}` : ''}
+          {encargado?.nombre ? ` · ${encargado.nombre}` : ''}
+          {esExtraordinaria(ocurrencia) ? <ExtraBadge /> : null}
+          {ocurrencia.estadoFijado ? <span>Fijado</span> : null}
+        </p>
         {ejecOpen ? (
-          <div className="accordion-body">
-            <EjecucionForm
-              ocurrenciaId={ocurrencia.id}
-              fichaId={currentFicha.id}
-              onSaved={() => setEjecOpen(false)}
-            />
-          </div>
+          <EjecucionForm
+            ocurrenciaId={ocurrencia.id}
+            fichaId={currentFicha.id}
+            onSaved={() => setEjecOpen(false)}
+          />
+        ) : ejecucion ? (
+          <p className="muted">
+            Realizada el {ejecucion.fechaReal}
+            {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
+          </p>
         ) : null}
-      </div>
+      </EntityCard>
 
       <AccionesPanel fichaId={currentFicha.id} ocurrenciaId={ocurrencia.id} onlyCorrectiva />
     </div>

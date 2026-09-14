@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react'
-import { ESTADOS, tipoActividadColor, tipoActividadLabel, type EstadoOcurrencia } from '../db/types'
+import { ESTADOS, tipoActividadLabel, type EstadoOcurrencia } from '../db/types'
 import { useTiposActividad } from '../hooks/useTiposActividad'
 import { label, useAliases } from '../lib/labels'
-import { bloqueColorVar } from '../lib/colors'
 import { useStatusLabels } from '../hooks/useStatusLabels'
 import { SIMBOLO_CORRECTIVA, SIMBOLOS_ESTADO } from '../lib/simbolos'
 
@@ -13,18 +12,7 @@ export function ExtraBadge() {
 export function TipoBadge({ tipo }: { tipo?: string | null }) {
   const tipos = useTiposActividad()
   const meta = tipos.find((t) => t.id === tipo)
-  const color = meta?.color ?? tipoActividadColor(tipo)
-  return (
-    <span
-      className="badge badge-tipo"
-      style={{
-        background: `color-mix(in srgb, ${bloqueColorVar(color)} 16%, var(--bg-muted))`,
-        color: bloqueColorVar(color),
-      }}
-    >
-      {meta?.label ?? tipoActividadLabel(tipo)}
-    </span>
-  )
+  return <span className="badge badge-tipo">{meta?.label ?? tipoActividadLabel(tipo)}</span>
 }
 
 export function StatusBadge({

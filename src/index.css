@@ -36,6 +36,7 @@
   --nav-h: 64px;
   --top-h: 56px;
   --sidebar-w: 232px;
+  --kind-actividad: #7c4a1e;
   --font: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
   --metal-ok: #4f5d6b;
   --metal-ok-hover: #3f4c58;
@@ -94,6 +95,7 @@
   --metal-delete: #7a7476;
   --metal-delete-hover: #8b8587;
   --metal-ink: #10151c;
+  --kind-actividad: #e0a36a;
   --app-texture:
     radial-gradient(980px 520px at 10% -12%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
     radial-gradient(720px 400px at 96% 6%, color-mix(in srgb, #1e3a5f 28%, transparent), transparent 55%),
@@ -1407,6 +1409,22 @@ a.icon-btn:hover {
   font-weight: 650;
 }
 
+.actividad-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.actividad-title .tipo-icon {
+  flex-shrink: 0;
+}
+
+.actividad-title-text {
+  min-width: 0;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -1461,6 +1479,19 @@ a.icon-btn:hover {
   text-transform: none;
   letter-spacing: 0;
   font-weight: 650;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.tipo-badge-inline {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .tipo-badge-inline {
+    display: inline-flex;
+  }
 }
 
 .prioridad {
@@ -1511,9 +1542,82 @@ a.icon-btn:hover {
   margin-top: 0.75rem;
 }
 
+.entity-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.entity-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.entity-card-title {
+  min-width: 0;
+  flex: 1;
+}
+
+.entity-card-title h2,
+.entity-card-title h3,
+.entity-card-title .title-sm {
+  margin: 0;
+}
+
+.entity-card-badge {
+  flex-shrink: 0;
+}
+
+.entity-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.entity-card-body > :first-child {
+  margin-top: 0;
+}
+
+.entity-card-body > :last-child {
+  margin-bottom: 0;
+}
+
+.entity-card-body p {
+  margin: 0;
+}
+
+.entity-card-foot,
+.card-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 0.45rem;
+}
+
+.entity-card-foot {
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.entity-card-foot .row,
 .card-toolbar .row {
   flex-wrap: nowrap;
   gap: 0.15rem;
+}
+
+.entity-card.is-compact {
+  padding: 0.75rem 0.8rem;
+  box-shadow: none;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+}
+
+.entity-card.is-compact + .entity-card.is-compact {
+  margin-top: 0.5rem;
 }
 
 .card-toolbar-actions {
@@ -2993,6 +3097,21 @@ a.table-row:focus-visible {
   overflow: hidden;
   font-size: 0.74rem;
   line-height: 1.2;
+}
+
+.year-grid .actividad-title {
+  display: inline-flex;
+  align-items: flex-start;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
+
+.year-grid .actividad-title-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 .ficha-meta {

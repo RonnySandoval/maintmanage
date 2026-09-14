@@ -19,7 +19,6 @@ import {
   prioridadOf,
   prioridadRank,
   tipoAccionOf,
-  tipoActividadColor,
   type AccionCorrectiva,
   type Actividad,
   type EstadoOcurrencia,
@@ -29,7 +28,7 @@ import {
   type Ficha,
   type Ocurrencia,
 } from '../db/types'
-import { bloqueColorVar } from '../lib/colors'
+import { bloqueColorVar, kindActividadVar } from '../lib/colors'
 import { formatDate, formatFechaProgramada } from '../lib/dates'
 import { accionHref, estadoAgendaCorrectiva } from '../lib/acciones'
 import { actividadTitulo } from '../lib/actividades'
@@ -40,8 +39,8 @@ import { PrioridadMark } from '../components/PrioridadMark'
 import { EjecucionModal } from '../components/EjecucionForm'
 import { ShareMenu } from '../components/ShareMenu'
 import { EmptyState, ExtraBadge, StatusBadge, StatusWordsToggle, TipoBadge } from '../components/ui'
+import { EntityCard } from '../components/EntityCard'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
-import { useTiposActividad } from '../hooks/useTiposActividad'
 
 type AccGroup = 'lista' | 'fecha' | 'prioridad' | 'estado' | 'ficha'
 type AccSort = 'fecha' | 'prioridad' | 'reciente'
@@ -498,7 +497,10 @@ export function HistoricosPage() {
                     return (
                       <section key={actId}>
                         <div className="table-section">
-                          <ActividadTitle actividad={act} />
+                          <span className="occ-meta">
+                            <ActividadTitle actividad={act} />
+                            {act ? <TipoBadge tipo={act.tipo} /> : null}
+                          </span>
                         </div>
                         {rows.map((e) => renderEvtRow(e, true))}
                       </section>
@@ -638,14 +640,13 @@ function EjecutadaRow({
   open: boolean
   onToggle: () => void
 }) {
-  const tipos = useTiposActividad()
   const [editOpen, setEditOpen] = useState(false)
   const item = occ ?? evento
   if (!item) return null
   const href = occ ? `/ocurrencias/${occ.id}` : `/eventos/${evento?.id}`
   const precision =
     (ficha?.fechaPrecision ?? actividad?.fechaPrecision) === 'dia' ? 'dia' : 'mes'
-  const barColor = actividad ? tipoActividadColor(actividad.tipo, tipos) : color
+  const barColor = actividad ? kindActividadVar() : bloqueColorVar(color)
   const fecha = formatFechaProgramada(item.fechaProgramada, precision)
   const shareTitle = ficha ? fichaTitulo(ficha) : actividad ? actividadTitulo(actividad) : 'Ejecución'
   const shareText = [
@@ -663,19 +664,24 @@ function EjecutadaRow({
   return (
     <div className={`hist-occ-item${open ? ' is-open' : ''}`}>
       <div className="table-row table-cols-hist-occ">
-        <span className="table-bar" style={{ background: bloqueColorVar(barColor) }} />
+        <span className="table-bar" style={{ background: barColor }} />
         <Link className="table-cell hist-occ-main" to={href}>
           {!hideTitle && ficha ? <FichaTitle ficha={ficha} color={color} /> : null}
-          {!hideTitle && actividad ? <ActividadTitle actividad={actividad} /> : null}
+          {!hideTitle && actividad ? (
+            <span className="occ-meta">
+              <ActividadTitle actividad={actividad} />
+              <TipoBadge tipo={actividad.tipo} />
+            </span>
+          ) : null}
           <span className="muted hist-occ-when">
             {fecha}
             {encargado ? ` · ${encargado.nombre}` : ''}
             {acciones.length ? ` · ▴ ${acciones.length}` : ''}
           </span>
-          {esExtraordinaria(item) || actividad ? (
+          {esExtraordinaria(item) || (hideTitle && actividad) ? (
             <span className="occ-meta">
               {esExtraordinaria(item) ? <ExtraBadge /> : null}
-              {actividad ? <TipoBadge tipo={actividad.tipo} /> : null}
+              {hideTitle && actividad ? <TipoBadge tipo={actividad.tipo} /> : null}
             </span>
           ) : null}
         </Link>
@@ -695,12 +701,15 @@ function EjecutadaRow({
       </div>
       {open ? (
         <div className="hist-occ-acciones">
-          <div className="hist-occ-ejecucion">
-            <div className="row-spread" style={{ marginBottom: 6 }}>
-              <strong>Ejecución</strong>
-              <span className="row" style={{ gap: 2 }}>
-                {ficha || actividad ? (
-                  <>
+          <EntityCard
+            nested
+            className="hist-occ-ejecucion"
+            title={<strong>Ejecución</strong>}
+            footer={
+              ficha || actividad ? (
+                <>
+                  <span />
+                  <div className="row" style={{ gap: 2 }}>
                     <button
                       type="button"
                       className="icon-btn icon-btn-edit"
@@ -711,10 +720,11 @@ function EjecutadaRow({
                       <Pencil size={16} />
                     </button>
                     <ShareMenu title={shareTitle} text={shareText} iconOnly />
-                  </>
-                ) : null}
-              </span>
-            </div>
+                  </div>
+                </>
+              ) : null
+            }
+          >
             {ejecucion ? (
               <>
                 <p>
@@ -730,7 +740,7 @@ function EjecutadaRow({
             ) : (
               <p className="muted">Sin registro de ejecución.</p>
             )}
-          </div>
+          </EntityCard>
           {acciones.length ? (
             acciones.map((a) => (
               <Link key={a.id} className="hist-occ-accion" to={accionHref(a)}>

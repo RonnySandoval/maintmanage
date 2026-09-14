@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ChevronDown, CircleCheck, Pencil, Trash2 } from 'lucide-react'
+import { CircleCheck, Pencil, Trash2 } from 'lucide-react'
 import { db } from '../db'
 import { prioridadOf, tipoAccionLabel, tipoAccionOf } from '../db/types'
 import { estadoAgendaCorrectiva } from '../lib/acciones'
@@ -12,6 +12,7 @@ import { EjecucionForm } from '../components/EjecucionForm'
 import { FichaTitle } from '../components/FichaTitle'
 import { PrioridadMark } from '../components/PrioridadMark'
 import { StatusBadge } from '../components/ui'
+import { EntityCard } from '../components/EntityCard'
 
 export function AccionDetailPage() {
   const { id } = useParams()
@@ -80,93 +81,83 @@ export function AccionDetailPage() {
   }
 
   return (
-    <div>
-      <div className="card">
-        <div className="row-spread" style={{ alignItems: 'flex-start', gap: '0.75rem' }}>
-          <div>
-            <h2 className="title-sm" style={{ margin: 0 }}>
-              {current.texto}
-            </h2>
-            <p className="muted occ-meta" style={{ margin: '0.35rem 0 0' }}>
-              <span>{tipoAccionLabel(tipo, aliases)}</span>
-              {tipo === 'correctiva' ? <PrioridadMark prioridad={prioridadOf(current)} /> : null}
-              {current.fechaObjetivo ? (
-                <span>Programada: {formatFechaProgramada(current.fechaObjetivo, 'dia')}</span>
-              ) : (
-                <span>Sin fecha programada</span>
-              )}
-            </p>
-            <p className="muted" style={{ margin: '0.35rem 0 0' }}>
-              Origen:{' '}
-              <Link to={origenHref}>
-                {actividad ? (
-                  <ActividadTitle actividad={actividad} />
-                ) : ficha ? (
-                  <FichaTitle ficha={ficha} color={bloque?.color} />
-                ) : (
-                  'Ver origen'
-                )}
-              </Link>
-              <span> · Estado propio, independiente del origen</span>
-            </p>
-          </div>
-          <StatusBadge estado={estadoAgendaCorrectiva(current)} />
-        </div>
-        <div className="card-toolbar">
-          <button
-            type="button"
-            className="icon-btn icon-btn-delete"
-            aria-label={removing ? 'Eliminando…' : 'Eliminar acción'}
-            title="Eliminar acción"
-            onClick={() => void removeAccion()}
-            disabled={removing}
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-      </div>
-
-      {canExecute ? (
-        <div className={`card accordion-panel${ejecOpen ? '' : ' is-collapsed'}`}>
-          <button
-            type="button"
-            className="accordion-trigger"
-            aria-expanded={ejecOpen}
-            onClick={() => setEjecOpen((was) => !was)}
-          >
-            <span className="accordion-label">
-              {ejecucion ? <Pencil size={16} /> : <CircleCheck size={16} />}
-              <span>
-                {ejecucion ? 'Editar ejecución' : 'Marcar como ejecutada'}
-                {ejecucion && !ejecOpen ? (
-                  <span className="muted" style={{ fontWeight: 500 }}>
-                    {' · '}
-                    {formatDate(ejecucion.fechaReal)}
-                    {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
-                  </span>
-                ) : null}
-              </span>
-            </span>
-            <ChevronDown size={18} className={ejecOpen ? 'is-open' : ''} />
-          </button>
-          {ejecOpen ? (
-            <div className="accordion-body">
-              <EjecucionForm
-                accionId={current.id}
-                fichaId={current.fichaId}
-                actividadId={current.actividadId}
-                onSaved={() => setEjecOpen(false)}
-              />
+    <div className="stack">
+      <EntityCard
+        title={<h2 className="title-sm">{current.texto}</h2>}
+        badge={<StatusBadge estado={estadoAgendaCorrectiva(current)} />}
+        footer={
+          <>
+            <div className="row card-toolbar-actions">
+              {canExecute ? (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setEjecOpen((was) => !was)}
+                >
+                  {ejecucion ? <Pencil size={16} /> : <CircleCheck size={16} />}
+                  {ejecucion
+                    ? ejecOpen
+                      ? 'Ocultar ejecución'
+                      : 'Editar ejecución'
+                    : 'Marcar como ejecutada'}
+                </button>
+              ) : null}
             </div>
-          ) : null}
-        </div>
-      ) : (
-        <div className="card">
-          <p className="muted" style={{ margin: 0 }}>
+            <button
+              type="button"
+              className="icon-btn icon-btn-delete"
+              aria-label={removing ? 'Eliminando…' : 'Eliminar acción'}
+              title="Eliminar acción"
+              onClick={() => void removeAccion()}
+              disabled={removing}
+            >
+              <Trash2 size={16} />
+            </button>
+          </>
+        }
+      >
+        <p className="muted occ-meta">
+          <span>{tipoAccionLabel(tipo, aliases)}</span>
+          {tipo === 'correctiva' ? <PrioridadMark prioridad={prioridadOf(current)} /> : null}
+          {current.fechaObjetivo ? (
+            <span>Programada: {formatFechaProgramada(current.fechaObjetivo, 'dia')}</span>
+          ) : (
+            <span>Sin fecha programada</span>
+          )}
+        </p>
+        <p className="muted">
+          Origen:{' '}
+          <Link to={origenHref}>
+            {actividad ? (
+              <ActividadTitle actividad={actividad} />
+            ) : ficha ? (
+              <FichaTitle ficha={ficha} color={bloque?.color} />
+            ) : (
+              'Ver origen'
+            )}
+          </Link>
+          <span> · Estado propio, independiente del origen</span>
+        </p>
+        {canExecute ? (
+          ejecOpen ? (
+            <EjecucionForm
+              accionId={current.id}
+              fichaId={current.fichaId}
+              actividadId={current.actividadId}
+              onSaved={() => setEjecOpen(false)}
+            />
+          ) : ejecucion ? (
+            <p className="muted">
+              Realizada el {formatDate(ejecucion.fechaReal)}
+              {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
+            </p>
+          ) : null
+        ) : (
+          <p className="muted">
             Añade una fecha programada para poder ejecutar esta {accionLabel(tipo, aliases).toLowerCase()}.
           </p>
-        </div>
-      )}
+        )}
+      </EntityCard>
     </div>
   )
 }

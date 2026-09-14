@@ -22,6 +22,7 @@ import { ExtraBadge, Modal, StatusBadge } from '../components/ui'
 import { FichaTitle } from '../components/FichaTitle'
 import { AccionesPanel } from '../components/AccionesPanel'
 import { CopyText } from '../components/CopyText'
+import { EntityCard } from '../components/EntityCard'
 
 export function FichaDetailPage() {
   const { id } = useParams()
@@ -160,28 +161,51 @@ export function FichaDetailPage() {
 
   return (
     <div className="stack">
-      <div className="card">
-        <div className="row-spread" style={{ marginBottom: '0.6rem', flexWrap: 'wrap' }}>
-          <div>
-            <h2 style={{ marginBottom: 4 }}>
-              <FichaTitle ficha={ficha} color={bloque?.color} />
-            </h2>
-            <p className="muted occ-meta" style={{ margin: 0 }}>
-              <span
-                className="color-dot"
-                style={{
-                  display: 'inline-block',
-                  margin: '0 6px 0 0',
-                  verticalAlign: 'middle',
-                  background: bloqueColorVar(bloque?.color),
-                }}
-              />
-              {bloque?.nombre}
-              {encargado ? ` · ${encargado.nombre}` : ''}
-              {` · ${frecuenciaLabel(ficha.frecuencia)}`}
-            </p>
-          </div>
-        </div>
+      <EntityCard
+        title={
+          <h2>
+            <FichaTitle ficha={ficha} color={bloque?.color} />
+          </h2>
+        }
+        footer={
+          <>
+            <ShareMenu title={fichaTitulo(ficha)} text={shareText} files={shareFiles} />
+            <div className="row">
+              <Link
+                className="icon-btn icon-btn-edit"
+                to={`/fichas/${ficha.id}/editar`}
+                aria-label="Editar"
+                title="Editar"
+              >
+                <Pencil size={16} />
+              </Link>
+              <button
+                type="button"
+                className="icon-btn icon-btn-delete"
+                aria-label="Eliminar"
+                title="Eliminar"
+                onClick={() => void remove()}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </>
+        }
+      >
+        <p className="muted occ-meta">
+          <span
+            className="color-dot"
+            style={{
+              display: 'inline-block',
+              margin: '0 6px 0 0',
+              verticalAlign: 'middle',
+              background: bloqueColorVar(bloque?.color),
+            }}
+          />
+          {bloque?.nombre}
+          {encargado ? ` · ${encargado.nombre}` : ''}
+          {` · ${frecuenciaLabel(ficha.frecuencia)}`}
+        </p>
         {telefonoEncargado ? (
           <p className="muted phone-line">
             Tel. {telefonoEncargado}
@@ -192,49 +216,22 @@ export function FichaDetailPage() {
           <p className="muted">Congregación: {encargado.congregacion}</p>
         ) : null}
         {ficha.notas ? <p>{ficha.notas}</p> : null}
-        <div className="card-toolbar">
-          <ShareMenu title={fichaTitulo(ficha)} text={shareText} files={shareFiles} />
-          <div className="row">
-            <Link
-              className="icon-btn icon-btn-edit"
-              to={`/fichas/${ficha.id}/editar`}
-              aria-label="Editar"
-              title="Editar"
-            >
-              <Pencil size={16} />
-            </Link>
-            <button
-              type="button"
-              className="icon-btn icon-btn-delete"
-              aria-label="Eliminar"
-              title="Eliminar"
-              onClick={() => void remove()}
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
+      </EntityCard>
 
-      <div className="card">
-        <h3 className="title-sm">Adjuntos de la ficha</h3>
+      <EntityCard title={<h3 className="title-sm">Adjuntos de la ficha</h3>}>
         <FilePicker
           onFiles={(files) => void saveAdjuntos(files, { tipo: 'ficha', fichaId: current.id })}
         />
-        <div style={{ marginTop: '0.75rem' }}>
-          <AttachmentList
-            adjuntos={plantilla}
-            onDelete={(adjId) => void removeAdjunto(adjId)}
-          />
-        </div>
-      </div>
+        <AttachmentList
+          adjuntos={plantilla}
+          onDelete={(adjId) => void removeAdjunto(adjId)}
+        />
+      </EntityCard>
 
-      <div className="card">
-        <div className="row-spread" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-          <h3 className="title-sm" style={{ margin: 0 }}>
-            Cronograma
-          </h3>
-          <div className="row" style={{ flexWrap: 'wrap' }}>
+      <EntityCard
+        title={<h3 className="title-sm">Cronograma</h3>}
+        footer={
+          <div className="row" style={{ flexWrap: 'wrap', gap: '0.45rem' }}>
             <button type="button" className="btn btn-add" onClick={openExtra}>
               <CalendarPlus size={16} />
               Añadir inspección
@@ -245,10 +242,11 @@ export function FichaDetailPage() {
             </button>
             <Link to={`/cronograma?ficha=${ficha.id}`}>Filtrar</Link>
           </div>
-        </div>
-        <div className="list" style={{ marginTop: '0.7rem' }}>
+        }
+      >
+        <div className="list">
           {ocurrencias.length === 0 ? (
-            <p className="muted" style={{ margin: 0 }}>
+            <p className="muted">
               Sin inspecciones. Añade una extraordinaria o espera al periodo programado.
             </p>
           ) : (
@@ -268,7 +266,7 @@ export function FichaDetailPage() {
             ))
           )}
         </div>
-      </div>
+      </EntityCard>
 
       <AccionesPanel fichaId={ficha.id} />
 

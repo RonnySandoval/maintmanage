@@ -199,15 +199,14 @@ export function DashboardPage() {
     return (
       <Link key={`evt-${e.id}`} className="card card-click dash-item" to={`/eventos/${e.id}`}>
         <div className="row-spread">
-          <strong>
+          <strong className="occ-meta">
             <ActividadTitle actividad={act} />
+            <TipoBadge tipo={act.tipo} />
           </strong>
           <StatusBadge estado={e.estado} />
         </div>
         <div className="muted occ-meta">
           {formatDate(e.fechaProgramada)}
-          {' · '}
-          <TipoBadge tipo={act.tipo} />
           {esExtraordinaria(e) ? <ExtraBadge /> : null}
         </div>
       </Link>

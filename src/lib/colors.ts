@@ -66,5 +66,10 @@ export function bloqueColorVar(stored?: string | null): string {
   return `var(--bloque-${bloqueColorId(stored)})`
 }
 
+/** Color único para títulos y barras de actividad (no por tipo). */
+export function kindActividadVar(): string {
+  return 'var(--kind-actividad)'
+}
+
 export const BLOQUE_COLORS = BLOQUE_PALETTE.map((swatch) => swatch.light)
 export const GRUPO_COLORS = BLOQUE_COLORS

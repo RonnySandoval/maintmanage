@@ -7,11 +7,9 @@ import {
   ESTADOS,
   esExtraordinaria,
   frecuenciaLabel,
-  tipoActividadColor,
   tipoActividadLabel,
   type EstadoOcurrencia,
 } from '../db/types'
-import { bloqueColorVar } from '../lib/colors'
 import { formatFechaProgramada, todayISO } from '../lib/dates'
 import { actividadTitulo, eventoVigente } from '../lib/actividades'
 import { saveAdjuntos } from '../lib/files'
@@ -30,6 +28,7 @@ import { ExtraBadge, Modal, StatusBadge, TipoBadge } from '../components/ui'
 import { useTiposActividad } from '../hooks/useTiposActividad'
 import { ActividadTitle } from '../components/ActividadTitle'
 import { CopyText } from '../components/CopyText'
+import { EntityCard } from '../components/EntityCard'
 
 export function ActividadDetailPage() {
   const { id } = useParams()
@@ -168,29 +167,51 @@ export function ActividadDetailPage() {
 
   return (
     <div className="stack">
-      <div className="card">
-        <div className="row-spread" style={{ marginBottom: '0.6rem', flexWrap: 'wrap' }}>
-          <div>
-            <h2 style={{ marginBottom: 4 }}>
-              <ActividadTitle actividad={actividad} />
-            </h2>
-            <p className="muted occ-meta" style={{ margin: 0 }}>
-              <span
-                className="color-dot"
-                style={{
-                  display: 'inline-block',
-                  margin: '0 6px 0 0',
-                  verticalAlign: 'middle',
-                  background: bloqueColorVar(tipoActividadColor(actividad.tipo, tipos)),
-                }}
-              />
-              <TipoBadge tipo={actividad.tipo} />
-              {encargado ? ` · ${encargado.nombre}` : ''}
-              {` · ${frecuenciaLabel(actividad.frecuencia)}`}
-            </p>
-          </div>
-          {eventoActual ? <StatusBadge estado={eventoActual.estado} /> : null}
-        </div>
+      <EntityCard
+        title={
+          <h2>
+            <ActividadTitle actividad={actividad} />
+          </h2>
+        }
+        badge={eventoActual ? <StatusBadge estado={eventoActual.estado} /> : null}
+        footer={
+          <>
+            <div className="row card-toolbar-actions">
+              {eventoActual ? (
+                <Link className="btn btn-primary" to={`/eventos/${eventoActual.id}?ejecutar=1`}>
+                  <CircleCheck size={16} />
+                  Ejecutar
+                </Link>
+              ) : null}
+              <ShareMenu title={actividadTitulo(actividad)} text={shareText} files={shareFiles} />
+            </div>
+            <div className="row">
+              <Link
+                className="icon-btn icon-btn-edit"
+                to={`/actividades/${actividad.id}/editar`}
+                aria-label="Editar"
+                title="Editar"
+              >
+                <Pencil size={16} />
+              </Link>
+              <button
+                type="button"
+                className="icon-btn icon-btn-delete"
+                aria-label="Eliminar"
+                title="Eliminar"
+                onClick={() => void remove()}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </>
+        }
+      >
+        <p className="muted occ-meta">
+          <TipoBadge tipo={actividad.tipo} />
+          {encargado ? ` · ${encargado.nombre}` : ''}
+          {` · ${frecuenciaLabel(actividad.frecuencia)}`}
+        </p>
         {telefonoEncargado ? (
           <p className="muted phone-line">
             Tel. {telefonoEncargado}
@@ -201,54 +222,19 @@ export function ActividadDetailPage() {
           <p className="muted">Congregación: {encargado.congregacion}</p>
         ) : null}
         {actividad.notas ? <p>{actividad.notas}</p> : null}
-        <div className="card-toolbar">
-          <div className="row card-toolbar-actions">
-            {eventoActual ? (
-              <Link className="btn btn-primary" to={`/eventos/${eventoActual.id}?ejecutar=1`}>
-                <CircleCheck size={16} />
-                Ejecutar
-              </Link>
-            ) : null}
-            <ShareMenu title={actividadTitulo(actividad)} text={shareText} files={shareFiles} />
-          </div>
-          <div className="row">
-            <Link
-              className="icon-btn icon-btn-edit"
-              to={`/actividades/${actividad.id}/editar`}
-              aria-label="Editar"
-              title="Editar"
-            >
-              <Pencil size={16} />
-            </Link>
-            <button
-              type="button"
-              className="icon-btn icon-btn-delete"
-              aria-label="Eliminar"
-              title="Eliminar"
-              onClick={() => void remove()}
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
+      </EntityCard>
 
-      <div className="card">
-        <h3 className="title-sm">Adjuntos</h3>
+      <EntityCard title={<h3 className="title-sm">Adjuntos</h3>}>
         <FilePicker
           onFiles={(files) => void saveAdjuntos(files, { tipo: 'actividad', actividadId: current.id })}
         />
-        <div style={{ marginTop: '0.75rem' }}>
-          <AttachmentList adjuntos={plantilla} onDelete={(adjId) => void removeAdjunto(adjId)} />
-        </div>
-      </div>
+        <AttachmentList adjuntos={plantilla} onDelete={(adjId) => void removeAdjunto(adjId)} />
+      </EntityCard>
 
-      <div className="card">
-        <div className="row-spread" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-          <h3 className="title-sm" style={{ margin: 0 }}>
-            Cronograma
-          </h3>
-          <div className="row" style={{ flexWrap: 'wrap' }}>
+      <EntityCard
+        title={<h3 className="title-sm">Cronograma</h3>}
+        footer={
+          <div className="row" style={{ flexWrap: 'wrap', gap: '0.45rem' }}>
             <button type="button" className="btn btn-add" onClick={openExtra}>
               <CalendarPlus size={16} />
               Añadir evento
@@ -259,12 +245,11 @@ export function ActividadDetailPage() {
             </button>
             <Link to={`/cronograma?ambito=actividades&tipo=${actividad.tipo}`}>Filtrar</Link>
           </div>
-        </div>
-        <div className="list" style={{ marginTop: '0.7rem' }}>
+        }
+      >
+        <div className="list">
           {eventos.length === 0 ? (
-            <p className="muted" style={{ margin: 0 }}>
-              Sin eventos. Añade uno o espera al periodo programado.
-            </p>
+            <p className="muted">Sin eventos. Añade uno o espera al periodo programado.</p>
           ) : (
             eventos.map((e) => (
               <Link key={e.id} className="card-click item" to={`/eventos/${e.id}`}>
@@ -282,7 +267,7 @@ export function ActividadDetailPage() {
             ))
           )}
         </div>
-      </div>
+      </EntityCard>
 
       <AccionesPanel actividadId={actividad.id} />
 

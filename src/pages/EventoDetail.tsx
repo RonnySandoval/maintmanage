@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ChevronDown, CircleCheck, Pencil, Trash2 } from 'lucide-react'
+import { CircleCheck, Pencil, Trash2 } from 'lucide-react'
 import { db } from '../db'
 import { esExtraordinaria, esOcurrenciaProgramada, tipoActividadLabel } from '../db/types'
 import { formatFechaProgramada, monthLabel } from '../lib/dates'
@@ -14,6 +14,7 @@ import { ExtraBadge, StatusBadge, TipoBadge } from '../components/ui'
 import { useTiposActividad } from '../hooks/useTiposActividad'
 import { ActividadTitle } from '../components/ActividadTitle'
 import { EjecucionForm } from '../components/EjecucionForm'
+import { EntityCard } from '../components/EntityCard'
 
 export function EventoDetailPage() {
   const { id } = useParams()
@@ -113,76 +114,71 @@ export function EventoDetailPage() {
 
   return (
     <div className="stack">
-      <div className="card occ-head-card">
-        <div className="row-spread" style={{ marginBottom: 8, flexWrap: 'wrap' }}>
-          <div>
-            <h2 style={{ marginBottom: 4 }}>
-              <Link to={`/actividades/${currentActividad.id}`}>
-                <ActividadTitle actividad={currentActividad} />
-              </Link>
-            </h2>
-            <p className="occ-period">{periodo}</p>
-            <p className="muted occ-meta" style={{ marginBottom: 0 }}>
-              {formatFechaProgramada(
-                current.fechaProgramada,
-                currentActividad.fechaPrecision === 'dia' ? 'dia' : 'mes',
-              )}
-              {' · '}
-              <TipoBadge tipo={currentActividad.tipo} />
-              {encargado?.nombre ? ` · ${encargado.nombre}` : ''}
-              {esExtraordinaria(current) ? <ExtraBadge /> : null}
-              {current.estadoFijado ? <span>Fijado</span> : null}
-            </p>
-          </div>
-          <StatusBadge estado={current.estado} />
-        </div>
-        <div className="card-toolbar">
-          <ShareMenu title={actividadTitulo(currentActividad)} text={shareText} files={shareFiles} />
-          <button
-            type="button"
-            className="icon-btn icon-btn-delete"
-            aria-label={removing ? 'Eliminando…' : 'Eliminar evento'}
-            title="Eliminar evento"
-            onClick={() => void removeEvt()}
-            disabled={removing}
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-      </div>
-
-      <div className={`card accordion-panel${ejecOpen ? '' : ' is-collapsed'}`}>
-        <button
-          type="button"
-          className="accordion-trigger"
-          aria-expanded={ejecOpen}
-          onClick={() => setEjecOpen((was) => !was)}
-        >
-          <span className="accordion-label">
-            {ejecucion ? <Pencil size={16} /> : <CircleCheck size={16} />}
-            <span>
-              {ejecucion ? 'Editar ejecución' : 'Marcar como ejecutada'}
-              {ejecucion && !ejecOpen ? (
-                <span className="muted" style={{ fontWeight: 500 }}>
-                  {' · '}
-                  {ejecucion.fechaReal}
-                  {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
-                </span>
-              ) : null}
-            </span>
-          </span>
-          <ChevronDown size={18} className={ejecOpen ? 'is-open' : ''} />
-        </button>
+      <EntityCard
+        className="occ-head-card"
+        title={
+          <h2>
+            <Link to={`/actividades/${currentActividad.id}`}>
+              <ActividadTitle actividad={currentActividad} />
+            </Link>
+          </h2>
+        }
+        badge={<StatusBadge estado={current.estado} />}
+        footer={
+          <>
+            <div className="row card-toolbar-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setEjecOpen((was) => !was)}
+              >
+                {ejecucion ? <Pencil size={16} /> : <CircleCheck size={16} />}
+                {ejecucion
+                  ? ejecOpen
+                    ? 'Ocultar ejecución'
+                    : 'Editar ejecución'
+                  : 'Marcar como ejecutada'}
+              </button>
+              <ShareMenu title={actividadTitulo(currentActividad)} text={shareText} files={shareFiles} />
+            </div>
+            <button
+              type="button"
+              className="icon-btn icon-btn-delete"
+              aria-label={removing ? 'Eliminando…' : 'Eliminar evento'}
+              title="Eliminar evento"
+              onClick={() => void removeEvt()}
+              disabled={removing}
+            >
+              <Trash2 size={16} />
+            </button>
+          </>
+        }
+      >
+        <p className="occ-period">{periodo}</p>
+        <p className="muted occ-meta">
+          {formatFechaProgramada(
+            current.fechaProgramada,
+            currentActividad.fechaPrecision === 'dia' ? 'dia' : 'mes',
+          )}
+          {' · '}
+          <TipoBadge tipo={currentActividad.tipo} />
+          {encargado?.nombre ? ` · ${encargado.nombre}` : ''}
+          {esExtraordinaria(current) ? <ExtraBadge /> : null}
+          {current.estadoFijado ? <span>Fijado</span> : null}
+        </p>
         {ejecOpen ? (
-          <div className="accordion-body">
-            <EjecucionForm
-              eventoId={current.id}
-              actividadId={currentActividad.id}
-              onSaved={() => setEjecOpen(false)}
-            />
-          </div>
+          <EjecucionForm
+            eventoId={current.id}
+            actividadId={currentActividad.id}
+            onSaved={() => setEjecOpen(false)}
+          />
+        ) : ejecucion ? (
+          <p className="muted">
+            Realizada el {ejecucion.fechaReal}
+            {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
+          </p>
         ) : null}
-      </div>
+      </EntityCard>
 
       <AccionesPanel
         actividadId={currentActividad.id}
