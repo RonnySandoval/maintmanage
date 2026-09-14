@@ -361,7 +361,9 @@ export function AjustesPage() {
                     onClick={() => void chooseFolder()}
                   >
                     <FolderOpen size={16} />
-                    {ajustes?.backupFolderName ? 'Cambiar carpeta' : 'Elegir carpeta'}
+                    <span className="btn-text">
+                      {ajustes?.backupFolderName ? 'Cambiar carpeta' : 'Elegir carpeta'}
+                    </span>
                   </button>
                 ) : null}
                 <button
@@ -371,11 +373,11 @@ export function AjustesPage() {
                   onClick={() => void saveNow()}
                 >
                   <Download size={16} />
-                  Guardar ahora
+                  <span className="btn-text">Guardar ahora</span>
                 </button>
                 <button type="button" className="btn" disabled={busy} onClick={() => void exportNow()}>
                   <Download size={16} />
-                  ZIP
+                  <span className="btn-text">ZIP</span>
                 </button>
                 {ajustes?.backupFolderName ? (
                   <button
@@ -385,7 +387,7 @@ export function AjustesPage() {
                     onClick={() => void forgetFolder()}
                   >
                     <FolderX size={16} />
-                    Dejar carpeta
+                    <span className="btn-text">Dejar carpeta</span>
                   </button>
                 ) : null}
               </div>
