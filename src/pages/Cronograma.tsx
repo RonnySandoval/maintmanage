@@ -25,6 +25,7 @@ import { ActividadTitle } from '../components/ActividadTitle'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
 import { useTiposActividad } from '../hooks/useTiposActividad'
 import { useAliases } from '../lib/labels'
+import { InboxAlert } from '../components/InboxAlert'
 
 type ListaItem =
   | { kind: 'occ'; id: string; fecha: string; occId: string; fichaId: string }
@@ -158,6 +159,24 @@ export function CronogramaPage() {
     }
     if (estado && estadoAgendaCorrectiva(a) !== estado) return false
     if (fecha && a.fechaObjetivo !== fecha) return false
+    return true
+  })
+
+  const correctivasSinProgramar = acciones.filter((a) => {
+    if (tipoAccionOf(a) !== 'correctiva' || a.fechaObjetivo || a.estado === 'ejecutada') return false
+    const ficha = a.fichaId ? fichaMap[a.fichaId] : undefined
+    const act = a.actividadId ? actividadMap[a.actividadId] : undefined
+    if (encargadoId) {
+      const enc = act?.encargadoId ?? ficha?.encargadoId
+      if (enc !== encargadoId) return false
+    }
+    if (tipoId && (!act || act.tipo !== tipoId)) return false
+    if (q) {
+      const hay = `${a.texto} ${ficha ? `${ficha.numero} ${ficha.nombre}` : ''} ${act?.titulo ?? ''}`.toLowerCase()
+      if (!hay.includes(qLower)) return false
+    }
+    if (estado && estadoAgendaCorrectiva(a) !== estado) return false
+    if (fecha) return false
     return true
   })
 
@@ -450,6 +469,10 @@ export function CronogramaPage() {
           inputMode="search"
         />
       </label>
+
+      {correctivasSinProgramar.length > 0 ? (
+        <InboxAlert count={correctivasSinProgramar.length} label="sin programar · fuera de grilla" />
+      ) : null}
 
       {vista === 'grilla' ? (
         <GrillaAnual

@@ -58,6 +58,13 @@ function titleFor(pathname: string, search = ''): string {
     if (tab === 'encargados') return 'Encargados'
     if (tab === 'bloques') return 'Bloques'
   }
+  if (pathname === '/historicos') {
+    const hist = new URLSearchParams(search)
+    if (hist.get('tab') === 'acciones') {
+      return hist.get('fecha') === 'sin' ? 'Sin programar' : 'Correctivas'
+    }
+    return 'Histórico'
+  }
   if (pathname === '/ajustes') {
     const tab = new URLSearchParams(search).get('tab')
     if (tab === 'nombres') return 'Nombres'

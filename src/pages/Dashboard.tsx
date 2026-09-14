@@ -26,6 +26,7 @@ import { ActividadTitle } from '../components/ActividadTitle'
 import { PrioridadMark } from '../components/PrioridadMark'
 import { FichaTitle } from '../components/FichaTitle'
 import { RestorePanel } from '../components/RestorePanel'
+import { InboxAlert } from '../components/InboxAlert'
 import { isRestoreSkipped, skipRestore } from '../lib/restoreSkip'
 import { accionHref, estadoAgendaCorrectiva } from '../lib/acciones'
 import { useSettled } from '../hooks/useSettled'
@@ -127,6 +128,9 @@ export function DashboardPage() {
   })
   const accionesAbiertas = acciones.filter(
     (a) => a.estado === 'pendiente' || a.estado === 'programada',
+  )
+  const correctivasSinProgramar = accionesAbiertas.filter(
+    (a) => tipoAccionOf(a) === 'correctiva' && !a.fechaObjetivo,
   )
   const rawCounts: DashCounts = {
     vencidas: delTrimestre.filter((o) => o.estado === 'vencida').length,
@@ -276,6 +280,10 @@ export function DashboardPage() {
         </p>
       </header>
 
+      {correctivasSinProgramar.length > 0 ? (
+        <InboxAlert count={correctivasSinProgramar.length} />
+      ) : null}
+
       <div className="kpis">
         <Link className="card kpi card-click tone-vencida" to="/cronograma?estado=vencida">
           <div className="kpi-head">
@@ -332,7 +340,7 @@ export function DashboardPage() {
             )}
           </div>
         </Link>
-        <Link className="card kpi card-click tone-correctiva" to="/historicos">
+        <Link className="card kpi card-click tone-correctiva" to="/historicos?tab=acciones">
           <div className="kpi-head">
             <ShieldAlert size={16} aria-hidden />
             <div className="label">{accionesTitulo(true, aliases)}</div>
@@ -395,7 +403,7 @@ export function DashboardPage() {
         <div style={{ marginTop: '1.25rem' }}>
           <div className="page-head">
             <h2 className="title-sm">{accionesTitulo(false, aliases)} abiertas</h2>
-            <Link to="/historicos">Ver histórico</Link>
+            <Link to="/historicos?tab=acciones">Ver correctivas</Link>
           </div>
           <div className="list">
             {accionesAbiertas.slice(0, 5).map((a) => {

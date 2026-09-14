@@ -1,18 +1,18 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CalendarClock, CircleCheck, Pencil, Trash2 } from 'lucide-react'
+import { CalendarClock, CircleCheck, Pencil, Trash2, Wrench } from 'lucide-react'
 import { db } from '../db'
 import { prioridadOf, tipoAccionLabel, tipoAccionOf } from '../db/types'
-import { estadoAgendaCorrectiva } from '../lib/acciones'
-import { formatDate, formatFechaProgramada } from '../lib/dates'
+import { convertirAccionHref, estadoAgendaCorrectiva } from '../lib/acciones'
+import { formatDate } from '../lib/dates'
 import { accionLabel, useAliases } from '../lib/labels'
 import { AccionEditor, ProgramarFechaForm } from '../components/AccionesPanel'
 import { ActividadTitle } from '../components/ActividadTitle'
 import { EjecucionForm } from '../components/EjecucionForm'
 import { FichaTitle } from '../components/FichaTitle'
 import { PrioridadMark } from '../components/PrioridadMark'
-import { StatusBadge } from '../components/ui'
+import { AccionFechaLabel, StatusBadge } from '../components/ui'
 import { EntityCard } from '../components/EntityCard'
 
 export function AccionDetailPage() {
@@ -91,6 +91,16 @@ export function AccionDetailPage() {
         footer={
           <>
             <div className="row card-toolbar-actions">
+              {tipo === 'correctiva' ? (
+                <Link
+                  className="btn"
+                  to={convertirAccionHref(current)}
+                  title="Crear una actividad planificable a partir de esta correctiva"
+                >
+                  <Wrench size={16} />
+                  <span className="btn-text">Convertir en actividad</span>
+                </Link>
+              ) : null}
               {needsSchedule ? (
                 <>
                   <button
@@ -144,11 +154,7 @@ export function AccionDetailPage() {
         <p className="muted occ-meta">
           <span>{tipoAccionLabel(tipo, aliases)}</span>
           {tipo === 'correctiva' ? <PrioridadMark prioridad={prioridadOf(current)} /> : null}
-          {current.fechaObjetivo ? (
-            <span>Programada: {formatFechaProgramada(current.fechaObjetivo, 'dia')}</span>
-          ) : (
-            <span>Sin fecha programada</span>
-          )}
+          <AccionFechaLabel fechaObjetivo={current.fechaObjetivo} />
         </p>
         <p className="muted">
           Origen:{' '}

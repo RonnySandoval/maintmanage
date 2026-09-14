@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react'
-import { Captions, CaptionsOff } from 'lucide-react'
+import { CalendarClock, CalendarOff, Captions, CaptionsOff } from 'lucide-react'
 import { ESTADOS, tipoActividadLabel, type EstadoOcurrencia } from '../db/types'
 import { useTiposActividad } from '../hooks/useTiposActividad'
+import { useAccionFechas } from '../hooks/useAccionFechas'
 import { accionesTitulo, accionLabel, label, useAliases } from '../lib/labels'
 import { useStatusLabels } from '../hooks/useStatusLabels'
+import { formatDate } from '../lib/dates'
 import { SIMBOLO_CORRECTIVA, SIMBOLOS_ESTADO } from '../lib/simbolos'
 
 export function ExtraBadge() {
@@ -64,6 +66,45 @@ export function StatusWordsToggle({ className }: { className?: string }) {
     >
       {showLabels ? <Captions size={18} /> : <CaptionsOff size={18} />}
     </button>
+  )
+}
+
+export function AccionFechasToggle({ className }: { className?: string }) {
+  const { showFechas, toggleFechas } = useAccionFechas()
+  return (
+    <button
+      type="button"
+      className={`estado-words-btn${className ? ` ${className}` : ''}${showFechas ? '' : ' is-off'}`}
+      onClick={toggleFechas}
+      aria-pressed={showFechas}
+      aria-label={showFechas ? 'Ocultar fechas de correctivas' : 'Mostrar fechas de correctivas'}
+      title={showFechas ? 'Ocultar fechas' : 'Mostrar fechas'}
+    >
+      {showFechas ? <CalendarClock size={18} /> : <CalendarOff size={18} />}
+    </button>
+  )
+}
+
+/** Fecha objetivo de correctiva, o «Sin fecha». Respeta el toggle global si `gated`. */
+export function AccionFechaLabel({
+  fechaObjetivo,
+  gated = false,
+  className,
+}: {
+  fechaObjetivo?: string
+  gated?: boolean
+  className?: string
+}) {
+  const { showFechas } = useAccionFechas()
+  if (gated && !showFechas) return null
+  const missing = !fechaObjetivo
+  return (
+    <span
+      className={`accion-fecha${missing ? ' is-missing' : ''}${className ? ` ${className}` : ''}`}
+      title={missing ? 'Sin fecha programada' : `Programada: ${fechaObjetivo}`}
+    >
+      {missing ? 'Sin fecha' : formatDate(fechaObjetivo)}
+    </span>
   )
 }
 

@@ -5,6 +5,7 @@ import { Splash } from './components/Splash'
 import { ThemeProvider } from './hooks/useTheme'
 import { FontScaleProvider } from './hooks/useFontScale'
 import { StatusLabelsProvider } from './hooks/useStatusLabels'
+import { AccionFechasProvider } from './hooks/useAccionFechas'
 import { ensureHorizon } from './db/occurrences'
 import { notifyIfNeeded } from './lib/notifications'
 import { AccionDetailPage } from './pages/AccionDetail'
@@ -42,6 +43,7 @@ export default function App() {
     <ThemeProvider>
       <FontScaleProvider>
       <StatusLabelsProvider>
+      <AccionFechasProvider>
         <Splash />
         <HashRouter>
         <Routes>
@@ -68,6 +70,7 @@ export default function App() {
           </Route>
         </Routes>
         </HashRouter>
+      </AccionFechasProvider>
       </StatusLabelsProvider>
       </FontScaleProvider>
     </ThemeProvider>

@@ -29,19 +29,26 @@ export function ActividadFormPage() {
   const editing = Boolean(id)
   const tipoParam = params.get('tipo')
   const tipoQuery = tipoParam ? tipoActividadOf(tipoParam) : ''
+  const fromAccion = params.get('fromAccion') || ''
+  const tituloQuery = params.get('titulo') || ''
+  const fechaQuery = params.get('fecha') || ''
 
   const actividad = useLiveQuery(async () => {
     if (!id) return null
     return (await db.actividades.get(id)) ?? null
   }, [id])
+  const origenAccion = useLiveQuery(async () => {
+    if (!fromAccion) return null
+    return (await db.accionesCorrectivas.get(fromAccion)) ?? null
+  }, [fromAccion])
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
 
   const [tipo, setTipo] = useState<TipoActividad>(() => tipoQuery || 'reparacion')
-  const [titulo, setTitulo] = useState('')
+  const [titulo, setTitulo] = useState(() => tituloQuery)
   const [encargadoId, setEncargadoId] = useState('')
   const [frecuencia, setFrecuencia] = useState<Frecuencia>('unica')
   const [fechaPrecision, setFechaPrecision] = useState<FechaPrecision>('dia')
-  const [fechaInicio, setFechaInicio] = useState(todayISO())
+  const [fechaInicio, setFechaInicio] = useState(() => fechaQuery || todayISO())
   const [notas, setNotas] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [error, setError] = useState('')
@@ -64,6 +71,15 @@ export function ActividadFormPage() {
     if (editing || !tipoQuery) return
     setTipo(tipoQuery)
   }, [editing, tipoQuery])
+
+  useEffect(() => {
+    if (editing || !origenAccion) return
+    setTitulo((was) => was || origenAccion.texto)
+    if (!fechaQuery && origenAccion.fechaObjetivo) {
+      setFechaInicio((was) => was || origenAccion.fechaObjetivo!)
+    }
+    setNotas((was) => was || `Derivada de correctiva: ${origenAccion.texto}`)
+  }, [editing, origenAccion, fechaQuery])
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -96,6 +112,15 @@ export function ActividadFormPage() {
       if (actividad?.fechasOmitidas?.length) record.fechasOmitidas = actividad.fechasOmitidas
       await db.actividades.put(record)
       if (files.length) await saveAdjuntos(files, { tipo: 'actividad', actividadId })
+      if (!editing && fromAccion) {
+        const accion = await db.accionesCorrectivas.get(fromAccion)
+        if (accion && !accion.actividadId) {
+          await db.accionesCorrectivas.update(fromAccion, {
+            actividadId,
+            updatedAt: now,
+          })
+        }
+      }
       await syncEventosForActividad(record)
       await refreshEstados()
       navigate(`/actividades/${actividadId}`, { replace: true })
@@ -118,6 +143,12 @@ export function ActividadFormPage() {
 
   return (
     <form className="card ficha-form" onSubmit={(e) => void onSubmit(e)}>
+      {fromAccion ? (
+        <p className="hint" style={{ marginTop: 0 }}>
+          Convirtiendo una correctiva en actividad planificable. La correctiva se conserva y queda
+          vinculada.
+        </p>
+      ) : null}
       <div className="ficha-form-grid">
         <div className="field">
           <label htmlFor="act-tipo">Tipo</label>

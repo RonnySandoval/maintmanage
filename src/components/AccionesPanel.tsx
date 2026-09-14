@@ -1,6 +1,15 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronDown, CircleCheck, CalendarClock, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react'
+import {
+  ChevronDown,
+  CircleCheck,
+  CalendarClock,
+  ListChecks,
+  Pencil,
+  Plus,
+  Trash2,
+  Wrench,
+} from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import {
@@ -13,12 +22,11 @@ import {
   type PrioridadAccion,
   type TipoAccion,
 } from '../db/types'
-import { accionHref, estadoAgendaCorrectiva } from '../lib/acciones'
+import { accionHref, convertirAccionHref, estadoAgendaCorrectiva } from '../lib/acciones'
 import { createId } from '../lib/ids'
-import { formatDate } from '../lib/dates'
 import { accionLabel, accionesTitulo, useAliases } from '../lib/labels'
 import { PrioridadMark } from './PrioridadMark'
-import { StatusBadge } from './ui'
+import { AccionFechaLabel, AccionFechasToggle, StatusBadge } from './ui'
 import { EntityCard } from './EntityCard'
 
 export function AccionesPanel({
@@ -213,6 +221,12 @@ export function AccionesPanel({
       <div style={{ marginTop: '0.9rem' }}>
         {acciones.length > 0 ? (
           <div className="acciones-filtros">
+            <div className="row-spread" style={{ marginBottom: '0.35rem' }}>
+              <span className="muted" style={{ fontSize: '0.78rem' }}>
+                Lista
+              </span>
+              <AccionFechasToggle />
+            </div>
             {onlyCorrectiva ? null : (
               <div className="chip-row tight" role="tablist" aria-label="Tipo en la lista">
                 <button
@@ -336,6 +350,16 @@ export function AccionesPanel({
                       ) : null}
                     </div>
                     <div className="row">
+                      {tipoAccionOf(a) === 'correctiva' ? (
+                        <Link
+                          className="icon-btn"
+                          to={convertirAccionHref(a)}
+                          aria-label="Convertir en actividad"
+                          title="Convertir en actividad"
+                        >
+                          <Wrench size={16} />
+                        </Link>
+                      ) : null}
                       {a.fechaObjetivo || tipoAccionOf(a) !== 'correctiva' ? (
                         <button
                           type="button"
@@ -369,7 +393,7 @@ export function AccionesPanel({
                       <PrioridadMark prioridad={prioridadOf(a)} />
                     </>
                   ) : null}
-                  {a.fechaObjetivo ? ` · ${formatDate(a.fechaObjetivo)}` : ' · Sin fecha'}
+                  <AccionFechaLabel fechaObjetivo={a.fechaObjetivo} gated />
                 </p>
               </EntityCard>
             ),

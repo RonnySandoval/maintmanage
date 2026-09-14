@@ -1,16 +1,19 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   ArrowUpDown,
   Boxes,
   CalendarDays,
+  CalendarOff,
   ChevronDown,
   CircleDot,
   FolderTree,
   History,
   Layers,
   Pencil,
+  Search,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { db } from '../db'
 import {
@@ -38,9 +41,10 @@ import { FichaTitle } from '../components/FichaTitle'
 import { PrioridadMark } from '../components/PrioridadMark'
 import { EjecucionModal } from '../components/EjecucionForm'
 import { ShareMenu } from '../components/ShareMenu'
-import { CorrectivaBadge, EmptyState, ExtraBadge, StatusBadge, StatusWordsToggle, TipoBadge } from '../components/ui'
+import { CorrectivaBadge, EmptyState, ExtraBadge, StatusBadge, StatusWordsToggle, AccionFechasToggle, AccionFechaLabel, TipoBadge } from '../components/ui'
 import { EntityCard } from '../components/EntityCard'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
+import { InboxAlert } from '../components/InboxAlert'
 
 type AccGroup = 'lista' | 'fecha' | 'prioridad' | 'estado' | 'ficha'
 type AccSort = 'fecha' | 'prioridad' | 'reciente'
@@ -114,12 +118,86 @@ function groupAcciones(
 }
 
 export function HistoricosPage() {
-  const [tab, setTab] = useState<'ocurrencias' | 'acciones'>('ocurrencias')
+  const [params, setParams] = useSearchParams()
+  const tab = params.get('tab') === 'acciones' ? 'acciones' : 'ocurrencias'
+  const q = params.get('q') ?? ''
+  const bloqueId = params.get('bloque') ?? ''
+  const encargadoId = params.get('encargado') ?? ''
+  const fechaFiltro =
+    params.get('fecha') === 'sin' || params.get('fecha') === 'con' ? params.get('fecha')! : ''
+  const estadoAccParam = params.get('estado')
+  const estadoAcc: EstadoOcurrencia | '' =
+    ESTADOS.some((s) => s.id === estadoAccParam) ? (estadoAccParam as EstadoOcurrencia) : ''
+  const groupAccRaw = params.get('agrupar')
+  const groupAcc: AccGroup =
+    groupAccRaw === 'fecha' ||
+    groupAccRaw === 'prioridad' ||
+    groupAccRaw === 'estado' ||
+    groupAccRaw === 'ficha'
+      ? groupAccRaw
+      : 'lista'
+  const sortAccRaw = params.get('ordenar')
+  const sortAcc: AccSort =
+    sortAccRaw === 'prioridad' || sortAccRaw === 'reciente' ? sortAccRaw : 'fecha'
+  const [searchText, setSearchText] = useState(q)
   const [groupBy, setGroupBy] = useState<'ficha' | 'bloque' | 'fecha'>('ficha')
-  const [estadoAcc, setEstadoAcc] = useState<EstadoOcurrencia | ''>('')
-  const [groupAcc, setGroupAcc] = useState<AccGroup>('lista')
-  const [sortAcc, setSortAcc] = useState<AccSort>('fecha')
   const [openOcc, setOpenOcc] = useState<string | null>(null)
+
+  function setParam(key: string, value: string) {
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current)
+        if (!value) next.delete(key)
+        else next.set(key, value)
+        return next
+      },
+      { replace: true },
+    )
+  }
+
+  function setTab(next: 'ocurrencias' | 'acciones') {
+    setParams(
+      (current) => {
+        const nextParams = new URLSearchParams(current)
+        if (next === 'ocurrencias') nextParams.delete('tab')
+        else nextParams.set('tab', 'acciones')
+        if (next === 'ocurrencias') {
+          nextParams.delete('fecha')
+          nextParams.delete('estado')
+          nextParams.delete('agrupar')
+          nextParams.delete('ordenar')
+        } else {
+          nextParams.delete('bloque')
+          nextParams.delete('encargado')
+        }
+        return nextParams
+      },
+      { replace: true },
+    )
+  }
+
+  useEffect(() => {
+    setSearchText(q)
+  }, [q])
+
+  function onSearchChange(value: string) {
+    setSearchText(value)
+    setParam('q', value)
+  }
+
+  function clearFilters() {
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current)
+        for (const key of ['q', 'bloque', 'encargado', 'fecha', 'estado', 'agrupar', 'ordenar']) {
+          next.delete(key)
+        }
+        return next
+      },
+      { replace: true },
+    )
+    setGroupBy('ficha')
+  }
 
   const ocurrencias =
     useLiveQuery(async () => {
@@ -190,28 +268,61 @@ export function HistoricosPage() {
     return map
   }, [acciones])
 
-  const byFicha = new Map<string, typeof ocurrencias>()
-  for (const o of ocurrencias) {
+  const qLower = q.trim().toLowerCase()
+
+  const occsFiltradas = useMemo(() => {
+    return ocurrencias.filter((o) => {
+      const ficha = fichaMap[o.fichaId]
+      if (!ficha) return false
+      if (bloqueId && ficha.grupoId !== bloqueId) return false
+      if (encargadoId && ficha.encargadoId !== encargadoId) return false
+      if (qLower) {
+        const enc = ficha.encargadoId ? encargadoMap[ficha.encargadoId]?.nombre ?? '' : ''
+        const bloque = bloqueMap[ficha.grupoId]?.nombre ?? ''
+        const hay = `${ficha.numero} ${ficha.nombre} ${bloque} ${enc} ${o.fechaProgramada}`.toLowerCase()
+        if (!hay.includes(qLower)) return false
+      }
+      return true
+    })
+  }, [ocurrencias, fichaMap, bloqueMap, encargadoMap, bloqueId, encargadoId, qLower])
+
+  const evtsFiltradas = useMemo(() => {
+    return eventos.filter((e) => {
+      const act = actividadMap[e.actividadId]
+      if (!act) return false
+      if (encargadoId && act.encargadoId !== encargadoId) return false
+      if (bloqueId) return false
+      if (qLower) {
+        const enc = act.encargadoId ? encargadoMap[act.encargadoId]?.nombre ?? '' : ''
+        const hay = `${act.titulo} ${act.tipo} ${enc} ${e.fechaProgramada}`.toLowerCase()
+        if (!hay.includes(qLower)) return false
+      }
+      return true
+    })
+  }, [eventos, actividadMap, encargadoMap, bloqueId, encargadoId, qLower])
+
+  const byFicha = new Map<string, typeof occsFiltradas>()
+  for (const o of occsFiltradas) {
     const list = byFicha.get(o.fichaId) ?? []
     list.push(o)
     byFicha.set(o.fichaId, list)
   }
 
-  const byFechaOcc = new Map<string, typeof ocurrencias>()
-  for (const o of ocurrencias) {
+  const byFechaOcc = new Map<string, typeof occsFiltradas>()
+  for (const o of occsFiltradas) {
     const key = monthValue(o.fechaProgramada)
     const list = byFechaOcc.get(key) ?? []
     list.push(o)
     byFechaOcc.set(key, list)
   }
-  const byActividad = new Map<string, typeof eventos>()
-  for (const e of eventos) {
+  const byActividad = new Map<string, typeof evtsFiltradas>()
+  for (const e of evtsFiltradas) {
     const list = byActividad.get(e.actividadId) ?? []
     list.push(e)
     byActividad.set(e.actividadId, list)
   }
-  const byFechaEvt = new Map<string, typeof eventos>()
-  for (const e of eventos) {
+  const byFechaEvt = new Map<string, typeof evtsFiltradas>()
+  for (const e of evtsFiltradas) {
     const key = monthValue(e.fechaProgramada)
     const list = byFechaEvt.get(key) ?? []
     list.push(e)
@@ -235,8 +346,8 @@ export function HistoricosPage() {
     return actividadTitulo(aa).localeCompare(actividadTitulo(ab), 'es')
   })
 
-  const byBloque = new Map<string, typeof ocurrencias>()
-  for (const o of ocurrencias) {
+  const byBloque = new Map<string, typeof occsFiltradas>()
+  for (const o of occsFiltradas) {
     const key = fichaMap[o.fichaId]?.grupoId ?? 'none'
     const list = byBloque.get(key) ?? []
     list.push(o)
@@ -247,13 +358,35 @@ export function HistoricosPage() {
     if (b === 'none') return -1
     return (bloqueMap[a]?.nombre ?? '').localeCompare(bloqueMap[b]?.nombre ?? '', 'es')
   })
-  const eventosPorFecha = [...eventos].sort((a, b) => b.fechaProgramada.localeCompare(a.fechaProgramada))
+  const eventosPorFecha = [...evtsFiltradas].sort((a, b) =>
+    b.fechaProgramada.localeCompare(a.fechaProgramada),
+  )
 
   const accionesFiltradas = sortAcciones(
-    acciones.filter((a) => !estadoAcc || estadoAgendaCorrectiva(a) === estadoAcc),
+    acciones.filter((a) => {
+      if (estadoAcc && estadoAgendaCorrectiva(a) !== estadoAcc) return false
+      if (fechaFiltro === 'sin' && a.fechaObjetivo) return false
+      if (fechaFiltro === 'con' && !a.fechaObjetivo) return false
+      const ficha = a.fichaId ? fichaMap[a.fichaId] : undefined
+      const act = a.actividadId ? actividadMap[a.actividadId] : undefined
+      if (bloqueId && ficha?.grupoId !== bloqueId) return false
+      if (encargadoId) {
+        const enc = act?.encargadoId ?? ficha?.encargadoId
+        if (enc !== encargadoId) return false
+      }
+      if (qLower) {
+        const hay =
+          `${a.texto} ${ficha ? `${ficha.numero} ${ficha.nombre}` : ''} ${act?.titulo ?? ''} ${a.fechaObjetivo ?? 'sin fecha'}`.toLowerCase()
+        if (!hay.includes(qLower)) return false
+      }
+      return true
+    }),
     sortAcc,
   )
   const gruposAcc = groupAcciones(accionesFiltradas, groupAcc, fichaMap, actividadMap)
+  const sinProgramarCount = acciones.filter(
+    (a) => !a.fechaObjetivo && a.estado !== 'ejecutada',
+  ).length
 
   function toggleOcc(id: string) {
     setOpenOcc((current) => (current === id ? null : id))
@@ -299,6 +432,61 @@ export function HistoricosPage() {
     if (tab === 'acciones') {
       return [
         {
+          id: 'filtrar',
+          label: 'Filtrar',
+          icon: CalendarOff,
+          active: Boolean(fechaFiltro || bloqueId || encargadoId),
+          content: (
+            <div className="stack" style={{ gap: '0.7rem' }}>
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor="hist-fecha">Fecha objetivo</label>
+                <select
+                  id="hist-fecha"
+                  className="select"
+                  value={fechaFiltro}
+                  onChange={(e) => setParam('fecha', e.target.value)}
+                >
+                  <option value="">Todas</option>
+                  <option value="sin">Sin programar</option>
+                  <option value="con">Con fecha</option>
+                </select>
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor="hist-acc-bloque">Bloque (origen ficha)</label>
+                <select
+                  id="hist-acc-bloque"
+                  className="select"
+                  value={bloqueId}
+                  onChange={(e) => setParam('bloque', e.target.value)}
+                >
+                  <option value="">Todos</option>
+                  {bloques.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor="hist-acc-enc">Encargado</label>
+                <select
+                  id="hist-acc-enc"
+                  className="select"
+                  value={encargadoId}
+                  onChange={(e) => setParam('encargado', e.target.value)}
+                >
+                  <option value="">Todos</option>
+                  {encargados.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ),
+        },
+        {
           id: 'estado',
           label: 'Estado',
           icon: CircleDot,
@@ -308,7 +496,7 @@ export function HistoricosPage() {
               <button
                 type="button"
                 className={`chip compact${!estadoAcc ? ' active' : ''}`}
-                onClick={() => setEstadoAcc('')}
+                onClick={() => setParam('estado', '')}
               >
                 Todos
               </button>
@@ -317,7 +505,7 @@ export function HistoricosPage() {
                   key={s.id}
                   type="button"
                   className={`chip compact${estadoAcc === s.id ? ' active' : ''}`}
-                  onClick={() => setEstadoAcc(s.id)}
+                  onClick={() => setParam('estado', s.id)}
                 >
                   {s.label}
                 </button>
@@ -345,7 +533,7 @@ export function HistoricosPage() {
                   key={id}
                   type="button"
                   className={`chip compact${groupAcc === id ? ' active' : ''}`}
-                  onClick={() => setGroupAcc(id)}
+                  onClick={() => setParam('agrupar', id === 'lista' ? '' : id)}
                 >
                   {label}
                 </button>
@@ -371,7 +559,7 @@ export function HistoricosPage() {
                   key={id}
                   type="button"
                   className={`chip compact${sortAcc === id ? ' active' : ''}`}
-                  onClick={() => setSortAcc(id)}
+                  onClick={() => setParam('ordenar', id === 'fecha' ? '' : id)}
                 >
                   {label}
                 </button>
@@ -382,6 +570,48 @@ export function HistoricosPage() {
       ]
     }
     return [
+      {
+        id: 'filtrar',
+        label: 'Filtrar',
+        icon: SlidersHorizontal,
+        active: Boolean(bloqueId || encargadoId),
+        content: (
+          <div className="stack" style={{ gap: '0.7rem' }}>
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="hist-bloque">Bloque</label>
+              <select
+                id="hist-bloque"
+                className="select"
+                value={bloqueId}
+                onChange={(e) => setParam('bloque', e.target.value)}
+              >
+                <option value="">Todos</option>
+                {bloques.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor="hist-enc">Encargado</label>
+              <select
+                id="hist-enc"
+                className="select"
+                value={encargadoId}
+                onChange={(e) => setParam('encargado', e.target.value)}
+              >
+                <option value="">Todos</option>
+                {encargados.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        ),
+      },
       {
         id: 'ficha',
         label: 'Por ficha',
@@ -404,7 +634,18 @@ export function HistoricosPage() {
         onClick: () => setGroupBy('fecha'),
       },
     ]
-  }, [tab, estadoAcc, groupAcc, sortAcc, groupBy])
+  }, [
+    tab,
+    estadoAcc,
+    groupAcc,
+    sortAcc,
+    groupBy,
+    fechaFiltro,
+    bloqueId,
+    encargadoId,
+    bloques,
+    encargados,
+  ])
 
   if (!ocurrencias.length && !eventos.length && !acciones.length) {
     return (
@@ -422,49 +663,84 @@ export function HistoricosPage() {
         title={tab === 'acciones' ? 'Correctivas' : 'Ejecutadas'}
         tools={filterTools}
         canClear={
-          tab === 'acciones'
-            ? Boolean(estadoAcc || groupAcc !== 'lista' || sortAcc !== 'fecha')
-            : groupBy !== 'ficha'
+          Boolean(q || bloqueId || encargadoId || fechaFiltro || estadoAcc) ||
+          groupAcc !== 'lista' ||
+          sortAcc !== 'fecha' ||
+          groupBy !== 'ficha'
         }
-        onClear={() => {
-          if (tab === 'acciones') {
-            setEstadoAcc('')
-            setGroupAcc('lista')
-            setSortAcc('fecha')
-            return
-          }
-          setGroupBy('ficha')
-        }}
+        onClear={clearFilters}
       />
       <div className="hist-toolbar">
         <div className="seg-toggle" role="tablist" aria-label="Histórico">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'ocurrencias'}
-          className={tab === 'ocurrencias' ? 'active' : ''}
-          onClick={() => setTab('ocurrencias')}
-        >
-          Ejecutadas
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'acciones'}
-          className={tab === 'acciones' ? 'active' : ''}
-          onClick={() => setTab('acciones')}
-        >
-          Correctivas
-        </button>
-      </div>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'ocurrencias'}
+            className={tab === 'ocurrencias' ? 'active' : ''}
+            onClick={() => setTab('ocurrencias')}
+          >
+            Ejecutadas
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'acciones'}
+            className={tab === 'acciones' ? 'active' : ''}
+            onClick={() => setTab('acciones')}
+          >
+            Correctivas
+            {sinProgramarCount > 0 ? (
+              <span className="tab-count" title="Sin programar">
+                {sinProgramarCount}
+              </span>
+            ) : null}
+          </button>
+        </div>
         <StatusWordsToggle />
+        {tab === 'acciones' || sinProgramarCount > 0 ? <AccionFechasToggle /> : null}
       </div>
+
+      <label className="search-field" htmlFor="hist-q">
+        <Search size={16} aria-hidden />
+        <input
+          id="hist-q"
+          className="input"
+          type="search"
+          placeholder={
+            tab === 'acciones'
+              ? 'Buscar correctiva u origen'
+              : 'Buscar ficha, actividad o encargado'
+          }
+          value={searchText}
+          onChange={(e) => onSearchChange(e.target.value)}
+          autoComplete="off"
+          enterKeyHint="search"
+          inputMode="search"
+        />
+      </label>
+
+      {sinProgramarCount > 0 && (tab !== 'acciones' || fechaFiltro !== 'sin') ? (
+        <InboxAlert count={sinProgramarCount} />
+      ) : null}
+
+      {tab === 'acciones' && fechaFiltro === 'sin' ? (
+        <p className="muted" style={{ marginTop: 0 }}>
+          Bandeja de correctivas pendientes de planificar.{' '}
+          <button type="button" className="btn btn-ghost" onClick={() => setParam('fecha', '')}>
+            Ver todas
+          </button>
+        </p>
+      ) : null}
 
       {tab === 'ocurrencias' ? (
         <>
-          {ocurrencias.length === 0 && eventos.length === 0 ? (
+          {occsFiltradas.length === 0 && evtsFiltradas.length === 0 ? (
             <div className="table-card">
-              <p className="table-empty">Aún no hay inspecciones ni actividades ejecutadas.</p>
+              <p className="table-empty">
+                {q || bloqueId || encargadoId
+                  ? 'No hay ejecuciones con esos filtros.'
+                  : 'Aún no hay inspecciones ni actividades ejecutadas.'}
+              </p>
             </div>
           ) : (
             <div className="table-card">
@@ -585,7 +861,8 @@ export function HistoricosPage() {
                           <strong>{a.texto}</strong>
                           <span className="muted col-sm-only">
                             {origen}
-                            {a.fechaObjetivo ? `${origen ? ' · ' : ''}${formatDate(a.fechaObjetivo)}` : ''}
+                            {origen ? ' · ' : ''}
+                            <AccionFechaLabel fechaObjetivo={a.fechaObjetivo} />
                             {' · '}
                             <PrioridadMark prioridad={prioridadOf(a)} />
                           </span>
@@ -598,7 +875,7 @@ export function HistoricosPage() {
                           )}
                         </span>
                         <span className="col-md muted table-nowrap">
-                          {a.fechaObjetivo ? formatDate(a.fechaObjetivo) : '—'}
+                          <AccionFechaLabel fechaObjetivo={a.fechaObjetivo} />
                         </span>
                         <span className="col-md">
                           <PrioridadMark prioridad={prioridadOf(a)} />
@@ -703,6 +980,12 @@ function EjecutadaRow({
       </div>
       {open ? (
         <div className="hist-occ-acciones">
+          {acciones.length ? (
+            <div className="hist-occ-acciones-head">
+              <span className="muted">Correctivas</span>
+              <AccionFechasToggle />
+            </div>
+          ) : null}
           <EntityCard
             nested
             className="hist-occ-ejecucion"
@@ -747,7 +1030,8 @@ function EjecutadaRow({
             acciones.map((a) => (
               <Link key={a.id} className="hist-occ-accion" to={accionHref(a)}>
                 <PrioridadMark prioridad={prioridadOf(a)} />
-                <span className="grow">{a.texto}</span>
+                <span className="grow hist-occ-accion-text">{a.texto}</span>
+                <AccionFechaLabel fechaObjetivo={a.fechaObjetivo} gated />
                 <StatusBadge estado={estadoAgendaCorrectiva(a)} />
               </Link>
             ))
