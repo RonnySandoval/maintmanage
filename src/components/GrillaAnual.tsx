@@ -5,7 +5,7 @@ import type { Actividad, Bloque, Encargado, EstadoOcurrencia, Evento, Ficha, Ocu
 import {
   esExtraordinaria,
   frecuenciaLabel,
-  tipoAccionLabel,
+  prioridadOf,
   tipoAccionOf,
   type AccionCorrectiva,
 } from '../db/types'
@@ -24,17 +24,18 @@ import {
   type ZoomLevel,
 } from '../hooks/useGridSpan'
 import { useGridNameCol } from '../hooks/useGridNameCol'
-import { useAliases } from '../lib/labels'
+import { label, useAliases } from '../lib/labels'
 import { ActividadTitle } from './ActividadTitle'
 import { FichaTitle } from './FichaTitle'
+import { PrioridadMark } from './PrioridadMark'
 import { LeyendaSimbolos, TipoBadge } from './ui'
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const TRIMESTRES = [
-  { id: 'T1', label: '1.er trim.', months: [0, 1, 2] },
-  { id: 'T2', label: '2.º trim.', months: [3, 4, 5] },
-  { id: 'T3', label: '3.er trim.', months: [6, 7, 8] },
-  { id: 'T4', label: '4.º trim.', months: [9, 10, 11] },
+  { id: 'T1', ordinal: '1.er', months: [0, 1, 2] },
+  { id: 'T2', ordinal: '2.º', months: [3, 4, 5] },
+  { id: 'T3', ordinal: '3.er', months: [6, 7, 8] },
+  { id: 'T4', ordinal: '4.º', months: [9, 10, 11] },
 ]
 
 const PRIORIDAD: Record<EstadoOcurrencia, number> = {
@@ -106,7 +107,12 @@ export function GrillaAnual({
   )
   const [detail, setDetail] = useState<DetailLevel>(0)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const chromeRef = useRef<HTMLDivElement>(null)
+  const qHeadRowRef = useRef<HTMLTableRowElement>(null)
+  const shellRef = useRef<HTMLDivElement>(null)
   const pinchRef = useRef({ dx: 0, dy: 0, dist: 0, locked: false })
+  const aliases = useAliases()
+  const trimestreWord = label('trimestre', aliases)
   const zoomRef = useRef(zoom)
   const detailRef = useRef(detail)
   zoomRef.current = zoom
@@ -331,6 +337,23 @@ export function GrillaAnual({
     return () => observer.disconnect()
   }, [vacia])
 
+  useEffect(() => {
+    if (vacia) return
+    const shell = shellRef.current
+    const chrome = chromeRef.current
+    const qRow = qHeadRowRef.current
+    if (!shell || !chrome) return
+    const apply = () => {
+      shell.style.setProperty('--year-chrome-h', `${chrome.offsetHeight}px`)
+      if (qRow) shell.style.setProperty('--year-qhead-h', `${qRow.offsetHeight}px`)
+    }
+    apply()
+    const observer = new ResizeObserver(apply)
+    observer.observe(chrome)
+    if (qRow) observer.observe(qRow)
+    return () => observer.disconnect()
+  }, [vacia, span, visible, start, modo])
+
   if (vacia) {
     return (
       <div className="card muted">
@@ -343,8 +366,8 @@ export function GrillaAnual({
 
   return (
     <div>
-      <div className="year-grid-shell">
-        <div className="year-grid-chrome">
+      <div className="year-grid-shell" ref={shellRef}>
+        <div className="year-grid-chrome" ref={chromeRef}>
           {span !== 'year' ? (
             <div className="row-spread grid-window">
               <button
@@ -437,7 +460,7 @@ export function GrillaAnual({
             }}
           >
           <thead>
-            <tr>
+            <tr ref={qHeadRowRef}>
               <th className="ficha-col" rowSpan={2}>
                 {modo === 'actividades' ? 'Actividad' : 'Ficha'}
                 {nameCol.canResize ? (
@@ -464,7 +487,7 @@ export function GrillaAnual({
                   className={`q-head q-${t.id}${i > 0 ? ' q-gap' : ''}`}
                   colSpan={t.months.length}
                 >
-                  {t.label}
+                  {`${t.ordinal} ${trimestreWord}`}
                 </th>
               ))}
             </tr>
@@ -721,7 +744,6 @@ function CorrectivaRow({
   year: number
   showMeta: boolean
 }) {
-  const aliases = useAliases()
   const fecha = accion.fechaObjetivo ?? ''
   const month = fecha.startsWith(String(year)) ? Number(fecha.slice(5, 7)) - 1 : -1
   const estado = estadoAgendaCorrectiva(accion)
@@ -731,13 +753,15 @@ function CorrectivaRow({
     <tr className="ficha-row">
       <th className="ficha-col" scope="row">
         <Link to={href}>{accion.texto}</Link>
-        <span className="ficha-meta">{tipoAccionLabel('correctiva', aliases)}</span>
+        <span className="ficha-meta">
+          <PrioridadMark prioridad={prioridadOf(accion)} />
+        </span>
         {showMeta && parent ? <span className="ficha-meta">{parent}</span> : null}
       </th>
       {monthIndexes.map((m) => {
         const cls = `month-col ${monthClass(m, start, currentMonth)}`.trim()
         if (m !== month) return <td key={m} className={cls} />
-        const title = [labelEstado(estado), tipoAccionLabel('correctiva', aliases)].join(' · ')
+        const title = [labelEstado(estado), `Prioridad ${prioridadOf(accion)}`].join(' · ')
         return (
           <td key={m} className={cls}>
             <Link

@@ -6,7 +6,7 @@ import { db } from '../db'
 import {
   ESTADOS,
   esExtraordinaria,
-  tipoAccionLabel,
+  prioridadOf,
   tipoAccionOf,
   tipoActividadLabel,
   type EstadoOcurrencia,
@@ -14,9 +14,11 @@ import {
 import { bloqueColorVar, kindActividadVar } from '../lib/colors'
 import { formatFechaProgramada, formatDateLong } from '../lib/dates'
 import { compareFichasByNumero, fichaTitulo } from '../lib/fichas'
-import { accionHref, estadoAgendaCorrectiva } from '../lib/acciones'
+import { accionHref, accionSearchText, estadoAgendaCorrectiva } from '../lib/acciones'
 import { compareActividadesByTitulo } from '../lib/actividades'
-import { EmptyState, ExtraBadge, LeyendaSimbolos, StatusBadge, StatusWordsToggle, TipoBadge } from '../components/ui'
+import { EmptyState, ExtraBadge, LeyendaSimbolos, StatusBadge, StatusWordsToggle } from '../components/ui'
+import { PrioridadMark } from '../components/PrioridadMark'
+import { TipoMark } from '../components/TipoMark'
 import { useStatusLabels } from '../hooks/useStatusLabels'
 import { SIMBOLOS_ESTADO } from '../lib/simbolos'
 import { GrillaAnual } from '../components/GrillaAnual'
@@ -24,7 +26,6 @@ import { FichaTitle } from '../components/FichaTitle'
 import { ActividadTitle } from '../components/ActividadTitle'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
 import { useTiposActividad } from '../hooks/useTiposActividad'
-import { useAliases } from '../lib/labels'
 import { InboxAlert } from '../components/InboxAlert'
 
 type ListaItem =
@@ -58,7 +59,6 @@ export function CronogramaPage() {
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
   const acciones = useLiveQuery(() => db.accionesCorrectivas.toArray()) ?? []
   const tipos = useTiposActividad()
-  const aliases = useAliases()
 
   const fichaMap = useMemo(() => Object.fromEntries(fichas.map((f) => [f.id, f])), [fichas])
   const actividadMap = useMemo(
@@ -154,7 +154,7 @@ export function CronogramaPage() {
     }
     if (tipoId && (!act || act.tipo !== tipoId)) return false
     if (q) {
-      const hay = `${a.texto} ${ficha ? `${ficha.numero} ${ficha.nombre}` : ''} ${act?.titulo ?? ''}`.toLowerCase()
+      const hay = `${accionSearchText(a)} ${ficha ? `${ficha.numero} ${ficha.nombre}` : ''} ${act?.titulo ?? ''}`.toLowerCase()
       if (!hay.includes(qLower)) return false
     }
     if (estado && estadoAgendaCorrectiva(a) !== estado) return false
@@ -172,7 +172,7 @@ export function CronogramaPage() {
     }
     if (tipoId && (!act || act.tipo !== tipoId)) return false
     if (q) {
-      const hay = `${a.texto} ${ficha ? `${ficha.numero} ${ficha.nombre}` : ''} ${act?.titulo ?? ''}`.toLowerCase()
+      const hay = `${accionSearchText(a)} ${ficha ? `${ficha.numero} ${ficha.nombre}` : ''} ${act?.titulo ?? ''}`.toLowerCase()
       if (!hay.includes(qLower)) return false
     }
     if (estado && estadoAgendaCorrectiva(a) !== estado) return false
@@ -272,13 +272,25 @@ export function CronogramaPage() {
 
   const listaItems: ListaItem[] =
     ambito === 'fichas'
-      ? filteredOcc.map((o) => ({
-          kind: 'occ' as const,
-          id: o.id,
-          fecha: o.fechaProgramada,
-          occId: o.id,
-          fichaId: o.fichaId,
-        }))
+      ? [
+          ...filteredOcc.map((o) => ({
+            kind: 'occ' as const,
+            id: o.id,
+            fecha: o.fechaProgramada,
+            occId: o.id,
+            fichaId: o.fichaId,
+          })),
+          ...correctivasFechadas
+            .filter((a) => a.fichaId && !a.actividadId)
+            .map((a) => ({
+              kind: 'acc' as const,
+              id: a.id,
+              fecha: a.fechaObjetivo as string,
+              accionId: a.id,
+              fichaId: a.fichaId,
+              actividadId: a.actividadId,
+            })),
+        ]
       : [
           ...filteredEvt.map((e) => ({
             kind: 'evt' as const,
@@ -531,8 +543,17 @@ export function CronogramaPage() {
                   </button>
                 </div>
               ) : null}
-              <div className={`table-head table-cols-crono${ambito === 'fichas' && showBloque ? '' : ' no-bloque'}`}>
+              <div
+                className={`table-head table-cols-crono${
+                  ambito === 'fichas' && showBloque ? '' : ' no-bloque'
+                }${ambito === 'actividades' ? ' has-mark' : ''}`}
+              >
                 <span className="table-bar" aria-hidden />
+                {ambito === 'actividades' ? (
+                  <span className="crono-mark" title="Tipo o prioridad">
+                    Tipo
+                  </span>
+                ) : null}
                 <span>{ambito === 'fichas' ? 'Ficha' : 'Actividad'}</span>
                 {ambito === 'fichas' && showBloque ? (
                   <span className="col-md">Bloque</span>
@@ -599,23 +620,25 @@ export function CronogramaPage() {
                         return (
                           <Link
                             key={item.id}
-                            className="table-row table-cols-crono no-bloque"
+                            className="table-row table-cols-crono no-bloque has-mark"
                             to={`/eventos/${evt.id}`}
                           >
                             <span
                               className="table-bar"
                               style={{ background: kindActividadVar() }}
                             />
+                            <span className="crono-mark">
+                              <TipoMark tipo={act.tipo} />
+                            </span>
                             <span className="table-cell">
                               <span className="occ-meta">
-                                <ActividadTitle actividad={act} />
-                                <TipoBadge tipo={act.tipo} />
+                                <ActividadTitle actividad={act} hideIcon />
                                 {esExtraordinaria(evt) ? <ExtraBadge /> : null}
                               </span>
                               <span className="muted col-sm-only">{encargado?.nombre ?? ''}</span>
                             </span>
                             <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
-                            <span className="table-nowrap">
+                            <span className="table-nowrap crono-estado">
                               <StatusBadge estado={evt.estado} />
                             </span>
                           </Link>
@@ -632,10 +655,14 @@ export function CronogramaPage() {
                           : undefined
                       if (!accion) return null
                       const parent = act ? act.titulo : ficha ? fichaTitulo(ficha) : ''
+                      const markClass =
+                        ambito === 'actividades'
+                          ? 'table-row table-cols-crono no-bloque has-mark'
+                          : `table-row table-cols-crono${ambito === 'fichas' && showBloque ? '' : ' no-bloque'}`
                       return (
                         <Link
                           key={item.id}
-                          className="table-row table-cols-crono no-bloque"
+                          className={markClass}
                           to={accionHref(accion)}
                         >
                           <span
@@ -644,17 +671,27 @@ export function CronogramaPage() {
                               background: act ? kindActividadVar() : bloqueColorVar(bloque?.color),
                             }}
                           />
+                          {ambito === 'actividades' ? (
+                            <span className="crono-mark">
+                              <PrioridadMark prioridad={prioridadOf(accion)} iconOnly />
+                            </span>
+                          ) : null}
                           <span className="table-cell">
                             <span className="occ-meta">
+                              {ambito === 'fichas' ? (
+                                <PrioridadMark prioridad={prioridadOf(accion)} iconOnly />
+                              ) : null}
                               <strong>{accion.texto}</strong>
-                              <span className="badge badge-tipo">{tipoAccionLabel('correctiva', aliases)}</span>
                             </span>
                             <span className="muted col-sm-only">
                               {parent}
                             </span>
                           </span>
+                          {ambito === 'fichas' && showBloque ? (
+                            <span className="col-md muted">{bloque?.nombre ?? '—'}</span>
+                          ) : null}
                           <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
-                          <span className="table-nowrap">
+                          <span className="table-nowrap crono-estado">
                             <StatusBadge estado={estadoAgendaCorrectiva(accion)} />
                           </span>
                         </Link>

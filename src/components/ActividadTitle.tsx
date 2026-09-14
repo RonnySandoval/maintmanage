@@ -8,9 +8,12 @@ import { actividadTitulo } from '../lib/actividades'
 export function ActividadTitle({
   actividad,
   className,
+  hideIcon = false,
 }: {
   actividad: Pick<Actividad, 'titulo' | 'tipo'> | null | undefined
   className?: string
+  /** Cuando el tipo ya va como viñeta a la izquierda de la fila. */
+  hideIcon?: boolean
 }) {
   const tipos = useTiposActividad()
   const text = actividad ? actividadTitulo(actividad, tipos) : 'Actividad'
@@ -22,7 +25,7 @@ export function ActividadTitle({
       style={{ color: kindActividadVar() }}
       title={typeLabel}
     >
-      <Icon className="tipo-icon" size={15} strokeWidth={2.25} aria-hidden />
+      {hideIcon ? null : <Icon className="tipo-icon" size={15} strokeWidth={2.25} aria-hidden />}
       <span className="actividad-title-text">{text}</span>
     </span>
   )

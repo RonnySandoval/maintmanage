@@ -33,7 +33,7 @@ import {
 } from '../db/types'
 import { bloqueColorVar, kindActividadVar } from '../lib/colors'
 import { formatDate, formatFechaProgramada, monthLabel, monthValue } from '../lib/dates'
-import { accionHref, estadoAgendaCorrectiva } from '../lib/acciones'
+import { accionHref, accionSearchText, estadoAgendaCorrectiva } from '../lib/acciones'
 import { actividadTitulo } from '../lib/actividades'
 import { fichaTitulo } from '../lib/fichas'
 import { ActividadTitle } from '../components/ActividadTitle'
@@ -41,7 +41,7 @@ import { FichaTitle } from '../components/FichaTitle'
 import { PrioridadMark } from '../components/PrioridadMark'
 import { EjecucionModal } from '../components/EjecucionForm'
 import { ShareMenu } from '../components/ShareMenu'
-import { CorrectivaBadge, EmptyState, ExtraBadge, StatusBadge, StatusWordsToggle, AccionFechasToggle, AccionFechaLabel, TipoBadge } from '../components/ui'
+import { CorrectivaBadge, EmptyState, ExtraBadge, StatusBadge, AccionFechaLabel, TipoBadge } from '../components/ui'
 import { EntityCard } from '../components/EntityCard'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
 import { InboxAlert } from '../components/InboxAlert'
@@ -267,6 +267,27 @@ export function HistoricosPage() {
     }
     return map
   }, [acciones])
+  /** Correctivas ligadas a la ficha sin inspección concreta (antes “huérfanas” en Ejecutadas). */
+  const accionesPorFichaSueltas = useMemo(() => {
+    const map = new Map<string, AccionCorrectiva[]>()
+    for (const a of acciones) {
+      if (!a.fichaId || a.ocurrenciaId || tipoAccionOf(a) !== 'correctiva') continue
+      const list = map.get(a.fichaId) ?? []
+      list.push(a)
+      map.set(a.fichaId, list)
+    }
+    return map
+  }, [acciones])
+  const accionesPorActividadSueltas = useMemo(() => {
+    const map = new Map<string, AccionCorrectiva[]>()
+    for (const a of acciones) {
+      if (!a.actividadId || a.eventoId || tipoAccionOf(a) !== 'correctiva') continue
+      const list = map.get(a.actividadId) ?? []
+      list.push(a)
+      map.set(a.actividadId, list)
+    }
+    return map
+  }, [acciones])
 
   const qLower = q.trim().toLowerCase()
 
@@ -280,11 +301,24 @@ export function HistoricosPage() {
         const enc = ficha.encargadoId ? encargadoMap[ficha.encargadoId]?.nombre ?? '' : ''
         const bloque = bloqueMap[ficha.grupoId]?.nombre ?? ''
         const hay = `${ficha.numero} ${ficha.nombre} ${bloque} ${enc} ${o.fechaProgramada}`.toLowerCase()
-        if (!hay.includes(qLower)) return false
+        const accHit = [...(accionesPorOcc.get(o.id) ?? []), ...(accionesPorFichaSueltas.get(o.fichaId) ?? [])].some(
+          (a) => accionSearchText(a).toLowerCase().includes(qLower),
+        )
+        if (!hay.includes(qLower) && !accHit) return false
       }
       return true
     })
-  }, [ocurrencias, fichaMap, bloqueMap, encargadoMap, bloqueId, encargadoId, qLower])
+  }, [
+    ocurrencias,
+    fichaMap,
+    bloqueMap,
+    encargadoMap,
+    bloqueId,
+    encargadoId,
+    qLower,
+    accionesPorOcc,
+    accionesPorFichaSueltas,
+  ])
 
   const evtsFiltradas = useMemo(() => {
     return eventos.filter((e) => {
@@ -295,11 +329,42 @@ export function HistoricosPage() {
       if (qLower) {
         const enc = act.encargadoId ? encargadoMap[act.encargadoId]?.nombre ?? '' : ''
         const hay = `${act.titulo} ${act.tipo} ${enc} ${e.fechaProgramada}`.toLowerCase()
-        if (!hay.includes(qLower)) return false
+        const accHit = [
+          ...(accionesPorEvento.get(e.id) ?? []),
+          ...(accionesPorActividadSueltas.get(e.actividadId) ?? []),
+        ].some((a) => accionSearchText(a).toLowerCase().includes(qLower))
+        if (!hay.includes(qLower) && !accHit) return false
       }
       return true
     })
-  }, [eventos, actividadMap, encargadoMap, bloqueId, encargadoId, qLower])
+  }, [
+    eventos,
+    actividadMap,
+    encargadoMap,
+    bloqueId,
+    encargadoId,
+    qLower,
+    accionesPorEvento,
+    accionesPorActividadSueltas,
+  ])
+
+  const latestOccIdByFicha = useMemo(() => {
+    const map = new Map<string, string>()
+    const sorted = [...occsFiltradas].sort((a, b) => b.fechaProgramada.localeCompare(a.fechaProgramada))
+    for (const o of sorted) {
+      if (!map.has(o.fichaId)) map.set(o.fichaId, o.id)
+    }
+    return map
+  }, [occsFiltradas])
+
+  const latestEvtIdByActividad = useMemo(() => {
+    const map = new Map<string, string>()
+    const sorted = [...evtsFiltradas].sort((a, b) => b.fechaProgramada.localeCompare(a.fechaProgramada))
+    for (const e of sorted) {
+      if (!map.has(e.actividadId)) map.set(e.actividadId, e.id)
+    }
+    return map
+  }, [evtsFiltradas])
 
   const byFicha = new Map<string, typeof occsFiltradas>()
   for (const o of occsFiltradas) {
@@ -376,7 +441,7 @@ export function HistoricosPage() {
       }
       if (qLower) {
         const hay =
-          `${a.texto} ${ficha ? `${ficha.numero} ${ficha.nombre}` : ''} ${act?.titulo ?? ''} ${a.fechaObjetivo ?? 'sin fecha'}`.toLowerCase()
+          `${accionSearchText(a)} ${ficha ? `${ficha.numero} ${ficha.nombre}` : ''} ${act?.titulo ?? ''} ${a.fechaObjetivo ?? 'sin fecha'}`.toLowerCase()
         if (!hay.includes(qLower)) return false
       }
       return true
@@ -395,6 +460,11 @@ export function HistoricosPage() {
   function renderOccRow(o: Ocurrencia, hideTitle: boolean) {
     const ficha = fichaMap[o.fichaId]
     const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
+    const linked = accionesPorOcc.get(o.id) ?? []
+    const sueltas =
+      latestOccIdByFicha.get(o.fichaId) === o.id
+        ? (accionesPorFichaSueltas.get(o.fichaId) ?? [])
+        : []
     return (
       <EjecutadaRow
         key={o.id}
@@ -403,7 +473,7 @@ export function HistoricosPage() {
         color={bloque?.color}
         encargado={ficha?.encargadoId ? encargadoMap[ficha.encargadoId] : undefined}
         ejecucion={ejecucionMap[o.id]}
-        acciones={accionesPorOcc.get(o.id) ?? []}
+        acciones={[...linked, ...sueltas]}
         hideTitle={hideTitle}
         open={openOcc === o.id}
         onToggle={() => toggleOcc(o.id)}
@@ -413,6 +483,11 @@ export function HistoricosPage() {
 
   function renderEvtRow(e: Evento, hideTitle: boolean) {
     const act = actividadMap[e.actividadId]
+    const linked = accionesPorEvento.get(e.id) ?? []
+    const sueltas =
+      latestEvtIdByActividad.get(e.actividadId) === e.id
+        ? (accionesPorActividadSueltas.get(e.actividadId) ?? [])
+        : []
     return (
       <EjecutadaRow
         key={e.id}
@@ -420,7 +495,7 @@ export function HistoricosPage() {
         actividad={act}
         encargado={act?.encargadoId ? encargadoMap[act.encargadoId] : undefined}
         ejecucion={ejecucionEventoMap[e.id]}
-        acciones={accionesPorEvento.get(e.id) ?? []}
+        acciones={[...linked, ...sueltas]}
         hideTitle={hideTitle}
         open={openOcc === e.id}
         onToggle={() => toggleOcc(e.id)}
@@ -696,8 +771,6 @@ export function HistoricosPage() {
             ) : null}
           </button>
         </div>
-        <StatusWordsToggle />
-        {tab === 'acciones' || sinProgramarCount > 0 ? <AccionFechasToggle /> : null}
       </div>
 
       <label className="search-field" htmlFor="hist-q">
@@ -841,10 +914,12 @@ export function HistoricosPage() {
           ) : (
             <div className="table-card">
               <div className="table-head table-cols-hist-acc">
+                <span className="hist-acc-prio" title="Prioridad">
+                  Prio
+                </span>
                 <span>Registro</span>
                 <span className="col-md">Origen</span>
                 <span className="col-md">Fecha</span>
-                <span className="col-md">Prioridad</span>
                 <span>Estado</span>
               </div>
               {gruposAcc.map((grupo) => (
@@ -857,30 +932,35 @@ export function HistoricosPage() {
                     const origen = act ? actividadTitulo(act) : ficha ? fichaTitulo(ficha) : ''
                     return (
                       <Link key={a.id} className="table-row table-cols-hist-acc" to={accionHref(a)}>
+                        <span className="hist-acc-prio">
+                          <PrioridadMark prioridad={prioridadOf(a)} iconOnly />
+                        </span>
                         <span className="table-cell">
                           <strong>{a.texto}</strong>
+                          {a.detalle?.trim() ? (
+                            <span className="muted" style={{ display: 'block', fontSize: '0.82rem' }}>
+                              {a.detalle.trim()}
+                            </span>
+                          ) : null}
                           <span className="muted col-sm-only">
                             {origen}
                             {origen ? ' · ' : ''}
                             <AccionFechaLabel fechaObjetivo={a.fechaObjetivo} />
-                            {' · '}
-                            <PrioridadMark prioridad={prioridadOf(a)} />
                           </span>
                         </span>
-                        <span className="col-md">
+                        <span className="col-md hist-acc-origen">
                           {act ? (
                             <ActividadTitle actividad={act} />
                           ) : (
                             <FichaTitle ficha={ficha} color={bloque?.color} />
                           )}
                         </span>
-                        <span className="col-md muted table-nowrap">
+                        <span className="col-md muted table-nowrap hist-acc-fecha">
                           <AccionFechaLabel fechaObjetivo={a.fechaObjetivo} />
                         </span>
-                        <span className="col-md">
-                          <PrioridadMark prioridad={prioridadOf(a)} />
+                        <span className="hist-acc-estado">
+                          <StatusBadge estado={estadoAgendaCorrectiva(a)} />
                         </span>
-                        <StatusBadge estado={estadoAgendaCorrectiva(a)} />
                       </Link>
                     )
                   })}
@@ -983,7 +1063,6 @@ function EjecutadaRow({
           {acciones.length ? (
             <div className="hist-occ-acciones-head">
               <span className="muted">Correctivas</span>
-              <AccionFechasToggle />
             </div>
           ) : null}
           <EntityCard
@@ -1029,7 +1108,7 @@ function EjecutadaRow({
           {acciones.length ? (
             acciones.map((a) => (
               <Link key={a.id} className="hist-occ-accion" to={accionHref(a)}>
-                <PrioridadMark prioridad={prioridadOf(a)} />
+                <PrioridadMark prioridad={prioridadOf(a)} iconOnly />
                 <span className="grow hist-occ-accion-text">{a.texto}</span>
                 <AccionFechaLabel fechaObjetivo={a.fechaObjetivo} gated />
                 <StatusBadge estado={estadoAgendaCorrectiva(a)} />

@@ -4,7 +4,12 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { CalendarClock, CircleCheck, Pencil, Trash2, Wrench } from 'lucide-react'
 import { db } from '../db'
 import { prioridadOf, tipoAccionLabel, tipoAccionOf } from '../db/types'
-import { convertirAccionHref, estadoAgendaCorrectiva } from '../lib/acciones'
+import {
+  accionDetalle,
+  accionTitulo,
+  convertirAccionHref,
+  estadoAgendaCorrectiva,
+} from '../lib/acciones'
 import { formatDate } from '../lib/dates'
 import { accionLabel, useAliases } from '../lib/labels'
 import { AccionEditor, ProgramarFechaForm } from '../components/AccionesPanel'
@@ -55,6 +60,7 @@ export function AccionDetailPage() {
 
   const current = accion
   const tipo = tipoAccionOf(current)
+  const detalleTxt = accionDetalle(current)
   const origenHref = current.ocurrenciaId
     ? `/ocurrencias/${current.ocurrenciaId}`
     : current.eventoId
@@ -86,58 +92,60 @@ export function AccionDetailPage() {
   return (
     <div className="stack">
       <EntityCard
-        title={<h2 className="title-sm">{current.texto}</h2>}
+        leading={
+          tipo === 'correctiva' ? (
+            <PrioridadMark prioridad={prioridadOf(current)} iconOnly />
+          ) : undefined
+        }
+        title={<h2 className="title-sm">{accionTitulo(current)}</h2>}
         badge={<StatusBadge estado={estadoAgendaCorrectiva(current)} />}
         footer={
-          <>
-            <div className="row card-toolbar-actions">
-              {tipo === 'correctiva' ? (
-                <Link
-                  className="btn"
-                  to={convertirAccionHref(current)}
-                  title="Crear una actividad planificable a partir de esta correctiva"
-                >
-                  <Wrench size={16} />
-                  <span className="btn-text">Convertir en actividad</span>
-                </Link>
-              ) : null}
-              {needsSchedule ? (
-                <>
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => setPanel((was) => (was === 'edit' ? 'none' : 'edit'))}
-                  >
-                    <Pencil size={16} />
-                    {panel === 'edit' ? 'Ocultar edición' : 'Editar'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => setPanel((was) => (was === 'schedule' ? 'none' : 'schedule'))}
-                  >
-                    <CalendarClock size={16} />
-                    {panel === 'schedule' ? 'Ocultar fecha' : 'Programar fecha'}
-                  </button>
-                </>
-              ) : canExecute ? (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => {
-                    setPanel('none')
-                    setEjecOpen((was) => !was)
-                  }}
-                >
-                  {ejecucion ? <Pencil size={16} /> : <CircleCheck size={16} />}
-                  {ejecucion
-                    ? ejecOpen
-                      ? 'Ocultar ejecución'
-                      : 'Editar ejecución'
-                    : 'Marcar como ejecutada'}
-                </button>
-              ) : null}
-            </div>
+          <div className="row accion-card-actions">
+            {needsSchedule ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-schedule"
+                onClick={() => setPanel((was) => (was === 'schedule' ? 'none' : 'schedule'))}
+              >
+                <CalendarClock size={16} />
+                {panel === 'schedule' ? 'Ocultar fecha' : 'Programar fecha'}
+              </button>
+            ) : canExecute ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-schedule"
+                onClick={() => {
+                  setPanel('none')
+                  setEjecOpen((was) => !was)
+                }}
+              >
+                {ejecucion ? <Pencil size={16} /> : <CircleCheck size={16} />}
+                {ejecucion
+                  ? ejecOpen
+                    ? 'Ocultar ejecución'
+                    : 'Editar ejecución'
+                  : 'Marcar como ejecutada'}
+              </button>
+            ) : null}
+            {tipo === 'correctiva' ? (
+              <Link
+                className="icon-btn"
+                to={convertirAccionHref(current)}
+                aria-label="Convertir en actividad"
+                title="Convertir en actividad"
+              >
+                <Wrench size={16} />
+              </Link>
+            ) : null}
+            <button
+              type="button"
+              className="icon-btn icon-btn-edit"
+              aria-label={panel === 'edit' ? 'Ocultar edición' : 'Editar'}
+              title={panel === 'edit' ? 'Ocultar edición' : 'Editar'}
+              onClick={() => setPanel((was) => (was === 'edit' ? 'none' : 'edit'))}
+            >
+              <Pencil size={16} />
+            </button>
             <button
               type="button"
               className="icon-btn icon-btn-delete"
@@ -148,12 +156,12 @@ export function AccionDetailPage() {
             >
               <Trash2 size={16} />
             </button>
-          </>
+          </div>
         }
       >
+        {detalleTxt ? <p className="accion-detalle">{detalleTxt}</p> : null}
         <p className="muted occ-meta">
           <span>{tipoAccionLabel(tipo, aliases)}</span>
-          {tipo === 'correctiva' ? <PrioridadMark prioridad={prioridadOf(current)} /> : null}
           <AccionFechaLabel fechaObjetivo={current.fechaObjetivo} />
         </p>
         <p className="muted">

@@ -416,12 +416,16 @@ export function DashboardPage() {
                   className="card card-click dash-item"
                   to={accionHref(a)}
                 >
-                  <div className="row-spread">
-                    <strong>{a.texto}</strong>
+                  <div className="row-spread" style={{ alignItems: 'flex-start', gap: '0.5rem' }}>
+                    <span className="occ-meta" style={{ alignItems: 'flex-start' }}>
+                      {tipoAccionOf(a) === 'correctiva' ? (
+                        <PrioridadMark prioridad={prioridadOf(a)} iconOnly />
+                      ) : null}
+                      <strong>{a.texto}</strong>
+                    </span>
                     <StatusBadge estado={estadoAgendaCorrectiva(a)} />
                   </div>
                   <div className="muted occ-meta">
-                    {tipoAccionOf(a) === 'correctiva' ? <PrioridadMark prioridad={prioridadOf(a)} /> : null}
                     {tipoAccionLabel(tipoAccionOf(a), aliases)} ·{' '}
                     {act ? (
                       <ActividadTitle actividad={act} />

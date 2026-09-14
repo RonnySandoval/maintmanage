@@ -7,11 +7,12 @@ import {
   CircleHelp,
   DatabaseBackup,
   Download,
+  FileJson,
   FolderOpen,
-  FolderInput,
   FolderX,
   Info,
   Monitor,
+  Share2,
   Smartphone,
   Type,
   Upload,
@@ -19,19 +20,25 @@ import {
 } from 'lucide-react'
 import { db } from '../db'
 import {
+  BACKUP_FILE_NAME,
+  backupKindLabel,
   backupIntervalHoursOf,
   backupIntervalMsOf,
   canUseFolderBackup,
   DEFAULT_BACKUP_INTERVAL_HOURS,
   downloadBlob,
-  exportBackup,
+  exportBackupJson,
+  exportBackupZip,
+  getUsableBackupFolder,
   hasUserData,
   importBackup,
+  markBackupDone,
   MAX_BACKUP_INTERVAL_HOURS,
   MIN_BACKUP_INTERVAL_HOURS,
   nextBackupAtOf,
   pickBackupFolder,
   restoreFromFolder,
+  shareBackupZip,
   unlinkBackupFolder,
   writeBackupToFolder,
 } from '../db/backup'
@@ -48,7 +55,6 @@ import {
 } from '../lib/labels'
 import { requestNotificaciones } from '../lib/notifications'
 import { EntityCard } from '../components/EntityCard'
-import { RestorePanel } from '../components/RestorePanel'
 import { ThemeModePicker } from '../components/ThemeQuickToggle'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 
@@ -79,6 +85,11 @@ export function AjustesPage() {
   const [quota, setQuota] = useState<string>('')
   const [aliasDrafts, setAliasDrafts] = useState<AliasMap>({})
   const [aliasFocus, setAliasFocus] = useState<AliasKey | null>(null)
+  const folderOk = canUseFolderBackup()
+  const [copiaPaso, setCopiaPaso] = useState<'guardar' | 'recuperar'>('guardar')
+  const [copiaCamino, setCopiaCamino] = useState<'carpeta' | 'zip' | 'json'>(() =>
+    canUseFolderBackup() ? 'carpeta' : 'zip',
+  )
 
   async function loadQuota() {
     const est = await navigator.storage?.estimate()
@@ -98,20 +109,68 @@ export function AjustesPage() {
   const aliases = useAliases()
   const intervalHours = backupIntervalHoursOf(ajustes?.backupIntervalHours)
   const nextBackupAt = nextBackupAtOf(ajustes)
-  const folderOk = canUseFolderBackup()
   const pendingChanges =
     !!ajustes?.lastChangedAt &&
-    (!ajustes.lastBackupAt || ajustes.lastChangedAt > ajustes.lastChangedAt)
+    (!ajustes.lastBackupAt || ajustes.lastChangedAt > ajustes.lastBackupAt)
+  const hasFolder = Boolean(ajustes?.backupFolderName)
+  const caminoActivo = copiaCamino === 'carpeta' && !folderOk ? 'zip' : copiaCamino
+  const caminoHint =
+    caminoActivo === 'carpeta'
+      ? `Carpeta → archivo ${BACKUP_FILE_NAME} (completo, con fotos).`
+      : caminoActivo === 'zip'
+        ? 'ZIP → archivo .zip completo (datos + fotos). Ideal para móvil o compartir.'
+        : 'JSON → archivo .json solo con datos (sin fotos ni documentos).'
 
-  async function exportNow() {
+  async function exportZip() {
     setBusy(true)
     setMessage('')
     try {
-      const { blob, filename } = await exportBackup()
+      const { blob, filename } = await exportBackupZip()
       downloadBlob(blob, filename)
-      setMessage(`Copia lista (${formatBytes(blob.size)}). Pásala al otro dispositivo e impórtala.`)
+      await markBackupDone('zip')
+      setMessage(
+        `ZIP listo (${formatBytes(blob.size)}). Guárdalo o pásalo al otro dispositivo e impórtalo como ZIP.`,
+      )
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'No se pudo exportar.')
+      setMessage(err instanceof Error ? err.message : 'No se pudo exportar el ZIP.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function exportJson() {
+    setBusy(true)
+    setMessage('')
+    try {
+      const { blob, filename } = await exportBackupJson()
+      downloadBlob(blob, filename)
+      await markBackupDone('json')
+      setMessage(
+        `JSON listo (${formatBytes(blob.size)}). Solo datos (sin fotos). Impórtalo como JSON.`,
+      )
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'No se pudo exportar el JSON.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function shareZip() {
+    setBusy(true)
+    setMessage('')
+    try {
+      const result = await shareBackupZip()
+      if (result === 'cancelled') {
+        setMessage('')
+        return
+      }
+      setMessage(
+        result === 'shared'
+          ? 'ZIP compartido. En el otro dispositivo restáuralo con «Elegir ZIP».'
+          : 'Este dispositivo no pudo compartir el archivo; se descargó el ZIP.',
+      )
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'No se pudo compartir el ZIP.')
     } finally {
       setBusy(false)
     }
@@ -124,8 +183,8 @@ export function AjustesPage() {
       const result = await saveBackupNow()
       setMessage(
         result.kind === 'folder'
-          ? `Copia actualizada en la carpeta «${ajustes?.backupFolderName || 'elegida'}» (${formatBytes(result.size)}).`
-          : `ZIP descargado (${formatBytes(result.size)}). Guárdalo en Drive, USB o WhatsApp.`,
+          ? `Actualizado en carpeta «${ajustes?.backupFolderName || 'elegida'}» (${formatBytes(result.size)}). Archivo: ${BACKUP_FILE_NAME}.`
+          : `ZIP descargado (${formatBytes(result.size)}). Restáuralo con «Elegir ZIP».`,
       )
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'No se pudo guardar la copia.')
@@ -166,10 +225,13 @@ export function AjustesPage() {
     setBusy(true)
     setMessage('')
     try {
-      const handle = await pickBackupFolder()
+      const linked = await getUsableBackupFolder()
+      const handle = linked ?? (await pickBackupFolder())
       await restoreFromFolder(handle, modeImport)
       await ensureHorizon()
-      setMessage('Datos recuperados desde la carpeta de copias.')
+      setMessage(
+        `Datos recuperados desde carpeta «${handle.name}» (${BACKUP_FILE_NAME} o ZIP maintmanage-*.zip).`,
+      )
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         setMessage('')
@@ -237,9 +299,15 @@ export function AjustesPage() {
     setBusy(true)
     setMessage('')
     try {
-      await importBackup(file, modeImport)
+      const kind = await importBackup(file, modeImport)
       await ensureHorizon()
-      setMessage('Copia importada. Ya puedes trabajar con esos datos en este dispositivo.')
+      const extra =
+        kind === 'json'
+          ? ' El JSON no incluye fotos ni documentos.'
+          : ' Incluye archivos del ZIP si venían en la copia.'
+      setMessage(
+        `Copia ${backupKindLabel(kind)} importada (${modeImport === 'replace' ? 'reemplazo' : 'fusión'}).${extra}`,
+      )
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'No se pudo importar.')
     } finally {
@@ -351,35 +419,110 @@ export function AjustesPage() {
                 </span>
               </h2>
             }
-            footer={
-              <div className="row card-toolbar-actions">
-                {folderOk ? (
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={busy}
-                    onClick={() => void chooseFolder()}
-                  >
-                    <FolderOpen size={16} />
-                    <span className="btn-text">
-                      {ajustes?.backupFolderName ? 'Cambiar carpeta' : 'Elegir carpeta'}
-                    </span>
-                  </button>
-                ) : null}
+          >
+            <p className="backup-status-line muted">
+              Última:{' '}
+              <strong>
+                {ajustes?.lastBackupAt ? formatDateTime(ajustes.lastBackupAt) : 'aún no hay'}
+              </strong>
+              {backupKindLabel(ajustes?.lastBackupKind)
+                ? ` · ${backupKindLabel(ajustes?.lastBackupKind)}`
+                : ''}
+              {' · '}
+              {pendingChanges ? 'hay cambios sin copiar' : 'al día'}
+              {hasFolder ? ` · carpeta «${ajustes?.backupFolderName}»` : ''}
+            </p>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Elige primero qué quieres hacer y después el mismo tipo al guardar y al recuperar.
+            </p>
+
+            <p className="backup-step-label">1. Qué quieres hacer</p>
+            <div className="seg-toggle" role="tablist" aria-label="Qué quieres hacer">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={copiaPaso === 'guardar'}
+                className={copiaPaso === 'guardar' ? 'active' : ''}
+                onClick={() => {
+                  setCopiaPaso('guardar')
+                  setMessage('')
+                }}
+              >
+                Guardar / exportar
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={copiaPaso === 'recuperar'}
+                className={copiaPaso === 'recuperar' ? 'active' : ''}
+                onClick={() => {
+                  setCopiaPaso('recuperar')
+                  setMessage('')
+                }}
+              >
+                Recuperar / importar
+              </button>
+            </div>
+
+            <p className="backup-step-label">2. Tipo de copia</p>
+            <div className="seg-toggle tabs-3" role="radiogroup" aria-label="Tipo de copia">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={caminoActivo === 'carpeta'}
+                className={caminoActivo === 'carpeta' ? 'active' : ''}
+                disabled={!folderOk}
+                title={folderOk ? 'Carpeta en el PC' : 'No disponible en este navegador'}
+                onClick={() => setCopiaCamino('carpeta')}
+              >
+                Carpeta
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={caminoActivo === 'zip'}
+                className={caminoActivo === 'zip' ? 'active' : ''}
+                onClick={() => setCopiaCamino('zip')}
+              >
+                ZIP
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={caminoActivo === 'json'}
+                className={caminoActivo === 'json' ? 'active' : ''}
+                onClick={() => setCopiaCamino('json')}
+              >
+                JSON
+              </button>
+            </div>
+            <p className="muted backup-camino-hint">{caminoHint}</p>
+
+            <p className="backup-step-label">
+              3. {copiaPaso === 'guardar' ? 'Acción' : 'Restaurar (mismo tipo que usaste al guardar)'}
+            </p>
+
+            {copiaPaso === 'guardar' && caminoActivo === 'carpeta' ? (
+              <div className="backup-actions">
                 <button
                   type="button"
                   className="btn btn-primary"
                   disabled={busy}
+                  onClick={() => void chooseFolder()}
+                >
+                  <FolderOpen size={16} />
+                  {hasFolder ? 'Cambiar carpeta' : 'Elegir carpeta'}
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy || !hasFolder}
                   onClick={() => void saveNow()}
                 >
                   <Download size={16} />
-                  <span className="btn-text">Guardar ahora</span>
+                  Guardar en carpeta
                 </button>
-                <button type="button" className="btn" disabled={busy} onClick={() => void exportNow()}>
-                  <Download size={16} />
-                  <span className="btn-text">ZIP</span>
-                </button>
-                {ajustes?.backupFolderName ? (
+                {hasFolder ? (
                   <button
                     type="button"
                     className="btn btn-ghost"
@@ -387,12 +530,151 @@ export function AjustesPage() {
                     onClick={() => void forgetFolder()}
                   >
                     <FolderX size={16} />
-                    <span className="btn-text">Dejar carpeta</span>
+                    Dejar de usar carpeta
                   </button>
                 ) : null}
               </div>
-            }
-          >
+            ) : null}
+
+            {copiaPaso === 'guardar' && caminoActivo === 'zip' ? (
+              <div className="backup-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={busy}
+                  onClick={() => void exportZip()}
+                >
+                  <Download size={16} />
+                  Descargar ZIP
+                </button>
+                <button type="button" className="btn" disabled={busy} onClick={() => void shareZip()}>
+                  <Share2 size={16} />
+                  Compartir ZIP
+                </button>
+              </div>
+            ) : null}
+
+            {copiaPaso === 'guardar' && caminoActivo === 'json' ? (
+              <div className="backup-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={busy}
+                  onClick={() => void exportJson()}
+                >
+                  <FileJson size={16} />
+                  Descargar JSON
+                </button>
+                <p className="muted" style={{ margin: 0, width: '100%' }}>
+                  Más liviano, pero al recuperar no volverán las fotos.
+                </p>
+              </div>
+            ) : null}
+
+            {copiaPaso === 'recuperar' && caminoActivo === 'carpeta' ? (
+              <div className="backup-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={busy}
+                  onClick={() => void restoreFolder('replace')}
+                >
+                  <Upload size={16} />
+                  Restaurar carpeta (reemplazar)
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy}
+                  onClick={() => void restoreFolder('merge')}
+                >
+                  <Upload size={16} />
+                  Fusionar desde carpeta
+                </button>
+                <p className="muted" style={{ margin: 0, width: '100%' }}>
+                  Reemplazar borra lo de este aparato. Fusionar añade y, si el id coincide, gana la
+                  copia.
+                </p>
+              </div>
+            ) : null}
+
+            {copiaPaso === 'recuperar' && caminoActivo === 'zip' ? (
+              <div className="backup-actions">
+                <label className="btn btn-primary">
+                  <Upload size={16} />
+                  Elegir ZIP (reemplazar)
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept=".zip,application/zip"
+                    disabled={busy}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ''
+                      void importNow(file, 'replace')
+                    }}
+                  />
+                </label>
+                <label className="btn">
+                  <Upload size={16} />
+                  Elegir ZIP (fusionar)
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept=".zip,application/zip"
+                    disabled={busy}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ''
+                      void importNow(file, 'merge')
+                    }}
+                  />
+                </label>
+              </div>
+            ) : null}
+
+            {copiaPaso === 'recuperar' && caminoActivo === 'json' ? (
+              <div className="backup-actions">
+                <label className="btn btn-primary">
+                  <Upload size={16} />
+                  Elegir JSON (reemplazar)
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept=".json,application/json"
+                    disabled={busy}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ''
+                      void importNow(file, 'replace')
+                    }}
+                  />
+                </label>
+                <label className="btn">
+                  <Upload size={16} />
+                  Elegir JSON (fusionar)
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept=".json,application/json"
+                    disabled={busy}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ''
+                      void importNow(file, 'merge')
+                    }}
+                  />
+                </label>
+                <p className="muted" style={{ margin: 0, width: '100%' }}>
+                  Este camino no restaura fotos ni documentos.
+                </p>
+              </div>
+            ) : null}
+
+            {message ? <div className="hint">{message}</div> : null}
+          </EntityCard>
+
+          <SettingsAccordion title="Programación automática" icon={DatabaseBackup} summary="Intervalo y próxima copia">
             <div className="backup-fields">
               <div className="field">
                 <label htmlFor="backup-interval">Intervalo (horas)</label>
@@ -428,90 +710,14 @@ export function AjustesPage() {
                 </p>
               </div>
             </div>
-            <ul className="backup-status">
-              <li>
-                Última:{' '}
-                <strong>
-                  {ajustes?.lastBackupAt ? formatDateTime(ajustes.lastBackupAt) : 'aún no hay'}
-                </strong>
-                {ajustes?.lastBackupKind === 'folder' ? ' (carpeta)' : null}
-                {ajustes?.lastBackupKind === 'download' ? ' (ZIP)' : null}
-              </li>
-              <li>
-                Carpeta:{' '}
-                <strong>
-                  {ajustes?.backupFolderName ? `«${ajustes.backupFolderName}»` : 'ninguna'}
-                </strong>
-              </li>
-              <li>
-                Estado: <strong>{pendingChanges ? 'cambios sin copiar' : 'al día'}</strong>
-              </li>
-            </ul>
             <label className="backup-toggle">
               <input
                 type="checkbox"
                 checked={ajustes?.autoBackup !== false}
                 onChange={() => void toggleAutoBackup()}
               />
-              Copia automática (solo si hay cambios)
+              Copia automática (solo si hay cambios). Preferible con carpeta vinculada.
             </label>
-            {message ? <div className="hint">{message}</div> : null}
-          </EntityCard>
-
-          <SettingsAccordion
-            title="Importar y recuperar"
-            icon={FolderInput}
-            summary="ZIP, carpeta o fusionar"
-          >
-            <RestorePanel compact embedded />
-            <h3 className="title-sm" style={{ marginTop: '0.75rem' }}>
-              Importar en este dispositivo
-            </h3>
-            <p className="muted">
-              Reemplazar deja este aparato igual que la copia. Fusionar añade; si el id coincide,
-              gana el archivo.
-            </p>
-            <div className="row" style={{ flexWrap: 'wrap' }}>
-              {folderOk ? (
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={busy}
-                  onClick={() => void restoreFolder('replace')}
-                >
-                  <FolderOpen size={16} />
-                  Desde carpeta
-                </button>
-              ) : null}
-              <label className="btn">
-                <Upload size={16} />
-                ZIP (reemplazar)
-                <input
-                  className="sr-only"
-                  type="file"
-                  accept=".zip,application/zip"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    e.target.value = ''
-                    void importNow(file, 'replace')
-                  }}
-                />
-              </label>
-              <label className="btn">
-                <Upload size={16} />
-                ZIP (fusionar)
-                <input
-                  className="sr-only"
-                  type="file"
-                  accept=".zip,application/zip"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    e.target.value = ''
-                    void importNow(file, 'merge')
-                  }}
-                />
-              </label>
-            </div>
             <button type="button" className="btn btn-ghost" onClick={() => void loadQuota()}>
               Ver espacio usado
             </button>
@@ -615,9 +821,9 @@ export function AjustesPage() {
         >
           <p className="muted">
             MaintManage funciona sin servidor. GitHub Pages solo entrega la aplicación. La copia
-            vive en la carpeta o el ZIP que elijas. Fotos y documentos grandes ocupan cuota del
-            navegador. Word se almacena; la vista previa rica no está incluida. iOS comparte peor
-            archivos que Android.
+            vive en la carpeta, el ZIP o el JSON que elijas. El ZIP y la carpeta incluyen fotos; el
+            JSON solo datos. Fotos y documentos grandes ocupan cuota del navegador. Word se
+            almacena; la vista previa rica no está incluida. iOS comparte peor archivos que Android.
           </p>
         </EntityCard>
       ) : null}

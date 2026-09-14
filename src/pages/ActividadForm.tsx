@@ -31,6 +31,7 @@ export function ActividadFormPage() {
   const tipoQuery = tipoParam ? tipoActividadOf(tipoParam) : ''
   const fromAccion = params.get('fromAccion') || ''
   const tituloQuery = params.get('titulo') || ''
+  const notasQuery = params.get('notas') || ''
   const fechaQuery = params.get('fecha') || ''
 
   const actividad = useLiveQuery(async () => {
@@ -49,7 +50,7 @@ export function ActividadFormPage() {
   const [frecuencia, setFrecuencia] = useState<Frecuencia>('unica')
   const [fechaPrecision, setFechaPrecision] = useState<FechaPrecision>('dia')
   const [fechaInicio, setFechaInicio] = useState(() => fechaQuery || todayISO())
-  const [notas, setNotas] = useState('')
+  const [notas, setNotas] = useState(() => notasQuery)
   const [files, setFiles] = useState<File[]>([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -78,7 +79,14 @@ export function ActividadFormPage() {
     if (!fechaQuery && origenAccion.fechaObjetivo) {
       setFechaInicio((was) => was || origenAccion.fechaObjetivo!)
     }
-    setNotas((was) => was || `Derivada de correctiva: ${origenAccion.texto}`)
+    const detalle = origenAccion.detalle?.trim()
+    setNotas(
+      (was) =>
+        was ||
+        (detalle
+          ? detalle
+          : `Derivada de correctiva: ${origenAccion.texto}`),
+    )
   }, [editing, origenAccion, fechaQuery])
 
   async function onSubmit(e: FormEvent) {

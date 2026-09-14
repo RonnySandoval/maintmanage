@@ -132,7 +132,10 @@ export interface AccionCorrectiva {
   actividadId?: string
   eventoId?: string
   tipo: TipoAccion
+  /** Título / definición corta. */
   texto: string
+  /** Detalle u observaciones (opcional). */
+  detalle?: string
   estado: EstadoCorrectiva
   fechaObjetivo?: string
   prioridad?: PrioridadAccion
@@ -162,7 +165,7 @@ export interface Ajustes {
   /** Última mutación de datos de usuario (fichas, fotos, etc.). */
   lastChangedAt?: number
   lastBackupAt?: number
-  lastBackupKind?: 'folder' | 'download'
+  lastBackupKind?: 'folder' | 'zip' | 'json' | 'download'
   backupFolderName?: string
   /** Tipos de actividad añadidos por el usuario. */
   tiposActividad?: TipoActividadDef[]

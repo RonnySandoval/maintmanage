@@ -19,10 +19,21 @@ import type {
 type AdjuntoMeta = Omit<Adjunto, 'blob'>
 
 export const BACKUP_FILE_NAME = 'maintmanage-backup.zip'
+export const BACKUP_JSON_NAME_PREFIX = 'maintmanage'
 export const DEFAULT_BACKUP_INTERVAL_HOURS = 12
 export const BACKUP_INTERVAL_MS = DEFAULT_BACKUP_INTERVAL_HOURS * 60 * 60 * 1000
 export const MIN_BACKUP_INTERVAL_HOURS = 1
 export const MAX_BACKUP_INTERVAL_HOURS = 168
+
+export type BackupFileKind = 'zip' | 'json'
+export type BackupSaveKind = 'folder' | BackupFileKind | 'download'
+
+export function backupKindLabel(kind?: string | null): string {
+  if (kind === 'folder') return 'carpeta'
+  if (kind === 'json') return 'JSON'
+  if (kind === 'zip' || kind === 'download') return 'ZIP'
+  return ''
+}
 
 export function backupIntervalHoursOf(hours?: number | null): number {
   if (typeof hours !== 'number' || !Number.isFinite(hours)) return DEFAULT_BACKUP_INTERVAL_HOURS
@@ -84,8 +95,7 @@ export async function requestPersistentStorage(): Promise<boolean> {
   }
 }
 
-export async function exportBackup(): Promise<{ blob: Blob; filename: string }> {
-  const zip = new JSZip()
+async function buildPayload(): Promise<{ payload: BackupPayload; adjuntos: Adjunto[] }> {
   const adjuntos = await db.adjuntos.toArray()
   const payload: BackupPayload = {
     version: 1,
@@ -111,28 +121,48 @@ export async function exportBackup(): Promise<{ blob: Blob; filename: string }> 
       createdAt: adjunto.createdAt,
     })),
   }
+  return { payload, adjuntos }
+}
+
+function assertPayload(payload: BackupPayload): void {
+  if (!payload || payload.version !== 1) {
+    throw new Error('Versión de copia no compatible.')
+  }
+}
+
+export async function exportBackup(): Promise<{ blob: Blob; filename: string }> {
+  return exportBackupZip()
+}
+
+/** ZIP completo: datos + fotos/documentos. */
+export async function exportBackupZip(): Promise<{ blob: Blob; filename: string }> {
+  const { payload, adjuntos } = await buildPayload()
+  const zip = new JSZip()
   zip.file('backup.json', JSON.stringify(payload))
   const folder = zip.folder('files')
   for (const adjunto of adjuntos) {
     folder?.file(adjunto.id, adjunto.blob)
   }
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' })
-  return { blob, filename: `maintmanage-${todayISO()}.zip` }
+  return { blob, filename: `${BACKUP_JSON_NAME_PREFIX}-${todayISO()}.zip` }
 }
 
-export async function importBackup(file: Blob, mode: 'replace' | 'merge'): Promise<void> {
+/** JSON ligero: solo datos (sin fotos ni documentos). */
+export async function exportBackupJson(): Promise<{ blob: Blob; filename: string }> {
+  const { payload } = await buildPayload()
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  return { blob, filename: `${BACKUP_JSON_NAME_PREFIX}-${todayISO()}.json` }
+}
+
+async function readZipBackup(file: Blob): Promise<{ payload: BackupPayload; adjuntos: Adjunto[] }> {
   const zip = await JSZip.loadAsync(file)
   const jsonFile = zip.file('backup.json')
   if (!jsonFile) {
-    throw new Error('El archivo no es una copia de MaintManage (falta backup.json).')
+    throw new Error('El ZIP no es una copia de MaintManage (falta backup.json).')
   }
   const payload = JSON.parse(await jsonFile.async('string')) as BackupPayload
-  if (payload.version !== 1) {
-    throw new Error('Versión de copia no compatible.')
-  }
+  assertPayload(payload)
 
-  // Extraer blobs del ZIP antes de abrir IndexedDB: await de JSZip dentro
-  // de la transacción provoca "Transaction committed too early".
   const adjuntos: Adjunto[] = []
   for (const meta of payload.adjuntosMeta ?? []) {
     const entry = zip.file(`files/${meta.id}`)
@@ -143,7 +173,58 @@ export async function importBackup(file: Blob, mode: 'replace' | 'merge'): Promi
     }
     adjuntos.push({ ...meta, blob })
   }
+  return { payload, adjuntos }
+}
 
+async function readJsonBackup(file: Blob): Promise<{ payload: BackupPayload; adjuntos: Adjunto[] }> {
+  const text = await file.text()
+  const payload = JSON.parse(text) as BackupPayload
+  assertPayload(payload)
+  return { payload, adjuntos: [] }
+}
+
+export function detectBackupKind(file: Blob): BackupFileKind {
+  const name = 'name' in file && typeof (file as File).name === 'string' ? (file as File).name.toLowerCase() : ''
+  if (name.endsWith('.json') || file.type.includes('json')) return 'json'
+  if (name.endsWith('.zip') || file.type.includes('zip')) return 'zip'
+  return 'zip'
+}
+
+export async function readBackupFile(
+  file: Blob,
+): Promise<{ kind: BackupFileKind; payload: BackupPayload; adjuntos: Adjunto[] }> {
+  const name = 'name' in file && typeof (file as File).name === 'string' ? (file as File).name.toLowerCase() : ''
+  const prefersJson = name.endsWith('.json') || file.type.includes('json')
+
+  if (prefersJson) {
+    const read = await readJsonBackup(file)
+    return { kind: 'json', ...read }
+  }
+
+  try {
+    const read = await readZipBackup(file)
+    return { kind: 'zip', ...read }
+  } catch (zipErr) {
+    try {
+      const text = await file.slice(0, 64).text()
+      if (text.trimStart().startsWith('{')) {
+        const read = await readJsonBackup(file)
+        return { kind: 'json', ...read }
+      }
+    } catch {
+      // keep zip error
+    }
+    throw zipErr instanceof Error
+      ? zipErr
+      : new Error('No se pudo leer la copia. Usa un ZIP o un JSON de MaintManage.')
+  }
+}
+
+async function applyBackupPayload(
+  payload: BackupPayload,
+  adjuntos: Adjunto[],
+  mode: 'replace' | 'merge',
+): Promise<void> {
   const encargados = payload.encargados ?? []
   const bloques = payload.bloques?.length ? payload.bloques : (payload.grupos ?? [])
   const fichas = (payload.fichas ?? []).map((ficha) => ({
@@ -198,6 +279,37 @@ export async function importBackup(file: Blob, mode: 'replace' | 'merge'): Promi
   })
 }
 
+export async function importBackup(file: Blob, mode: 'replace' | 'merge'): Promise<BackupFileKind> {
+  const { kind, payload, adjuntos } = await readBackupFile(file)
+  await applyBackupPayload(payload, adjuntos, mode)
+  return kind
+}
+
+export async function shareBackupZip(): Promise<'shared' | 'downloaded' | 'cancelled'> {
+  const { blob, filename } = await exportBackupZip()
+  const file = new File([blob], filename, { type: 'application/zip' })
+  const nav = navigator as Navigator & {
+    share?: (data: ShareData) => Promise<void>
+    canShare?: (data: ShareData) => boolean
+  }
+  if (nav.share && nav.canShare?.({ files: [file] })) {
+    try {
+      await nav.share({
+        files: [file],
+        title: 'Copia MaintManage',
+        text: 'Copia completa (ZIP) de MaintManage.',
+      })
+      await markBackupDone('zip')
+      return 'shared'
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return 'cancelled'
+    }
+  }
+  downloadBlob(blob, filename)
+  await markBackupDone('zip')
+  return 'downloaded'
+}
+
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
@@ -209,12 +321,13 @@ export function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url)
 }
 
-export async function markBackupDone(kind: 'folder' | 'download'): Promise<void> {
+export async function markBackupDone(kind: BackupSaveKind): Promise<void> {
   const now = Date.now()
   const current = await db.ajustes.get('app')
+  const normalized: BackupSaveKind = kind === 'download' ? 'zip' : kind
   await db.ajustes.update('app', {
     lastBackupAt: now,
-    lastBackupKind: kind,
+    lastBackupKind: normalized,
     nextBackupAt: now + backupIntervalMsOf(current?.backupIntervalHours),
   })
 }

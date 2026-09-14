@@ -20,7 +20,8 @@ import { congregacionDe, congregacionLabel, fichaTitulo } from '../lib/fichas'
 import { ActividadTitle } from './ActividadTitle'
 import { PrioridadMark } from './PrioridadMark'
 import { SortHeader } from './SortHeader'
-import { EmptyState, StatusBadge, TipoBadge } from './ui'
+import { TipoMark } from './TipoMark'
+import { EmptyState, StatusBadge } from './ui'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
 import type { AccionCorrectiva, Actividad, Ficha } from '../db/types'
 
@@ -414,20 +415,16 @@ export function ActividadesPanel() {
         </div>
       ) : (
         <div className="table-card">
-          <div className="table-head table-cols-fichas">
+          <div className="table-head table-cols-fichas has-mark">
             <span className="table-bar" aria-hidden />
+            <span className="crono-mark" title="Tipo o prioridad">
+              Tipo
+            </span>
             <SortHeader
               label="Actividad"
               active={sortCol === 'titulo'}
               dir={sortDir}
               onClick={() => setSort('titulo')}
-            />
-            <SortHeader
-              label="Tipo"
-              className="col-md"
-              active={sortCol === 'tipo'}
-              dir={sortDir}
-              onClick={() => setSort('tipo')}
             />
             <SortHeader
               label="Encargado"
@@ -454,7 +451,7 @@ export function ActividadesPanel() {
                   return (
                     <Link
                       key={row.id}
-                      className="table-row table-cols-fichas"
+                      className="table-row table-cols-fichas has-mark"
                       to={accionHref(row.accion)}
                     >
                       <span
@@ -463,10 +460,12 @@ export function ActividadesPanel() {
                           background: actividad ? kindActividadVar() : bloqueColorVar('rose'),
                         }}
                       />
+                      <span className="crono-mark">
+                        <PrioridadMark prioridad={prioridadOf(row.accion)} iconOnly />
+                      </span>
                       <span className="table-cell">
                         <span className="row" style={{ flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
                           <strong>{row.accion.texto}</strong>
-                          <PrioridadMark prioridad={prioridadOf(row.accion)} />
                           <StatusBadge estado={estadoAgendaCorrectiva(row.accion)} />
                         </span>
                         <span className="muted col-sm-only">
@@ -475,7 +474,6 @@ export function ActividadesPanel() {
                           {encargado ? ` · ${encargado.nombre}` : ''}
                         </span>
                       </span>
-                      <span className="col-md muted">{correctivaLabel}</span>
                       <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
                       <span className="muted table-nowrap">
                         {row.accion.fechaObjetivo ? formatDate(row.accion.fechaObjetivo) : '—'}
@@ -489,27 +487,24 @@ export function ActividadesPanel() {
                 return (
                   <Link
                     key={row.id}
-                    className="table-row table-cols-fichas"
+                    className="table-row table-cols-fichas has-mark"
                     to={`/actividades/${a.id}`}
                   >
                     <span
                       className="table-bar"
                       style={{ background: kindActividadVar() }}
                     />
+                    <span className="crono-mark">
+                      <TipoMark tipo={a.tipo} />
+                    </span>
                     <span className="table-cell">
                       <span className="row" style={{ flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
-                        <ActividadTitle actividad={a} />
-                        <span className="tipo-badge-inline">
-                          <TipoBadge tipo={a.tipo} />
-                        </span>
+                        <ActividadTitle actividad={a} hideIcon />
                         {vigente ? <StatusBadge estado={vigente} /> : null}
                       </span>
                       <span className="muted col-sm-only">
                         {encargado ? encargado.nombre : ''}
                       </span>
-                    </span>
-                    <span className="col-md muted">
-                      <TipoBadge tipo={a.tipo} />
                     </span>
                     <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
                     <span className="muted table-nowrap">{frecuenciaLabel(a.frecuencia)}</span>

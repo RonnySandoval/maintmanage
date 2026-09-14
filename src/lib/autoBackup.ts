@@ -1,6 +1,6 @@
 import {
   downloadBlob,
-  exportBackup,
+  exportBackupZip,
   getUsableBackupFolder,
   hasUserData,
   markBackupDone,
@@ -77,14 +77,14 @@ export function runAutoBackupIfDue(): Promise<AutoBackupResult> {
   return inFlight
 }
 
-export async function saveBackupNow(): Promise<{ kind: 'folder' | 'download'; size: number }> {
+export async function saveBackupNow(): Promise<{ kind: 'folder' | 'zip'; size: number }> {
   const folder = await getUsableBackupFolder()
   if (folder) {
     const size = await writeBackupToFolder(folder)
     return { kind: 'folder', size }
   }
-  const { blob, filename } = await exportBackup()
+  const { blob, filename } = await exportBackupZip()
   downloadBlob(blob, filename)
-  await markBackupDone('download')
-  return { kind: 'download', size: blob.size }
+  await markBackupDone('zip')
+  return { kind: 'zip', size: blob.size }
 }
