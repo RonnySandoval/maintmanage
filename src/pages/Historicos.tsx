@@ -469,9 +469,7 @@ export function HistoricosPage() {
             <div className="table-card">
               <div className="table-head table-cols-hist-occ">
                 <span className="table-bar" aria-hidden />
-                <span className="col-md">Fecha</span>
                 <span>Origen</span>
-                <span className="col-md">Encargado</span>
                 <span className="col-md">Acciones</span>
                 <span>Estado</span>
               </div>
@@ -666,21 +664,21 @@ function EjecutadaRow({
     <div className={`hist-occ-item${open ? ' is-open' : ''}`}>
       <div className="table-row table-cols-hist-occ">
         <span className="table-bar" style={{ background: bloqueColorVar(barColor) }} />
-        <span className="col-md muted table-nowrap">{fecha}</span>
         <Link className="table-cell hist-occ-main" to={href}>
-          <span className="occ-meta">
-            {!hideTitle && ficha ? <FichaTitle ficha={ficha} color={color} /> : null}
-            {!hideTitle && actividad ? <ActividadTitle actividad={actividad} /> : null}
-            {esExtraordinaria(item) ? <ExtraBadge /> : null}
-            {actividad ? <TipoBadge tipo={actividad.tipo} /> : null}
-          </span>
-          <span className="muted col-sm-only">
+          {!hideTitle && ficha ? <FichaTitle ficha={ficha} color={color} /> : null}
+          {!hideTitle && actividad ? <ActividadTitle actividad={actividad} /> : null}
+          <span className="muted hist-occ-when">
             {fecha}
             {encargado ? ` · ${encargado.nombre}` : ''}
             {acciones.length ? ` · ▴ ${acciones.length}` : ''}
           </span>
+          {esExtraordinaria(item) || actividad ? (
+            <span className="occ-meta">
+              {esExtraordinaria(item) ? <ExtraBadge /> : null}
+              {actividad ? <TipoBadge tipo={actividad.tipo} /> : null}
+            </span>
+          ) : null}
         </Link>
-        <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
         <span className="col-md muted table-nowrap">{acciones.length || '—'}</span>
         <span className="table-nowrap hist-occ-end">
           <button

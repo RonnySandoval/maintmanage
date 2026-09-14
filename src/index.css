@@ -1712,9 +1712,18 @@ a.icon-btn:hover {
 }
 
 .hist-occ-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.12rem;
   color: inherit;
   text-decoration: none;
   min-width: 0;
+}
+
+.hist-occ-when {
+  font-size: 0.82rem;
+  line-height: 1.25;
 }
 
 .hist-occ-main:hover {
@@ -1976,7 +1985,7 @@ a.table-row:focus-visible {
 }
 
 .table-cols-hist-occ {
-  grid-template-columns: 5px max-content minmax(0, 1.5fr) minmax(0, 0.9fr) auto auto;
+  grid-template-columns: 5px minmax(0, 1fr) auto auto;
 }
 
 .table-cols-hist-acc {
