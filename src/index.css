@@ -1659,94 +1659,6 @@ a.icon-btn:hover {
   padding-inline: 0.38rem;
 }
 
-.ejec-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.ejec-group {
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 0.65rem 0.7rem 0.75rem;
-}
-
-.ejec-group-title {
-  margin: 0 0 0.5rem;
-  font-size: 0.86rem;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-.ejec-tiles {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(8.2rem, 1fr));
-  gap: 0.4rem;
-}
-
-.ejec-tile {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0.22rem;
-  min-width: 0;
-  padding: 0.42rem 0.48rem 0.4rem 0.62rem;
-  border-radius: 10px;
-  background: var(--bg-muted);
-  color: inherit;
-  text-decoration: none;
-}
-
-.ejec-tile:hover {
-  text-decoration: none;
-  background: var(--hover-fill);
-}
-
-.ejec-tile:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.ejec-tile-bar {
-  position: absolute;
-  left: 0;
-  top: 0.32rem;
-  bottom: 0.32rem;
-  width: 3px;
-  border-radius: 0 2px 2px 0;
-}
-
-.ejec-tile-label {
-  font-weight: 650;
-  font-size: 0.78rem;
-  line-height: 1.25;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  line-clamp: 2;
-}
-
-.ejec-tile-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.18rem;
-}
-
-.ejec-tile .badge {
-  font-size: 0.62rem;
-  padding: 0.06rem 0.3rem;
-}
-
-.ejec-tile-acc {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: var(--text-muted);
-}
-
 .hist-occ-ejecucion {
   padding: 0.55rem 0.6rem;
   border-radius: var(--radius-sm);
@@ -1788,6 +1700,11 @@ a.icon-btn:hover {
 .filter-line .chip-row {
   margin-bottom: 0;
   padding-bottom: 0;
+}
+
+.hist-occ-item .table-row {
+  min-height: 42px;
+  padding-block: 0.4rem;
 }
 
 .hist-occ-item.is-open {
@@ -2059,7 +1976,7 @@ a.table-row:focus-visible {
 }
 
 .table-cols-hist-occ {
-  grid-template-columns: 5px minmax(0, 1fr) auto;
+  grid-template-columns: 5px max-content minmax(0, 1.5fr) minmax(0, 0.9fr) auto auto;
 }
 
 .table-cols-hist-acc {
@@ -2132,6 +2049,10 @@ a.table-row:focus-visible {
 
   .table-cols-accion {
     grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .table-cols-hist-occ {
+    grid-template-columns: 5px minmax(0, 1fr) auto;
   }
 
   .table-cols-hist-acc {

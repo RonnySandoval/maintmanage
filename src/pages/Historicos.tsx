@@ -3,11 +3,14 @@ import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   ArrowUpDown,
+  Boxes,
   CalendarDays,
+  ChevronDown,
   CircleDot,
   FolderTree,
   History,
   Layers,
+  Pencil,
 } from 'lucide-react'
 import { db } from '../db'
 import {
@@ -20,7 +23,11 @@ import {
   type AccionCorrectiva,
   type Actividad,
   type EstadoOcurrencia,
+  type Ejecucion,
+  type Encargado,
+  type Evento,
   type Ficha,
+  type Ocurrencia,
 } from '../db/types'
 import { bloqueColorVar } from '../lib/colors'
 import { formatDate, formatFechaProgramada } from '../lib/dates'
@@ -30,6 +37,8 @@ import { fichaTitulo } from '../lib/fichas'
 import { ActividadTitle } from '../components/ActividadTitle'
 import { FichaTitle } from '../components/FichaTitle'
 import { PrioridadMark } from '../components/PrioridadMark'
+import { EjecucionModal } from '../components/EjecucionForm'
+import { ShareMenu } from '../components/ShareMenu'
 import { EmptyState, ExtraBadge, StatusBadge, StatusWordsToggle, TipoBadge } from '../components/ui'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
 import { useTiposActividad } from '../hooks/useTiposActividad'
@@ -107,11 +116,11 @@ function groupAcciones(
 
 export function HistoricosPage() {
   const [tab, setTab] = useState<'ocurrencias' | 'acciones'>('ocurrencias')
-  const [groupBy, setGroupBy] = useState<'ficha' | 'fecha'>('ficha')
+  const [groupBy, setGroupBy] = useState<'ficha' | 'bloque' | 'fecha'>('ficha')
   const [estadoAcc, setEstadoAcc] = useState<EstadoOcurrencia | ''>('')
   const [groupAcc, setGroupAcc] = useState<AccGroup>('lista')
   const [sortAcc, setSortAcc] = useState<AccSort>('fecha')
-  const tipos = useTiposActividad()
+  const [openOcc, setOpenOcc] = useState<string | null>(null)
 
   const ocurrencias =
     useLiveQuery(async () => {
@@ -126,6 +135,8 @@ export function HistoricosPage() {
   const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
   const actividades = useLiveQuery(() => db.actividades.toArray()) ?? []
   const bloques = useLiveQuery(() => db.grupos.toArray()) ?? []
+  const encargados = useLiveQuery(() => db.encargados.toArray()) ?? []
+  const ejecuciones = useLiveQuery(() => db.ejecuciones.toArray()) ?? []
   const acciones =
     useLiveQuery(async () => {
       const rows = await db.accionesCorrectivas.toArray()
@@ -138,6 +149,26 @@ export function HistoricosPage() {
     [actividades],
   )
   const bloqueMap = useMemo(() => Object.fromEntries(bloques.map((b) => [b.id, b])), [bloques])
+  const encargadoMap = useMemo(
+    () => Object.fromEntries(encargados.map((e) => [e.id, e])),
+    [encargados],
+  )
+  const ejecucionMap = useMemo(
+    () =>
+      Object.fromEntries(
+        ejecuciones
+          .filter((e) => e.ocurrenciaId)
+          .map((e) => [e.ocurrenciaId as string, e]),
+      ),
+    [ejecuciones],
+  )
+  const ejecucionEventoMap = useMemo(
+    () =>
+      Object.fromEntries(
+        ejecuciones.filter((e) => e.eventoId).map((e) => [e.eventoId as string, e]),
+      ),
+    [ejecuciones],
+  )
 
   const accionesPorOcc = useMemo(() => {
     const map = new Map<string, AccionCorrectiva[]>()
@@ -203,11 +234,65 @@ export function HistoricosPage() {
     return actividadTitulo(aa).localeCompare(actividadTitulo(ab), 'es')
   })
 
+  const byBloque = new Map<string, typeof ocurrencias>()
+  for (const o of ocurrencias) {
+    const key = fichaMap[o.fichaId]?.grupoId ?? 'none'
+    const list = byBloque.get(key) ?? []
+    list.push(o)
+    byBloque.set(key, list)
+  }
+  const bloquesOrdenados = [...byBloque.keys()].sort((a, b) => {
+    if (a === 'none') return 1
+    if (b === 'none') return -1
+    return (bloqueMap[a]?.nombre ?? '').localeCompare(bloqueMap[b]?.nombre ?? '', 'es')
+  })
+  const eventosPorFecha = [...eventos].sort((a, b) => b.fechaProgramada.localeCompare(a.fechaProgramada))
+
   const accionesFiltradas = sortAcciones(
     acciones.filter((a) => !estadoAcc || estadoAgendaCorrectiva(a) === estadoAcc),
     sortAcc,
   )
   const gruposAcc = groupAcciones(accionesFiltradas, groupAcc, fichaMap, actividadMap)
+
+  function toggleOcc(id: string) {
+    setOpenOcc((current) => (current === id ? null : id))
+  }
+
+  function renderOccRow(o: Ocurrencia, hideTitle: boolean) {
+    const ficha = fichaMap[o.fichaId]
+    const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
+    return (
+      <EjecutadaRow
+        key={o.id}
+        occ={o}
+        ficha={ficha}
+        color={bloque?.color}
+        encargado={ficha?.encargadoId ? encargadoMap[ficha.encargadoId] : undefined}
+        ejecucion={ejecucionMap[o.id]}
+        acciones={accionesPorOcc.get(o.id) ?? []}
+        hideTitle={hideTitle}
+        open={openOcc === o.id}
+        onToggle={() => toggleOcc(o.id)}
+      />
+    )
+  }
+
+  function renderEvtRow(e: Evento, hideTitle: boolean) {
+    const act = actividadMap[e.actividadId]
+    return (
+      <EjecutadaRow
+        key={e.id}
+        evento={e}
+        actividad={act}
+        encargado={act?.encargadoId ? encargadoMap[act.encargadoId] : undefined}
+        ejecucion={ejecucionEventoMap[e.id]}
+        acciones={accionesPorEvento.get(e.id) ?? []}
+        hideTitle={hideTitle}
+        open={openOcc === e.id}
+        onToggle={() => toggleOcc(e.id)}
+      />
+    )
+  }
 
   const filterTools = useMemo<FilterTool[]>(() => {
     if (tab === 'acciones') {
@@ -304,6 +389,13 @@ export function HistoricosPage() {
         onClick: () => setGroupBy('ficha'),
       },
       {
+        id: 'bloque',
+        label: 'Por bloque',
+        icon: Boxes,
+        active: groupBy === 'bloque',
+        onClick: () => setGroupBy('bloque'),
+      },
+      {
         id: 'fecha',
         label: 'Por fecha',
         icon: CalendarDays,
@@ -373,113 +465,92 @@ export function HistoricosPage() {
             <div className="table-card">
               <p className="table-empty">Aún no hay inspecciones ni actividades ejecutadas.</p>
             </div>
-          ) : groupBy === 'ficha' ? (
-            <div className="ejec-groups">
-              {fichasOrdenadas.map((fichaId) => {
-                const ficha = fichaMap[fichaId]
-                const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
-                const rows = (byFicha.get(fichaId) ?? []).sort((a, b) =>
-                  b.fechaProgramada.localeCompare(a.fechaProgramada),
-                )
-                return (
-                  <section key={fichaId} className="ejec-group">
-                    <h3 className="ejec-group-title">
-                      <FichaTitle ficha={ficha} color={bloque?.color} />
-                    </h3>
-                    <div className="ejec-tiles">
-                      {rows.map((o) => (
-                        <EjecutadaTile
-                          key={o.id}
-                          href={`/ocurrencias/${o.id}`}
-                          label={formatFechaProgramada(
-                            o.fechaProgramada,
-                            ficha?.fechaPrecision === 'dia' ? 'dia' : 'mes',
-                          )}
-                          color={bloque?.color}
-                          extra={esExtraordinaria(o)}
-                          acciones={accionesPorOcc.get(o.id)?.length ?? 0}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                )
-              })}
-              {actividadesOrdenadas.map((actId) => {
-                const act = actividadMap[actId]
-                const rows = (byActividad.get(actId) ?? []).sort((a, b) =>
-                  b.fechaProgramada.localeCompare(a.fechaProgramada),
-                )
-                return (
-                  <section key={actId} className="ejec-group">
-                    <h3 className="ejec-group-title">
-                      <ActividadTitle actividad={act} />
-                    </h3>
-                    <div className="ejec-tiles">
-                      {rows.map((e) => (
-                        <EjecutadaTile
-                          key={e.id}
-                          href={`/eventos/${e.id}`}
-                          label={formatFechaProgramada(
-                            e.fechaProgramada,
-                            act?.fechaPrecision === 'dia' ? 'dia' : 'mes',
-                          )}
-                          color={act ? tipoActividadColor(act.tipo, tipos) : undefined}
-                          extra={esExtraordinaria(e)}
-                          tipo={act?.tipo}
-                          acciones={accionesPorEvento.get(e.id)?.length ?? 0}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                )
-              })}
-            </div>
           ) : (
-            <div className="ejec-groups">
-              {fechasOrdenadas.map((day) => {
-                const occRows = byFechaOcc.get(day) ?? []
-                const evtRows = byFechaEvt.get(day) ?? []
-                const precision =
-                  fichaMap[occRows[0]?.fichaId ?? '']?.fechaPrecision === 'dia' ||
-                  actividadMap[evtRows[0]?.actividadId ?? '']?.fechaPrecision === 'dia'
-                    ? 'dia'
-                    : 'mes'
-                return (
-                  <section key={day} className="ejec-group">
-                    <h3 className="ejec-group-title">{formatFechaProgramada(day, precision)}</h3>
-                    <div className="ejec-tiles">
-                      {occRows.map((o) => {
-                        const ficha = fichaMap[o.fichaId]
-                        const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
-                        return (
-                          <EjecutadaTile
-                            key={o.id}
-                            href={`/ocurrencias/${o.id}`}
-                            label={ficha ? fichaTitulo(ficha) : 'Ficha'}
-                            color={bloque?.color}
-                            extra={esExtraordinaria(o)}
-                            acciones={accionesPorOcc.get(o.id)?.length ?? 0}
-                          />
-                        )
-                      })}
-                      {evtRows.map((e) => {
-                        const act = actividadMap[e.actividadId]
-                        return (
-                          <EjecutadaTile
-                            key={e.id}
-                            href={`/eventos/${e.id}`}
-                            label={act ? actividadTitulo(act) : 'Actividad'}
-                            color={act ? tipoActividadColor(act.tipo, tipos) : undefined}
-                            extra={esExtraordinaria(e)}
-                            tipo={act?.tipo}
-                            acciones={accionesPorEvento.get(e.id)?.length ?? 0}
-                          />
-                        )
-                      })}
-                    </div>
-                  </section>
-                )
-              })}
+            <div className="table-card">
+              <div className="table-head table-cols-hist-occ">
+                <span className="table-bar" aria-hidden />
+                <span className="col-md">Fecha</span>
+                <span>Origen</span>
+                <span className="col-md">Encargado</span>
+                <span className="col-md">Acciones</span>
+                <span>Estado</span>
+              </div>
+              {groupBy === 'ficha' ? (
+                <>
+                  {fichasOrdenadas.map((fichaId) => {
+                    const ficha = fichaMap[fichaId]
+                    const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
+                    const rows = (byFicha.get(fichaId) ?? []).sort((a, b) =>
+                      b.fechaProgramada.localeCompare(a.fechaProgramada),
+                    )
+                    return (
+                      <section key={fichaId}>
+                        <div className="table-section">
+                          <FichaTitle ficha={ficha} color={bloque?.color} />
+                        </div>
+                        {rows.map((o) => renderOccRow(o, true))}
+                      </section>
+                    )
+                  })}
+                  {actividadesOrdenadas.map((actId) => {
+                    const act = actividadMap[actId]
+                    const rows = (byActividad.get(actId) ?? []).sort((a, b) =>
+                      b.fechaProgramada.localeCompare(a.fechaProgramada),
+                    )
+                    return (
+                      <section key={actId}>
+                        <div className="table-section">
+                          <ActividadTitle actividad={act} />
+                        </div>
+                        {rows.map((e) => renderEvtRow(e, true))}
+                      </section>
+                    )
+                  })}
+                </>
+              ) : groupBy === 'bloque' ? (
+                <>
+                  {bloquesOrdenados.map((bloqueId) => {
+                    const bloque = bloqueMap[bloqueId]
+                    const rows = (byBloque.get(bloqueId) ?? []).sort((a, b) =>
+                      b.fechaProgramada.localeCompare(a.fechaProgramada),
+                    )
+                    return (
+                      <section key={bloqueId}>
+                        <div
+                          className="table-section"
+                          style={bloque ? { color: bloqueColorVar(bloque.color) } : undefined}
+                        >
+                          {bloque?.nombre ?? 'Sin bloque'}
+                        </div>
+                        {rows.map((o) => renderOccRow(o, false))}
+                      </section>
+                    )
+                  })}
+                  {eventosPorFecha.length ? (
+                    <section>
+                      <div className="table-section">Actividades</div>
+                      {eventosPorFecha.map((e) => renderEvtRow(e, false))}
+                    </section>
+                  ) : null}
+                </>
+              ) : (
+                fechasOrdenadas.map((day) => {
+                  const occRows = byFechaOcc.get(day) ?? []
+                  const evtRows = byFechaEvt.get(day) ?? []
+                  const precision =
+                    fichaMap[occRows[0]?.fichaId ?? '']?.fechaPrecision === 'dia' ||
+                    actividadMap[evtRows[0]?.actividadId ?? '']?.fechaPrecision === 'dia'
+                      ? 'dia'
+                      : 'mes'
+                  return (
+                    <section key={day}>
+                      <div className="table-section">{formatFechaProgramada(day, precision)}</div>
+                      {occRows.map((o) => renderOccRow(o, false))}
+                      {evtRows.map((e) => renderEvtRow(e, false))}
+                    </section>
+                  )
+                })
+              )}
             </div>
           )}
         </>
@@ -544,30 +615,155 @@ export function HistoricosPage() {
   )
 }
 
-function EjecutadaTile({
-  href,
-  label,
+function EjecutadaRow({
+  occ,
+  evento,
+  ficha,
+  actividad,
   color,
-  extra,
-  tipo,
+  encargado,
+  ejecucion,
   acciones,
+  hideTitle,
+  open,
+  onToggle,
 }: {
-  href: string
-  label: string
+  occ?: Ocurrencia
+  evento?: Evento
+  ficha?: Ficha
+  actividad?: Actividad
   color?: string
-  extra?: boolean
-  tipo?: string
-  acciones: number
+  encargado?: Encargado
+  ejecucion?: Ejecucion
+  acciones: AccionCorrectiva[]
+  hideTitle?: boolean
+  open: boolean
+  onToggle: () => void
 }) {
+  const tipos = useTiposActividad()
+  const [editOpen, setEditOpen] = useState(false)
+  const item = occ ?? evento
+  if (!item) return null
+  const href = occ ? `/ocurrencias/${occ.id}` : `/eventos/${evento?.id}`
+  const precision =
+    (ficha?.fechaPrecision ?? actividad?.fechaPrecision) === 'dia' ? 'dia' : 'mes'
+  const barColor = actividad ? tipoActividadColor(actividad.tipo, tipos) : color
+  const fecha = formatFechaProgramada(item.fechaProgramada, precision)
+  const shareTitle = ficha ? fichaTitulo(ficha) : actividad ? actividadTitulo(actividad) : 'Ejecución'
+  const shareText = [
+    ficha ? `Ficha: ${fichaTitulo(ficha)}` : '',
+    actividad ? `Actividad: ${actividadTitulo(actividad)}` : '',
+    `Programada: ${item.fechaProgramada}`,
+    ejecucion?.fechaReal ? `Realizada: ${ejecucion.fechaReal}` : '',
+    ejecucion?.realizadoPor ? `Realizado por: ${ejecucion.realizadoPor}` : '',
+    encargado ? `Encargado: ${encargado.nombre}` : '',
+    ejecucion?.observaciones ? `Observaciones: ${ejecucion.observaciones}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
   return (
-    <Link className="ejec-tile" to={href}>
-      <span className="ejec-tile-bar" style={{ background: bloqueColorVar(color) }} />
-      <span className="ejec-tile-label">{label}</span>
-      <span className="ejec-tile-meta">
-        {extra ? <ExtraBadge /> : null}
-        {tipo ? <TipoBadge tipo={tipo} /> : null}
-        {acciones ? <span className="ejec-tile-acc">▴ {acciones}</span> : null}
-      </span>
-    </Link>
+    <div className={`hist-occ-item${open ? ' is-open' : ''}`}>
+      <div className="table-row table-cols-hist-occ">
+        <span className="table-bar" style={{ background: bloqueColorVar(barColor) }} />
+        <span className="col-md muted table-nowrap">{fecha}</span>
+        <Link className="table-cell hist-occ-main" to={href}>
+          <span className="occ-meta">
+            {!hideTitle && ficha ? <FichaTitle ficha={ficha} color={color} /> : null}
+            {!hideTitle && actividad ? <ActividadTitle actividad={actividad} /> : null}
+            {esExtraordinaria(item) ? <ExtraBadge /> : null}
+            {actividad ? <TipoBadge tipo={actividad.tipo} /> : null}
+          </span>
+          <span className="muted col-sm-only">
+            {fecha}
+            {encargado ? ` · ${encargado.nombre}` : ''}
+            {acciones.length ? ` · ▴ ${acciones.length}` : ''}
+          </span>
+        </Link>
+        <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
+        <span className="col-md muted table-nowrap">{acciones.length || '—'}</span>
+        <span className="table-nowrap hist-occ-end">
+          <button
+            type="button"
+            className="icon-btn hist-occ-toggle"
+            aria-expanded={open}
+            aria-label={open ? 'Ocultar detalle' : 'Ver detalle de la ejecución'}
+            onClick={onToggle}
+          >
+            <ChevronDown size={16} className={open ? 'is-open' : ''} />
+          </button>
+          <StatusBadge estado="ejecutada" />
+        </span>
+      </div>
+      {open ? (
+        <div className="hist-occ-acciones">
+          <div className="hist-occ-ejecucion">
+            <div className="row-spread" style={{ marginBottom: 6 }}>
+              <strong>Ejecución</strong>
+              <span className="row" style={{ gap: 2 }}>
+                {ficha || actividad ? (
+                  <>
+                    <button
+                      type="button"
+                      className="icon-btn icon-btn-edit"
+                      aria-label="Editar ejecución"
+                      title="Editar ejecución"
+                      onClick={() => setEditOpen(true)}
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <ShareMenu title={shareTitle} text={shareText} iconOnly />
+                  </>
+                ) : null}
+              </span>
+            </div>
+            {ejecucion ? (
+              <>
+                <p>
+                  Realizada el <strong>{formatDate(ejecucion.fechaReal)}</strong>
+                  {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
+                </p>
+                {ejecucion.observaciones ? (
+                  <p>{ejecucion.observaciones}</p>
+                ) : (
+                  <p className="muted">Sin observaciones.</p>
+                )}
+              </>
+            ) : (
+              <p className="muted">Sin registro de ejecución.</p>
+            )}
+          </div>
+          {acciones.length ? (
+            acciones.map((a) => (
+              <Link key={a.id} className="hist-occ-accion" to={accionHref(a)}>
+                <PrioridadMark prioridad={prioridadOf(a)} />
+                <span className="grow">{a.texto}</span>
+                <StatusBadge estado={estadoAgendaCorrectiva(a)} />
+              </Link>
+            ))
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>
+              Sin acciones correctivas.
+            </p>
+          )}
+        </div>
+      ) : null}
+      {ficha && occ ? (
+        <EjecucionModal
+          open={editOpen}
+          ocurrenciaId={occ.id}
+          fichaId={ficha.id}
+          onClose={() => setEditOpen(false)}
+        />
+      ) : null}
+      {actividad && evento ? (
+        <EjecucionModal
+          open={editOpen}
+          eventoId={evento.id}
+          actividadId={actividad.id}
+          onClose={() => setEditOpen(false)}
+        />
+      ) : null}
+    </div>
   )
 }
