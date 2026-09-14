@@ -27,6 +27,7 @@ import { useGridNameCol } from '../hooks/useGridNameCol'
 import { label, useAliases } from '../lib/labels'
 import { ActividadTitle } from './ActividadTitle'
 import { FichaTitle } from './FichaTitle'
+import { ExpandableText } from './ExpandableText'
 import { PrioridadMark } from './PrioridadMark'
 import { LeyendaSimbolos, TipoBadge } from './ui'
 
@@ -779,7 +780,9 @@ function CorrectivaRow({
   return (
     <tr className="ficha-row">
       <th className="ficha-col" scope="row">
-        <Link to={href}>{accion.texto}</Link>
+        <Link to={href}>
+          <ExpandableText text={accion.texto} maxLines={2} maxChars={80} />
+        </Link>
         <span className="ficha-meta">
           <PrioridadMark prioridad={prioridadOf(accion)} />
         </span>

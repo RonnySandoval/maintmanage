@@ -18,11 +18,14 @@ import { compareActividadesByTitulo, estadoVigente } from '../lib/actividades'
 import { accionLabel, label, useAliases } from '../lib/labels'
 import { congregacionDe, congregacionLabel, fichaTitulo } from '../lib/fichas'
 import { ActividadTitle } from './ActividadTitle'
+import { AdjuntosMark } from './AdjuntosMark'
 import { PrioridadMark } from './PrioridadMark'
+import { ExpandableText } from './ExpandableText'
 import { SortHeader } from './SortHeader'
 import { TipoMark } from './TipoMark'
 import { EmptyState, StatusBadge } from './ui'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
+import { EMPTY_COUNTS, buildAdjuntoCounts } from '../lib/adjuntos'
 import type { AccionCorrectiva, Actividad, Ficha } from '../db/types'
 
 type ListRow =
@@ -66,6 +69,8 @@ export function ActividadesPanel() {
       return rows.filter((a) => tipoAccionOf(a) === 'correctiva')
     }) ?? []
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
+  const adjuntoCounts =
+    useLiveQuery(async () => buildAdjuntoCounts(await db.adjuntos.toArray())) ?? EMPTY_COUNTS
   const tipos = useTiposActividad()
   const aliases = useAliases()
   const encargadoMap = useMemo(
@@ -145,16 +150,18 @@ export function ActividadesPanel() {
   }
 
   const filteredActs = useMemo(() => {
+    const qLower = q.toLowerCase()
     return actividades.filter((a) => {
       if (tipoId && a.tipo !== tipoId) return false
       if (encargadoId && a.encargadoId !== encargadoId) return false
       if (q) {
-        const hay = `${a.titulo} ${tipoActividadLabel(a.tipo, tipos)}`.toLowerCase()
-        if (!hay.includes(q.toLowerCase())) return false
+        const hay =
+          `${a.titulo} ${tipoActividadLabel(a.tipo, tipos)} ${adjuntoCounts.searchActividad[a.id] ?? ''}`.toLowerCase()
+        if (!hay.includes(qLower)) return false
       }
       return true
     })
-  }, [actividades, tipoId, encargadoId, q, tipos])
+  }, [actividades, tipoId, encargadoId, q, tipos, adjuntoCounts.searchActividad])
 
   const filteredAcciones = useMemo(() => {
     const qLower = q.toLowerCase()
@@ -388,7 +395,7 @@ export function ActividadesPanel() {
             id="act-q"
             className="input"
             type="search"
-            placeholder="Buscar actividad o correctiva"
+            placeholder="Buscar actividad, correctiva o etiqueta"
             value={searchText}
             onChange={(e) => onSearchChange(e.target.value)}
             autoComplete="off"
@@ -464,10 +471,18 @@ export function ActividadesPanel() {
                         <PrioridadMark prioridad={prioridadOf(row.accion)} iconOnly />
                       </span>
                       <span className="table-cell">
-                        <span className="row" style={{ flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
-                          <strong>{row.accion.texto}</strong>
+                        <span className="row" style={{ flexWrap: 'wrap', gap: '0.35rem', alignItems: 'flex-start' }}>
+                          <ExpandableText text={row.accion.texto} maxLines={2} maxChars={110} />
                           <StatusBadge estado={estadoAgendaCorrectiva(row.accion)} />
                         </span>
+                        {row.accion.detalle?.trim() ? (
+                          <ExpandableText
+                            text={row.accion.detalle}
+                            className="muted"
+                            maxLines={2}
+                            maxChars={100}
+                          />
+                        ) : null}
                         <span className="muted col-sm-only">
                           {correctivaLabel}
                           {parent ? ` · ${parent}` : ''}
@@ -501,6 +516,7 @@ export function ActividadesPanel() {
                       <span className="row" style={{ flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
                         <ActividadTitle actividad={a} hideIcon />
                         {vigente ? <StatusBadge estado={vigente} /> : null}
+                        <AdjuntosMark count={adjuntoCounts.actividad[a.id] ?? 0} />
                       </span>
                       <span className="muted col-sm-only">
                         {encargado ? encargado.nombre : ''}

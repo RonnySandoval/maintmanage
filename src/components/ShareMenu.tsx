@@ -8,11 +8,13 @@ export function ShareMenu({
   text,
   files,
   iconOnly = false,
+  className,
 }: {
   title: string
   text: string
   files?: File[]
   iconOnly?: boolean
+  className?: string
 }) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -32,10 +34,18 @@ export function ShareMenu({
     <>
       <button
         type="button"
-        className={iconOnly ? 'icon-btn' : 'btn btn-share'}
+        className={
+          iconOnly
+            ? `icon-btn${className ? ` ${className}` : ''}`
+            : `btn btn-share${className ? ` ${className}` : ''}`
+        }
         aria-label="Compartir"
         title="Compartir"
-        onClick={() => setOpen(true)}
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setOpen(true)
+        }}
       >
         <Share2 size={16} />
         {iconOnly ? null : 'Compartir'}

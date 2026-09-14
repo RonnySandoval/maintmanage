@@ -16,9 +16,10 @@ import { formatFechaProgramada, formatDateLong } from '../lib/dates'
 import { compareFichasByNumero, fichaTitulo } from '../lib/fichas'
 import { accionHref, accionSearchText, estadoAgendaCorrectiva } from '../lib/acciones'
 import { compareActividadesByTitulo } from '../lib/actividades'
-import { EmptyState, ExtraBadge, LeyendaSimbolos, StatusBadge, StatusWordsToggle } from '../components/ui'
+import { EmptyState, ExtraBadge, LeyendaSimbolos, StatusBadge } from '../components/ui'
 import { PrioridadMark } from '../components/PrioridadMark'
 import { TipoMark } from '../components/TipoMark'
+import { ExpandableText } from '../components/ExpandableText'
 import { useStatusLabels } from '../hooks/useStatusLabels'
 import { SIMBOLOS_ESTADO } from '../lib/simbolos'
 import { GrillaAnual } from '../components/GrillaAnual'
@@ -464,7 +465,6 @@ export function CronogramaPage() {
             </button>
           ))}
         </div>
-        <StatusWordsToggle />
       </div>
 
       <label className="search-field" htmlFor="crono-q">
@@ -681,8 +681,16 @@ export function CronogramaPage() {
                               {ambito === 'fichas' ? (
                                 <PrioridadMark prioridad={prioridadOf(accion)} iconOnly />
                               ) : null}
-                              <strong>{accion.texto}</strong>
+                              <ExpandableText text={accion.texto} maxLines={2} maxChars={100} />
                             </span>
+                            {accion.detalle?.trim() ? (
+                              <ExpandableText
+                                text={accion.detalle}
+                                className="muted"
+                                maxLines={2}
+                                maxChars={100}
+                              />
+                            ) : null}
                             <span className="muted col-sm-only">
                               {parent}
                             </span>

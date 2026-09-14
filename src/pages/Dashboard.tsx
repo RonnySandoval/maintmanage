@@ -24,6 +24,7 @@ import { CountUp } from '../components/CountUp'
 import { EmptyState, ExtraBadge, StatusBadge, TipoBadge } from '../components/ui'
 import { ActividadTitle } from '../components/ActividadTitle'
 import { PrioridadMark } from '../components/PrioridadMark'
+import { ExpandableText } from '../components/ExpandableText'
 import { FichaTitle } from '../components/FichaTitle'
 import { RestorePanel } from '../components/RestorePanel'
 import { InboxAlert } from '../components/InboxAlert'
@@ -421,10 +422,18 @@ export function DashboardPage() {
                       {tipoAccionOf(a) === 'correctiva' ? (
                         <PrioridadMark prioridad={prioridadOf(a)} iconOnly />
                       ) : null}
-                      <strong>{a.texto}</strong>
+                      <ExpandableText text={a.texto} maxLines={2} maxChars={120} />
                     </span>
                     <StatusBadge estado={estadoAgendaCorrectiva(a)} />
                   </div>
+                  {a.detalle?.trim() ? (
+                    <ExpandableText
+                      text={a.detalle}
+                      className="muted"
+                      maxLines={2}
+                      maxChars={120}
+                    />
+                  ) : null}
                   <div className="muted occ-meta">
                     {tipoAccionLabel(tipoAccionOf(a), aliases)} ·{' '}
                     {act ? (

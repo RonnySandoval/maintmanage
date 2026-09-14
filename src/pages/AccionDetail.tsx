@@ -17,6 +17,7 @@ import { ActividadTitle } from '../components/ActividadTitle'
 import { EjecucionForm } from '../components/EjecucionForm'
 import { FichaTitle } from '../components/FichaTitle'
 import { PrioridadMark } from '../components/PrioridadMark'
+import { ExpandableText } from '../components/ExpandableText'
 import { AccionFechaLabel, StatusBadge } from '../components/ui'
 import { EntityCard } from '../components/EntityCard'
 
@@ -97,7 +98,7 @@ export function AccionDetailPage() {
             <PrioridadMark prioridad={prioridadOf(current)} iconOnly />
           ) : undefined
         }
-        title={<h2 className="title-sm">{accionTitulo(current)}</h2>}
+        title={<ExpandableText as="h2" className="title-sm" text={accionTitulo(current)} maxLines={4} maxChars={220} />}
         badge={<StatusBadge estado={estadoAgendaCorrectiva(current)} />}
         footer={
           <div className="row accion-card-actions">
@@ -120,11 +121,11 @@ export function AccionDetailPage() {
                 }}
               >
                 {ejecucion ? <Pencil size={16} /> : <CircleCheck size={16} />}
-                {ejecucion
-                  ? ejecOpen
-                    ? 'Ocultar ejecución'
-                    : 'Editar ejecución'
-                  : 'Marcar como ejecutada'}
+                {ejecOpen
+                  ? 'Ocultar'
+                  : ejecucion
+                    ? 'Editar ejecución'
+                    : 'Registrar ejecución'}
               </button>
             ) : null}
             {tipo === 'correctiva' ? (
@@ -159,7 +160,9 @@ export function AccionDetailPage() {
           </div>
         }
       >
-        {detalleTxt ? <p className="accion-detalle">{detalleTxt}</p> : null}
+        {detalleTxt ? (
+          <ExpandableText text={detalleTxt} className="accion-detalle" maxLines={6} maxChars={320} />
+        ) : null}
         <p className="muted occ-meta">
           <span>{tipoAccionLabel(tipo, aliases)}</span>
           <AccionFechaLabel fechaObjetivo={current.fechaObjetivo} />

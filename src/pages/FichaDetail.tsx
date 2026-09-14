@@ -225,6 +225,7 @@ export function FichaDetailPage() {
         <AttachmentList
           adjuntos={plantilla}
           onDelete={(adjId) => void removeAdjunto(adjId)}
+          parentLabel={fichaTitulo(current)}
         />
       </EntityCard>
 

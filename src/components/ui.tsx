@@ -61,8 +61,8 @@ export function StatusWordsToggle({ className }: { className?: string }) {
       className={`estado-words-btn${className ? ` ${className}` : ''}${showLabels ? '' : ' is-off'}`}
       onClick={toggleLabels}
       aria-pressed={showLabels}
-      aria-label={showLabels ? 'Ocultar nombres de estado' : 'Mostrar nombres de estado'}
-      title={showLabels ? 'Ocultar nombres de estado' : 'Mostrar nombres de estado'}
+      aria-label={showLabels ? 'Ocultar textos de estado y prioridad' : 'Mostrar textos de estado y prioridad'}
+      title={showLabels ? 'Ocultar textos' : 'Mostrar textos'}
     >
       {showLabels ? <Captions size={18} /> : <CaptionsOff size={18} />}
     </button>

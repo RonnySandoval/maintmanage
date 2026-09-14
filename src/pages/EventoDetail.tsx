@@ -133,11 +133,11 @@ export function EventoDetailPage() {
                 onClick={() => setEjecOpen((was) => !was)}
               >
                 {ejecucion ? <Pencil size={16} /> : <CircleCheck size={16} />}
-                {ejecucion
-                  ? ejecOpen
-                    ? 'Ocultar ejecución'
-                    : 'Editar ejecución'
-                  : 'Marcar como ejecutada'}
+                {ejecOpen
+                  ? 'Ocultar'
+                  : ejecucion
+                    ? 'Editar ejecución'
+                    : 'Registrar ejecución'}
               </button>
               <ShareMenu title={actividadTitulo(currentActividad)} text={shareText} files={shareFiles} />
             </div>

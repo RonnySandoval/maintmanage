@@ -1,6 +1,7 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Camera, FileText, Images, Paperclip, Trash2 } from 'lucide-react'
 import { fileKind } from '../lib/files'
+import { ImageLightbox } from './ImageLightbox'
 
 const ACCEPT =
   'image/*,.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -12,6 +13,7 @@ export function PendingFileThumbs({
   files: File[]
   onRemove?: (index: number) => void
 }) {
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null)
   const imageKeys = useMemo(
     () =>
       files
@@ -41,34 +43,51 @@ export function PendingFileThumbs({
   if (!files.length) return null
 
   return (
-    <div className="thumbs" style={{ marginTop: '0.65rem' }}>
-      {files.map((file, index) => {
-        const kind = fileKind(file.type, file.name)
-        return (
-          <div key={`${file.name}-${file.size}-${index}`} className="thumb" style={{ position: 'relative' }}>
-            {kind === 'image' && urls[index] ? (
-              <img src={urls[index]} alt={file.name} />
-            ) : kind === 'pdf' ? (
-              <FileText size={22} />
-            ) : (
-              <Paperclip size={22} />
-            )}
-            <span style={{ wordBreak: 'break-all' }}>{file.name}</span>
-            {onRemove ? (
-              <button
-                type="button"
-                className="icon-btn icon-btn-delete"
-                style={{ position: 'absolute', top: 0, right: 0 }}
-                aria-label={`Quitar ${file.name}`}
-                onClick={() => onRemove(index)}
-              >
-                <Trash2 size={14} />
-              </button>
-            ) : null}
-          </div>
-        )
-      })}
-    </div>
+    <>
+      <div className="thumbs" style={{ marginTop: '0.65rem' }}>
+        {files.map((file, index) => {
+          const kind = fileKind(file.type, file.name)
+          const url = urls[index]
+          return (
+            <div key={`${file.name}-${file.size}-${index}`} className="thumb" style={{ position: 'relative' }}>
+              {kind === 'image' && url ? (
+                <button
+                  type="button"
+                  className="thumb-open"
+                  onClick={() => setLightbox({ src: url, alt: file.name })}
+                  title={`Ver ${file.name}`}
+                >
+                  <img src={url} alt={file.name} />
+                </button>
+              ) : kind === 'pdf' ? (
+                <FileText size={22} />
+              ) : (
+                <Paperclip size={22} />
+              )}
+              <span style={{ wordBreak: 'break-all' }}>{file.name}</span>
+              {onRemove ? (
+                <button
+                  type="button"
+                  className="icon-btn icon-btn-delete"
+                  style={{ position: 'absolute', top: 0, right: 0 }}
+                  aria-label={`Quitar ${file.name}`}
+                  onClick={() => onRemove(index)}
+                >
+                  <Trash2 size={14} />
+                </button>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+      {lightbox ? (
+        <ImageLightbox
+          src={lightbox.src}
+          alt={lightbox.alt}
+          onClose={() => setLightbox(null)}
+        />
+      ) : null}
+    </>
   )
 }
 

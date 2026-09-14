@@ -1,27 +1,32 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ClipboardList, Layers, Plus, Search, SlidersHorizontal, Users, Wrench } from 'lucide-react'
+import { ClipboardList, Layers, Paperclip, Plus, Search, SlidersHorizontal, Users, Wrench } from 'lucide-react'
 import { db } from '../db'
-import { frecuenciaLabel, mesesDeFrecuencia } from '../db/types'
+import { frecuenciaLabel, mesesDeFrecuencia, type Adjunto } from '../db/types'
 import { bloqueColorVar } from '../lib/colors'
-import { compareFichasByNumero, congregacionDe, congregacionLabel } from '../lib/fichas'
+import { compareFichasByNumero, congregacionDe, congregacionLabel, fichaTitulo } from '../lib/fichas'
 import { ActividadesPanel } from '../components/ActividadesPanel'
 import { BloquesPanel } from '../components/BloquesPanel'
 import { EncargadosPanel } from '../components/EncargadosPanel'
 import { FichaTitle } from '../components/FichaTitle'
+import { AdjuntosMark } from '../components/AdjuntosMark'
+import { DocumentosAgrupados, type DocumentosGrupo } from '../components/DocumentosAgrupados'
 import { SortHeader } from '../components/SortHeader'
 import { EmptyState } from '../components/ui'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
+import { EMPTY_COUNTS, buildAdjuntoCounts } from '../lib/adjuntos'
+import { etiquetasOf } from '../lib/etiquetasAdjuntos'
 import type { Ficha } from '../db/types'
 
-type FichasTab = 'fichas' | 'actividades' | 'encargados' | 'bloques'
+type FichasTab = 'fichas' | 'actividades' | 'bloques' | 'encargados' | 'documentos'
 type GroupBy = 'bloque' | 'encargado' | 'congregacion'
 type SortCol = 'ficha' | 'bloque' | 'encargado' | 'periodo'
 type SortDir = 'asc' | 'desc'
 
-function tabFromParam(value: string | null): FichasTab {
-  if (value === 'actividades' || value === 'encargados' || value === 'bloques') return value
+function tabFromParam(tab: string | null, vista: string | null): FichasTab {
+  if (tab === 'documentos' || vista === 'documentos') return 'documentos'
+  if (tab === 'actividades' || tab === 'encargados' || tab === 'bloques') return tab
   return 'fichas'
 }
 
@@ -39,9 +44,15 @@ function sortDirFromParam(value: string | null): SortDir {
   return value === 'desc' ? 'desc' : 'asc'
 }
 
+function adjuntoMatchesQuery(adjunto: Adjunto, qLower: string): boolean {
+  if (!qLower) return true
+  const hay = `${adjunto.nombre} ${etiquetasOf(adjunto.etiquetas).join(' ')}`.toLowerCase()
+  return hay.includes(qLower)
+}
+
 export function FichasPage() {
   const [params, setParams] = useSearchParams()
-  const tab = tabFromParam(params.get('tab'))
+  const tab = tabFromParam(params.get('tab'), params.get('vista'))
   const bloqueId = params.get('bloque') ?? ''
   const encargadoId = params.get('encargado') ?? ''
   const q = params.get('q') ?? ''
@@ -53,6 +64,10 @@ export function FichasPage() {
   const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
   const bloques = useLiveQuery(() => db.grupos.orderBy('nombre').toArray()) ?? []
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
+  const adjuntos =
+    useLiveQuery(() => db.adjuntos.where('tipo').equals('ficha').toArray()) ?? []
+  const adjuntoCounts =
+    useLiveQuery(async () => buildAdjuntoCounts(await db.adjuntos.toArray())) ?? EMPTY_COUNTS
 
   const bloqueMap = useMemo(
     () => Object.fromEntries(bloques.map((b) => [b.id, b])),
@@ -62,16 +77,25 @@ export function FichasPage() {
     () => Object.fromEntries(encargados.map((e) => [e.id, e])),
     [encargados],
   )
+  const fichaMap = useMemo(() => Object.fromEntries(fichas.map((f) => [f.id, f])), [fichas])
 
   function setTab(next: FichasTab) {
     const nextParams = new URLSearchParams()
     if (next !== 'fichas') nextParams.set('tab', next)
+    if (next === 'fichas' || next === 'documentos') {
+      for (const key of ['q', 'bloque', 'encargado', 'agrupar', 'col', 'dir'] as const) {
+        const value = params.get(key)
+        if (value) nextParams.set(key, value)
+      }
+    }
     setParams(nextParams, { replace: true })
   }
 
   function patch(updates: Record<string, string | undefined>) {
     const next = new URLSearchParams(params)
-    next.delete('tab')
+    next.delete('vista')
+    if (tab !== 'fichas') next.set('tab', tab)
+    else next.delete('tab')
     for (const [key, value] of Object.entries(updates)) {
       if (value) next.set(key, value)
       else next.delete(key)
@@ -107,16 +131,60 @@ export function FichasPage() {
   }
 
   const filtered = useMemo(() => {
+    const qLower = q.toLowerCase()
     return fichas.filter((f) => {
       if (bloqueId && f.grupoId !== bloqueId) return false
       if (encargadoId && f.encargadoId !== encargadoId) return false
       if (q) {
-        const hay = `${f.numero} ${f.nombre}`.toLowerCase()
-        if (!hay.includes(q.toLowerCase())) return false
+        const hay = `${f.numero} ${f.nombre} ${adjuntoCounts.searchFicha[f.id] ?? ''}`.toLowerCase()
+        if (!hay.includes(qLower)) return false
       }
       return true
     })
-  }, [fichas, bloqueId, encargadoId, q])
+  }, [fichas, bloqueId, encargadoId, q, adjuntoCounts.searchFicha])
+
+  const documentosGrupos = useMemo(() => {
+    const qLower = q.trim().toLowerCase()
+    const byFicha = new Map<string, Adjunto[]>()
+    for (const adj of adjuntos) {
+      if (!adj.fichaId) continue
+      const ficha = fichaMap[adj.fichaId]
+      if (!ficha) continue
+      if (bloqueId && ficha.grupoId !== bloqueId) continue
+      if (encargadoId && ficha.encargadoId !== encargadoId) continue
+      if (!adjuntoMatchesQuery(adj, qLower)) continue
+      const list = byFicha.get(adj.fichaId) ?? []
+      list.push(adj)
+      byFicha.set(adj.fichaId, list)
+    }
+
+    const groups: DocumentosGrupo[] = []
+    const fichaIds = [...byFicha.keys()].sort((a, b) => {
+      const fa = fichaMap[a]
+      const fb = fichaMap[b]
+      if (!fa || !fb) return 0
+      return compareFichasByNumero(fa, fb)
+    })
+    for (const fichaId of fichaIds) {
+      const ficha = fichaMap[fichaId]
+      if (!ficha) continue
+      const bloque = bloqueMap[ficha.grupoId]
+      const encargado = ficha.encargadoId ? encargadoMap[ficha.encargadoId] : undefined
+      const rows = (byFicha.get(fichaId) ?? []).sort((a, b) => b.createdAt - a.createdAt)
+      groups.push({
+        key: fichaId,
+        title: <FichaTitle ficha={ficha} color={bloque?.color} />,
+        shareTitle: fichaTitulo(ficha),
+        href: `/fichas/${fichaId}`,
+        meta: [bloque?.nombre ?? 'Sin bloque', encargado?.nombre].filter(Boolean).join(' · '),
+        adjuntos: rows,
+      })
+    }
+    return groups
+  }, [adjuntos, fichaMap, bloqueMap, encargadoMap, bloqueId, encargadoId, q])
+
+  const docsCount = adjuntos.length
+  const docsFichasCount = documentosGrupos.length
 
   const grouped = useMemo(() => {
     const dir = sortDir === 'desc' ? -1 : 1
@@ -193,7 +261,7 @@ export function FichasPage() {
   }, [filtered, bloqueMap, encargadoMap, groupBy, sortCol, sortDir])
 
   const filterTools = useMemo<FilterTool[]>(() => {
-    if (tab !== 'fichas') return []
+    if (tab !== 'fichas' && tab !== 'documentos') return []
     return [
       {
         id: 'filtrar',
@@ -237,37 +305,41 @@ export function FichasPage() {
           </div>
         ),
       },
-      {
-        id: 'agrupar',
-        label: 'Agrupar',
-        icon: Layers,
-        active: groupBy !== 'bloque',
-        content: (
-          <div className="chip-row tight" role="tablist" aria-label="Agrupar">
-            <button
-              type="button"
-              className={`chip compact${groupBy === 'bloque' ? ' active' : ''}`}
-              onClick={() => setGroup('bloque')}
-            >
-              Bloque
-            </button>
-            <button
-              type="button"
-              className={`chip compact${groupBy === 'encargado' ? ' active' : ''}`}
-              onClick={() => setGroup('encargado')}
-            >
-              Encargado
-            </button>
-            <button
-              type="button"
-              className={`chip compact${groupBy === 'congregacion' ? ' active' : ''}`}
-              onClick={() => setGroup('congregacion')}
-            >
-              Congregación
-            </button>
-          </div>
-        ),
-      },
+      ...(tab === 'documentos'
+        ? []
+        : [
+            {
+              id: 'agrupar',
+              label: 'Agrupar',
+              icon: Layers,
+              active: groupBy !== 'bloque',
+              content: (
+                <div className="chip-row tight" role="tablist" aria-label="Agrupar">
+                  <button
+                    type="button"
+                    className={`chip compact${groupBy === 'bloque' ? ' active' : ''}`}
+                    onClick={() => setGroup('bloque')}
+                  >
+                    Bloque
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip compact${groupBy === 'encargado' ? ' active' : ''}`}
+                    onClick={() => setGroup('encargado')}
+                  >
+                    Encargado
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip compact${groupBy === 'congregacion' ? ' active' : ''}`}
+                    onClick={() => setGroup('congregacion')}
+                  >
+                    Congregación
+                  </button>
+                </div>
+              ),
+            } satisfies FilterTool,
+          ]),
     ]
   }, [tab, bloqueId, encargadoId, groupBy, bloques, encargados])
 
@@ -275,16 +347,25 @@ export function FichasPage() {
     <div>
       {filterTools.length ? (
         <FilterDrawerSlot
-          title="Fichas"
+          title={tab === 'documentos' ? 'Documentos' : 'Fichas'}
           tools={filterTools}
-          canClear={Boolean(q || bloqueId || encargadoId || groupBy !== 'bloque')}
+          canClear={Boolean(q || bloqueId || encargadoId || (tab === 'fichas' && groupBy !== 'bloque'))}
           onClear={() => {
             setSearchText('')
-            patch({ q: undefined, bloque: undefined, encargado: undefined, agrupar: undefined })
+            patch({
+              q: undefined,
+              bloque: undefined,
+              encargado: undefined,
+              agrupar: undefined,
+            })
           }}
         />
       ) : null}
-      <div className="seg-toggle tabs-4" role="tablist" aria-label="Fichas, actividades, encargados o bloques">
+      <div
+        className="seg-toggle tabs-5 fichas-main-tabs"
+        role="tablist"
+        aria-label="Fichas, actividades, bloques, encargados o documentos"
+      >
         <button
           type="button"
           role="tab"
@@ -293,7 +374,7 @@ export function FichasPage() {
           onClick={() => setTab('fichas')}
         >
           <ClipboardList size={16} />
-          Fichas
+          <span className="tab-label">Fichas</span>
         </button>
         <button
           type="button"
@@ -303,17 +384,7 @@ export function FichasPage() {
           onClick={() => setTab('actividades')}
         >
           <Wrench size={16} />
-          Actividades
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'encargados'}
-          className={tab === 'encargados' ? 'active' : ''}
-          onClick={() => setTab('encargados')}
-        >
-          <Users size={16} />
-          Encargados
+          <span className="tab-label">Actividades</span>
         </button>
         <button
           type="button"
@@ -323,13 +394,85 @@ export function FichasPage() {
           onClick={() => setTab('bloques')}
         >
           <Layers size={16} />
-          Bloques
+          <span className="tab-label">Bloques</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'encargados'}
+          className={tab === 'encargados' ? 'active' : ''}
+          onClick={() => setTab('encargados')}
+        >
+          <Users size={16} />
+          <span className="tab-label">Encargados</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'documentos'}
+          className={tab === 'documentos' ? 'active' : ''}
+          onClick={() => setTab('documentos')}
+          title="Documentos adjuntos"
+        >
+          <Paperclip size={16} />
+          <span className="tab-label">Documentos</span>
         </button>
       </div>
 
       {tab === 'actividades' ? <ActividadesPanel /> : null}
       {tab === 'encargados' ? <EncargadosPanel /> : null}
       {tab === 'bloques' ? <BloquesPanel /> : null}
+
+      {tab === 'documentos' ? (
+        <>
+          <div className="page-head">
+            <p className="muted" style={{ margin: 0 }}>
+              {docsCount} documento{docsCount === 1 ? '' : 's'}
+              {docsFichasCount
+                ? ` · ${docsFichasCount} ficha${docsFichasCount === 1 ? '' : 's'}`
+                : ''}
+            </p>
+          </div>
+          {fichas.length > 0 ? (
+            <label className="search-field" htmlFor="fichas-docs-q">
+              <Search size={16} aria-hidden />
+              <input
+                id="fichas-docs-q"
+                className="input"
+                type="search"
+                placeholder="Buscar documento o etiqueta"
+                value={searchText}
+                onChange={(e) => onSearchChange(e.target.value)}
+                autoComplete="off"
+                enterKeyHint="search"
+                inputMode="search"
+              />
+            </label>
+          ) : null}
+          {fichas.length === 0 ? (
+            <EmptyState
+              icon={<ClipboardList size={36} />}
+              title="Sin fichas"
+              text="Crea fichas para poder adjuntar documentos."
+              action={
+                <Link className="btn btn-add" to="/fichas/nueva">
+                  Crear ficha
+                </Link>
+              }
+            />
+          ) : (
+            <DocumentosAgrupados
+              groups={documentosGrupos}
+              emptyText={
+                q || bloqueId || encargadoId
+                  ? 'No hay documentos con esos filtros.'
+                  : 'Aún no hay documentos adjuntos en las fichas.'
+              }
+            />
+          )}
+        </>
+      ) : null}
+
       {tab !== 'fichas' ? null : (
         <>
           <div className="page-head">
@@ -351,7 +494,7 @@ export function FichasPage() {
                 id="fichas-q"
                 className="input"
                 type="search"
-                placeholder="Buscar por número o nombre"
+                placeholder="Buscar por número, nombre o etiqueta"
                 value={searchText}
                 onChange={(e) => onSearchChange(e.target.value)}
                 autoComplete="off"
@@ -425,7 +568,10 @@ export function FichasPage() {
                           style={{ background: bloqueColorVar(bloque?.color) }}
                         />
                         <span className="table-cell">
-                          <FichaTitle ficha={f} color={bloque?.color} />
+                          <span className="row" style={{ flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
+                            <FichaTitle ficha={f} color={bloque?.color} />
+                            <AdjuntosMark count={adjuntoCounts.ficha[f.id] ?? 0} />
+                          </span>
                           <span className="muted col-sm-only">
                             {bloque?.nombre ?? 'Sin bloque'}
                             {encargado ? ` · ${encargado.nombre}` : ''}

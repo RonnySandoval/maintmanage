@@ -39,6 +39,7 @@ import {
   pickBackupFolder,
   restoreFromFolder,
   shareBackupZip,
+  sharePreparedBackupZip,
   unlinkBackupFolder,
   writeBackupToFolder,
 } from '../db/backup'
@@ -90,6 +91,7 @@ export function AjustesPage() {
   const [copiaCamino, setCopiaCamino] = useState<'carpeta' | 'zip' | 'json'>(() =>
     canUseFolderBackup() ? 'carpeta' : 'zip',
   )
+  const [sharePending, setSharePending] = useState<{ blob: Blob; filename: string } | null>(null)
 
   async function loadQuota() {
     const est = await navigator.storage?.estimate()
@@ -158,8 +160,16 @@ export function AjustesPage() {
   async function shareZip() {
     setBusy(true)
     setMessage('')
+    setSharePending(null)
     try {
       const result = await shareBackupZip()
+      if (typeof result === 'object' && result.status === 'ready') {
+        setSharePending({ blob: result.blob, filename: result.filename })
+        setMessage(
+          'ZIP listo. Pulsa «Abrir compartir» para enviarlo por WhatsApp u otra app.',
+        )
+        return
+      }
       if (result === 'cancelled') {
         setMessage('')
         return
@@ -169,6 +179,31 @@ export function AjustesPage() {
           ? 'ZIP compartido. En el otro dispositivo restáuralo con «Elegir ZIP».'
           : 'Este dispositivo no pudo compartir el archivo; se descargó el ZIP.',
       )
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'No se pudo compartir el ZIP.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function openShareSheet() {
+    if (!sharePending) return
+    setBusy(true)
+    setMessage('')
+    try {
+      const result = await sharePreparedBackupZip(sharePending.blob, sharePending.filename)
+      if (result === 'cancelled') {
+        setMessage('')
+        return
+      }
+      if (result === 'shared') {
+        setSharePending(null)
+        setMessage('ZIP compartido. En el otro dispositivo restáuralo con «Elegir ZIP».')
+        return
+      }
+      downloadBlob(sharePending.blob, sharePending.filename)
+      setSharePending(null)
+      setMessage('No se pudo abrir el menú de compartir; se descargó el ZIP.')
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'No se pudo compartir el ZIP.')
     } finally {
@@ -446,6 +481,7 @@ export function AjustesPage() {
                 onClick={() => {
                   setCopiaPaso('guardar')
                   setMessage('')
+                  setSharePending(null)
                 }}
               >
                 Guardar / exportar
@@ -547,10 +583,22 @@ export function AjustesPage() {
                   <Download size={16} />
                   Descargar ZIP
                 </button>
-                <button type="button" className="btn" disabled={busy} onClick={() => void shareZip()}>
-                  <Share2 size={16} />
-                  Compartir ZIP
-                </button>
+                {sharePending ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={busy}
+                    onClick={() => void openShareSheet()}
+                  >
+                    <Share2 size={16} />
+                    Abrir compartir
+                  </button>
+                ) : (
+                  <button type="button" className="btn" disabled={busy} onClick={() => void shareZip()}>
+                    <Share2 size={16} />
+                    Compartir ZIP
+                  </button>
+                )}
               </div>
             ) : null}
 

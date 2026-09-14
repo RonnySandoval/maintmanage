@@ -228,7 +228,11 @@ export function ActividadDetailPage() {
         <FilePicker
           onFiles={(files) => void saveAdjuntos(files, { tipo: 'actividad', actividadId: current.id })}
         />
-        <AttachmentList adjuntos={plantilla} onDelete={(adjId) => void removeAdjunto(adjId)} />
+        <AttachmentList
+          adjuntos={plantilla}
+          onDelete={(adjId) => void removeAdjunto(adjId)}
+          parentLabel={actividadTitulo(current)}
+        />
       </EntityCard>
 
       <EntityCard

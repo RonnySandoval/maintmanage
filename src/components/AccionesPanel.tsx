@@ -32,6 +32,7 @@ import {
 import { createId } from '../lib/ids'
 import { accionLabel, accionesTitulo, useAliases } from '../lib/labels'
 import { PrioridadMark } from './PrioridadMark'
+import { ExpandableText } from './ExpandableText'
 import { AccionFechaLabel, AccionFechasToggle, StatusBadge } from './ui'
 import { EntityCard } from './EntityCard'
 
@@ -178,9 +179,10 @@ export function AccionesPanel({
             )}
             <div className="field">
               <label htmlFor="accion-texto">Título</label>
-              <input
+              <textarea
                 id="accion-texto"
-                className="input"
+                className="textarea compact"
+                rows={2}
                 value={texto}
                 onChange={(e) => setTexto(e.target.value)}
                 placeholder={
@@ -194,8 +196,8 @@ export function AccionesPanel({
               <label htmlFor="accion-detalle">Detalle</label>
               <textarea
                 id="accion-detalle"
-                className="input"
-                rows={2}
+                className="textarea compact"
+                rows={3}
                 value={detalle}
                 onChange={(e) => setDetalle(e.target.value)}
                 placeholder="Opcional: contexto, materiales, ubicación…"
@@ -224,7 +226,7 @@ export function AccionesPanel({
                       className={`chip compact${prioridad === p.id ? ' active' : ''}`}
                       onClick={() => setPrioridad(p.id)}
                     >
-                      <PrioridadMark prioridad={p.id} />
+                      <PrioridadMark prioridad={p.id} forceLabel />
                     </button>
                   ))}
                 </div>
@@ -353,11 +355,11 @@ export function AccionesPanel({
                           <PrioridadMark prioridad={prioridadOf(a)} iconOnly />
                         ) : undefined
                       }
-                      title={
-                        <Link to={accionHref(a)}>
-                          <strong>{accionTitulo(a)}</strong>
-                        </Link>
-                      }
+                        title={
+                          <Link to={accionHref(a)} className="accion-title-link">
+                            <ExpandableText text={accionTitulo(a)} maxLines={2} maxChars={120} />
+                          </Link>
+                        }
                       badge={<StatusBadge estado={estadoAgendaCorrectiva(a)} />}
                       footer={
                         <div className="row accion-card-actions">
@@ -417,7 +419,14 @@ export function AccionesPanel({
                         </div>
                       }
                     >
-                      {detalleTxt ? <p className="accion-detalle">{detalleTxt}</p> : null}
+                      {detalleTxt ? (
+                        <ExpandableText
+                          text={detalleTxt}
+                          className="accion-detalle"
+                          maxLines={3}
+                          maxChars={180}
+                        />
+                      ) : null}
                       <p className="muted occ-meta">
                         {tipoAccionLabel(tipoAccionOf(a), aliases)}
                         <AccionFechaLabel fechaObjetivo={a.fechaObjetivo} gated />
@@ -567,13 +576,18 @@ export function AccionEditor({
       )}
       <div className="field">
         <label>Título</label>
-        <input className="input" value={texto} onChange={(e) => setTexto(e.target.value)} />
+        <textarea
+          className="textarea compact"
+          rows={2}
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+        />
       </div>
       <div className="field">
         <label>Detalle</label>
         <textarea
-          className="input"
-          rows={2}
+          className="textarea compact"
+          rows={3}
           value={detalle}
           onChange={(e) => setDetalle(e.target.value)}
           placeholder="Opcional: contexto, materiales, ubicación…"
@@ -612,7 +626,7 @@ export function AccionEditor({
                 className={`chip compact${prioridad === p.id ? ' active' : ''}`}
                 onClick={() => setPrioridad(p.id)}
               >
-                <PrioridadMark prioridad={p.id} />
+                <PrioridadMark prioridad={p.id} forceLabel />
               </button>
             ))}
           </div>

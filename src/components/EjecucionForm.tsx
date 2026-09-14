@@ -170,7 +170,7 @@ export function EjecucionForm({
         ) : null}
       </div>
       <button className="btn btn-primary" type="submit" disabled={saving}>
-        {saving ? 'Guardando…' : ejecucion ? 'Guardar cambios' : 'Registrar ejecución'}
+        {saving ? 'Guardando…' : ejecucion ? 'Guardar cambios' : 'Marcar como ejecutada'}
       </button>
     </form>
   )

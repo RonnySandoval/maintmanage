@@ -152,6 +152,8 @@ export interface Adjunto {
   actividadId?: string
   ejecucionId?: string
   tipo: TipoAdjunto
+  /** Etiquetas libres creadas por el usuario (formato, instructivo…). */
+  etiquetas?: string[]
   createdAt: number
 }
 
@@ -169,6 +171,8 @@ export interface Ajustes {
   backupFolderName?: string
   /** Tipos de actividad añadidos por el usuario. */
   tiposActividad?: TipoActividadDef[]
+  /** Catálogo de etiquetas de adjuntos (creadas por el usuario). */
+  etiquetasAdjuntos?: string[]
   /** Horas entre copias automáticas. Por defecto 12. */
   backupIntervalHours?: number
   /** Si está fijada, la copia automática espera a esta fecha. */
