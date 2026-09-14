@@ -265,11 +265,19 @@ export function AjustesPage() {
 
   return (
     <div className="stack ajustes-page">
-      <SettingsAccordion title="Apariencia" icon={Monitor} defaultOpen>
-        <div className="ajustes-apariencia-row">
-          <ThemeModePicker />
-        </div>
-      </SettingsAccordion>
+      <EntityCard
+        className="ajustes-apariencia is-inline"
+        compact
+        title={
+          <h2 className="title-sm">
+            <span className="accordion-label">
+              <Monitor size={16} />
+              Apariencia
+            </span>
+          </h2>
+        }
+        badge={<ThemeModePicker />}
+      />
 
       <div className="seg-toggle tabs-5 icon-only" role="tablist" aria-label="Secciones de ajustes">
         {AJUSTES_TABS.map((item) => {

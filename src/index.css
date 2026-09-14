@@ -52,89 +52,52 @@
   --metal-delete: #4a4648;
   --metal-delete-hover: #3b383a;
   --metal-ink: #12161c;
-  --metal-ok-grad:
-    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.72) 0%, transparent 42%),
-    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.42) 0%, transparent 40%),
-    radial-gradient(70% 55% at 50% 48%, rgb(232 238 244 / 0.55) 0%, transparent 62%),
-    linear-gradient(
+  --metal-ok-grad: linear-gradient(
       180deg,
-      #1e242c 0%,
-      #4a5562 22%,
-      #9aa6b4 48%,
-      #dfe6ee 56%,
-      #7a8796 78%,
-      #2a323c 100%
+      #c8d0d8 0%,
+      #a8b2bc 38%,
+      #8e99a4 62%,
+      #7a8692 100%
     );
-  --metal-ok-grad-hover:
-    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.8) 0%, transparent 44%),
-    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.5) 0%, transparent 42%),
-    radial-gradient(70% 55% at 50% 48%, rgb(242 246 250 / 0.62) 0%, transparent 64%),
-    linear-gradient(
+  --metal-ok-grad-hover: linear-gradient(
       180deg,
-      #262e36 0%,
-      #566270 22%,
-      #a8b4c2 48%,
-      #e8eef4 56%,
-      #8894a2 78%,
-      #343c48 100%
+      #d4dce4 0%,
+      #b4bec8 38%,
+      #9aa5b0 62%,
+      #86929e 100%
     );
-  --metal-add-grad:
-    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.68) 0%, transparent 42%),
-    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.38) 0%, transparent 40%),
-    radial-gradient(70% 55% at 50% 48%, rgb(232 226 218 / 0.5) 0%, transparent 62%),
-    linear-gradient(
+  --metal-add-grad: linear-gradient(
       180deg,
-      #221f1c 0%,
-      #524e48 22%,
-      #a09a92 48%,
-      #e0dad2 56%,
-      #7c766e 78%,
-      #2e2a26 100%
+      #cfc8c0 0%,
+      #b0a89f 38%,
+      #968e85 62%,
+      #827a72 100%
     );
-  --metal-add-grad-hover:
-    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.76) 0%, transparent 44%),
-    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.46) 0%, transparent 42%),
-    radial-gradient(70% 55% at 50% 48%, rgb(242 236 228 / 0.58) 0%, transparent 64%),
-    linear-gradient(
+  --metal-add-grad-hover: linear-gradient(
       180deg,
-      #2a2622 0%,
-      #5e5a52 22%,
-      #aea8a0 48%,
-      #eae4dc 56%,
-      #8a847c 78%,
-      #383430 100%
+      #dbd4cc 0%,
+      #bcb4ab 38%,
+      #a29a91 62%,
+      #8e8680 100%
     );
-  --metal-share-grad:
-    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.7) 0%, transparent 42%),
-    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.4) 0%, transparent 40%),
-    radial-gradient(70% 55% at 50% 48%, rgb(232 238 244 / 0.52) 0%, transparent 62%),
-    linear-gradient(
+  --metal-share-grad: linear-gradient(
       180deg,
-      #1e242c 0%,
-      #4c5562 22%,
-      #9aa4b2 48%,
-      #dfe6ee 56%,
-      #7a8492 78%,
-      #2a323c 100%
+      #c9d1da 0%,
+      #a9b3be 38%,
+      #8f9aa6 62%,
+      #7b8794 100%
     );
-  --metal-share-grad-hover:
-    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.78) 0%, transparent 44%),
-    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.48) 0%, transparent 42%),
-    radial-gradient(70% 55% at 50% 48%, rgb(242 246 250 / 0.6) 0%, transparent 64%),
-    linear-gradient(
+  --metal-share-grad-hover: linear-gradient(
       180deg,
-      #262e36 0%,
-      #586270 22%,
-      #a8b2c0 48%,
-      #e8eef4 56%,
-      #8892a0 78%,
-      #343c48 100%
+      #d5dde6 0%,
+      #b5bfca 38%,
+      #9ba6b2 62%,
+      #87939f 100%
     );
   --metal-shine:
-    inset 0 1px 0 rgb(255 255 255 / 0.7),
-    inset 0 -3px 6px rgb(0 0 0 / 0.38),
-    inset 0 0 0 1px rgb(255 255 255 / 0.1);
-  --metal-shadow: 0 2px 3px rgb(0 0 0 / 0.3), 0 8px 18px rgb(0 0 0 / 0.2);
+    inset 0 1px 0 rgb(255 255 255 / 0.55),
+    inset 0 -1px 0 rgb(0 0 0 / 0.18);
+  --metal-shadow: 0 1px 2px rgb(0 0 0 / 0.22), 0 4px 12px rgb(0 0 0 / 0.14);
   --app-texture:
     radial-gradient(980px 520px at 10% -12%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 60%),
     radial-gradient(720px 400px at 96% 6%, color-mix(in srgb, var(--bg-muted) 72%, transparent), transparent 55%),
@@ -184,89 +147,52 @@
   --metal-delete: #7a7476;
   --metal-delete-hover: #8b8587;
   --metal-ink: #10151c;
-  --metal-ok-grad:
-    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.75) 0%, transparent 42%),
-    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.45) 0%, transparent 40%),
-    radial-gradient(70% 55% at 50% 48%, rgb(240 244 248 / 0.6) 0%, transparent 62%),
-    linear-gradient(
+  --metal-ok-grad: linear-gradient(
       180deg,
-      #2c343e 0%,
-      #62707e 22%,
-      #b8c2ce 48%,
-      #eef2f6 56%,
-      #8e9aa8 78%,
-      #3a4450 100%
+      #d8e0e8 0%,
+      #b4bec8 36%,
+      #96a2ae 64%,
+      #7e8b98 100%
     );
-  --metal-ok-grad-hover:
-    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.82) 0%, transparent 44%),
-    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.52) 0%, transparent 42%),
-    radial-gradient(70% 55% at 50% 48%, rgb(248 250 252 / 0.68) 0%, transparent 64%),
-    linear-gradient(
+  --metal-ok-grad-hover: linear-gradient(
       180deg,
-      #343c48 0%,
-      #6e7c8c 22%,
-      #c4ced8 48%,
-      #f4f7fa 56%,
-      #9aa6b4 78%,
-      #46505c 100%
+      #e4ecf2 0%,
+      #c0cad4 36%,
+      #a2aeb8 64%,
+      #8a97a4 100%
     );
-  --metal-add-grad:
-    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.7) 0%, transparent 42%),
-    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.4) 0%, transparent 40%),
-    radial-gradient(70% 55% at 50% 48%, rgb(240 234 226 / 0.55) 0%, transparent 62%),
-    linear-gradient(
+  --metal-add-grad: linear-gradient(
       180deg,
-      #302c28 0%,
-      #6a645c 22%,
-      #bcb6ae 48%,
-      #eee8e0 56%,
-      #908a82 78%,
-      #3e3a36 100%
+      #ddd6ce 0%,
+      #bcb4ab 36%,
+      #a0988f 64%,
+      #8a827a 100%
     );
-  --metal-add-grad-hover:
-    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.78) 0%, transparent 44%),
-    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.48) 0%, transparent 42%),
-    radial-gradient(70% 55% at 50% 48%, rgb(248 242 234 / 0.62) 0%, transparent 64%),
-    linear-gradient(
+  --metal-add-grad-hover: linear-gradient(
       180deg,
-      #383430 0%,
-      #78726a 22%,
-      #cac4bc 48%,
-      #f4eee6 56%,
-      #9e9890 78%,
-      #484440 100%
+      #e9e2da 0%,
+      #c8c0b7 36%,
+      #aca49b 64%,
+      #968e86 100%
     );
-  --metal-share-grad:
-    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.72) 0%, transparent 42%),
-    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.42) 0%, transparent 40%),
-    radial-gradient(70% 55% at 50% 48%, rgb(240 244 248 / 0.56) 0%, transparent 62%),
-    linear-gradient(
+  --metal-share-grad: linear-gradient(
       180deg,
-      #2c343e 0%,
-      #64707e 22%,
-      #bcc6d0 48%,
-      #eef2f6 56%,
-      #8e98a6 78%,
-      #3a4450 100%
+      #dae2ea 0%,
+      #b8c2cc 36%,
+      #9aa6b2 64%,
+      #8290a0 100%
     );
-  --metal-share-grad-hover:
-    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.8) 0%, transparent 44%),
-    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.5) 0%, transparent 42%),
-    radial-gradient(70% 55% at 50% 48%, rgb(248 250 252 / 0.64) 0%, transparent 64%),
-    linear-gradient(
+  --metal-share-grad-hover: linear-gradient(
       180deg,
-      #343c48 0%,
-      #707c8c 22%,
-      #c8d2dc 48%,
-      #f4f7fa 56%,
-      #9aa4b2 78%,
-      #46505c 100%
+      #e6eef4 0%,
+      #c4ced8 36%,
+      #a6b2be 64%,
+      #8e9cac 100%
     );
   --metal-shine:
-    inset 0 1px 0 rgb(255 255 255 / 0.65),
-    inset 0 -3px 6px rgb(0 0 0 / 0.42),
-    inset 0 0 0 1px rgb(255 255 255 / 0.1);
-  --metal-shadow: 0 2px 3px rgb(0 0 0 / 0.42), 0 10px 20px rgb(0 0 0 / 0.3);
+    inset 0 1px 0 rgb(255 255 255 / 0.62),
+    inset 0 -1px 0 rgb(0 0 0 / 0.22);
+  --metal-shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 5px 14px rgb(0 0 0 / 0.22);
   --kind-actividad: #e0a36a;
   --app-texture:
     radial-gradient(980px 520px at 10% -12%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
@@ -719,21 +645,21 @@ button.nuevo-fab-item {
   width: 52px;
   height: 52px;
   padding: 0;
-  border: 1px solid color-mix(in srgb, #12161c 70%, #fff);
+  border: 1px solid color-mix(in srgb, #403c38 50%, #fff);
   border-radius: 999px;
   background: var(--metal-add-grad);
   color: var(--metal-ink);
   font-weight: 750;
   font-size: 0.92rem;
   cursor: pointer;
-  box-shadow: var(--metal-shine), 0 3px 5px rgb(0 0 0 / 0.32), 0 12px 26px rgb(0 0 0 / 0.28);
-  text-shadow: 0 1px 0 rgb(255 255 255 / 0.35);
+  box-shadow: var(--metal-shine), var(--metal-shadow);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.22);
 }
 
 .nuevo-fab-btn:hover,
 .nuevo-fab-btn.is-open {
   background: var(--metal-add-grad-hover);
-  border-color: color-mix(in srgb, #12161c 55%, #fff);
+  border-color: color-mix(in srgb, #403c38 35%, #fff);
 }
 
 .nuevo-fab-btn:focus-visible {
@@ -1080,10 +1006,10 @@ button.nuevo-fab-item {
 .btn-share {
   position: relative;
   overflow: hidden;
-  border-color: color-mix(in srgb, #0b1016 55%, transparent);
+  border-color: color-mix(in srgb, #0b1016 40%, transparent);
   color: var(--metal-ink);
   box-shadow: var(--metal-shine), var(--metal-shadow);
-  text-shadow: 0 1px 0 rgb(255 255 255 / 0.35);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.22);
 }
 
 .btn-primary > *,
@@ -1096,12 +1022,12 @@ button.nuevo-fab-item {
 
 .btn-primary {
   background: var(--metal-ok-grad);
-  border-color: color-mix(in srgb, #12161c 70%, #fff);
+  border-color: color-mix(in srgb, #3a4450 55%, #fff);
 }
 
 .btn-primary:hover {
   background: var(--metal-ok-grad-hover);
-  border-color: color-mix(in srgb, #12161c 55%, #fff);
+  border-color: color-mix(in srgb, #3a4450 40%, #fff);
 }
 
 .btn-primary:focus-visible {
@@ -1110,12 +1036,12 @@ button.nuevo-fab-item {
 
 .btn-add {
   background: var(--metal-add-grad);
-  border-color: color-mix(in srgb, #12161c 70%, #fff);
+  border-color: color-mix(in srgb, #403c38 55%, #fff);
 }
 
 .btn-add:hover {
   background: var(--metal-add-grad-hover);
-  border-color: color-mix(in srgb, #12161c 55%, #fff);
+  border-color: color-mix(in srgb, #403c38 40%, #fff);
 }
 
 .btn-add.is-open {
@@ -1124,19 +1050,19 @@ button.nuevo-fab-item {
 
 .btn-share {
   background: var(--metal-share-grad);
-  border-color: color-mix(in srgb, #12161c 70%, #fff);
+  border-color: color-mix(in srgb, #3a4450 55%, #fff);
 }
 
 .btn-share:hover {
   background: var(--metal-share-grad-hover);
-  border-color: color-mix(in srgb, #12161c 55%, #fff);
+  border-color: color-mix(in srgb, #3a4450 40%, #fff);
 }
 
 [data-theme='dark'] .btn-primary,
 [data-theme='dark'] .btn-add,
 [data-theme='dark'] .btn-share,
 [data-theme='dark'] .nuevo-fab-btn {
-  text-shadow: 0 1px 0 rgb(255 255 255 / 0.4);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.28);
 }
 
 .btn-edit {
@@ -1385,9 +1311,13 @@ a.icon-btn:hover {
   font-size: 0.75rem;
 }
 
+.seg-toggle.compact.icon-only {
+  grid-template-columns: repeat(3, minmax(2rem, auto));
+}
+
 .seg-toggle.compact.icon-only button {
-  min-width: 32px;
-  padding: 0 0.28rem;
+  min-width: 2rem;
+  padding: 0 0.3rem;
 }
 
 .year-stepper {
@@ -1667,9 +1597,20 @@ a.icon-btn:hover {
 }
 
 .seg-toggle button.active {
-  background: var(--bg-elev);
-  box-shadow: var(--shadow);
+  background: color-mix(in srgb, var(--bg-elev) 92%, #fff);
   color: var(--accent);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.18),
+    0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+[data-theme='dark'] .seg-toggle button.active {
+  background: color-mix(in srgb, var(--bg-elev) 88%, #fff);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.35),
+    0 0 0 1px color-mix(in srgb, var(--border) 80%, transparent),
+    inset 0 1px 0 rgb(255 255 255 / 0.1);
 }
 
 .ficha-title {
@@ -1922,17 +1863,29 @@ a.icon-btn:hover {
   border-radius: 8px;
 }
 
-.ajustes-apariencia-row {
-  display: flex;
+.ajustes-apariencia.is-inline {
+  padding-block: 0.65rem;
+}
+
+.ajustes-apariencia.is-inline .entity-card-head {
   align-items: center;
-  justify-content: flex-start;
+  gap: 0.55rem;
+}
+
+.ajustes-apariencia.is-inline .entity-card-title {
   min-width: 0;
 }
 
-.ajustes-apariencia-row .seg-toggle {
+.ajustes-apariencia.is-inline .entity-card-badge {
+  flex: 0 0 auto;
+}
+
+.ajustes-apariencia.is-inline .title-sm {
+  margin: 0;
+}
+
+.ajustes-apariencia.is-inline .seg-toggle {
   margin-bottom: 0;
-  width: auto;
-  max-width: 100%;
 }
 
 .entity-card.is-compact + .entity-card.is-compact {
