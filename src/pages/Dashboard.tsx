@@ -12,7 +12,6 @@ import {
   Wrench,
 } from 'lucide-react'
 import { db } from '../db'
-import { bloqueColorVar } from '../lib/colors'
 import { formatDate, inCurrentQuarter, quarterLabel } from '../lib/dates'
 import { accionesTitulo, label, useAliases } from '../lib/labels'
 import {
@@ -20,7 +19,6 @@ import {
   prioridadOf,
   tipoAccionLabel,
   tipoAccionOf,
-  tipoActividadColor,
 } from '../db/types'
 import { CountUp } from '../components/CountUp'
 import { EmptyState, ExtraBadge, StatusBadge, TipoBadge } from '../components/ui'
@@ -31,7 +29,6 @@ import { RestorePanel } from '../components/RestorePanel'
 import { isRestoreSkipped, skipRestore } from '../lib/restoreSkip'
 import { accionHref, estadoAgendaCorrectiva } from '../lib/acciones'
 import { useSettled } from '../hooks/useSettled'
-import { useTiposActividad } from '../hooks/useTiposActividad'
 
 type DashCounts = {
   vencidas: number
@@ -42,11 +39,12 @@ type DashCounts = {
   progreso: number
   correctivasHechas: number
   correctivasTotal: number
+  actividadesHechas: number
   actividades: number
 }
 
 function packCounts(c: DashCounts): string {
-  return `${c.vencidas}:${c.programadas}:${c.pendientes}:${c.ejecutadas}:${c.total}:${c.progreso}:${c.correctivasHechas}:${c.correctivasTotal}:${c.actividades}`
+  return `${c.vencidas}:${c.programadas}:${c.pendientes}:${c.ejecutadas}:${c.total}:${c.progreso}:${c.correctivasHechas}:${c.correctivasTotal}:${c.actividadesHechas}:${c.actividades}`
 }
 
 function unpackCounts(token: string): DashCounts {
@@ -59,6 +57,7 @@ function unpackCounts(token: string): DashCounts {
     progreso,
     correctivasHechas,
     correctivasTotal,
+    actividadesHechas,
     actividades,
   ] = token.split(':').map(Number)
   return {
@@ -70,6 +69,7 @@ function unpackCounts(token: string): DashCounts {
     progreso,
     correctivasHechas,
     correctivasTotal,
+    actividadesHechas,
     actividades,
   }
 }
@@ -86,7 +86,6 @@ export function DashboardPage() {
     adjuntos: await db.adjuntos.count(),
     ejecuciones: await db.ejecuciones.count(),
   }))
-  const tipos = useTiposActividad()
   const aliases = useAliases()
   const [skipRestoreUi, setSkipRestoreUi] = useState(isRestoreSkipped)
   const loaded =
@@ -143,7 +142,8 @@ export function DashboardPage() {
           ),
     correctivasHechas: correctivasTrimestre.filter((a) => a.estado === 'ejecutada').length,
     correctivasTotal: correctivasTrimestre.length,
-    actividades: actividadesList.length,
+    actividadesHechas: evtsTrimestre.filter((e) => e.estado === 'ejecutada').length,
+    actividades: evtsTrimestre.length,
   }
   const skipTransientEmpty = loaded && fichasList.length > 0 && occs.length === 0
   const settledToken = useSettled(
@@ -164,6 +164,55 @@ export function DashboardPage() {
     ...agendaOcc.map((o) => ({ kind: 'occ' as const, fecha: o.fechaProgramada, o })),
     ...agendaEvt.map((e) => ({ kind: 'evt' as const, fecha: e.fechaProgramada, e })),
   ].sort((a, b) => a.fecha.localeCompare(b.fecha))
+  const pendientes = agenda.filter((item) => {
+    const estado = item.kind === 'occ' ? item.o.estado : item.e.estado
+    return estado === 'pendiente' || estado === 'vencida'
+  })
+  const ejecutadas = [...agenda]
+    .filter((item) => (item.kind === 'occ' ? item.o.estado : item.e.estado) === 'ejecutada')
+    .reverse()
+
+  function renderDashItem(item: (typeof agenda)[number]) {
+    if (item.kind === 'occ') {
+      const o = item.o
+      const ficha = fichaMap[o.fichaId]
+      const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
+      return (
+        <Link key={`occ-${o.id}`} className="card card-click dash-item" to={`/ocurrencias/${o.id}`}>
+          <div className="row-spread">
+            <strong>
+              <FichaTitle ficha={ficha} color={bloque?.color} />
+            </strong>
+            <StatusBadge estado={o.estado} />
+          </div>
+          <div className="muted occ-meta">
+            {formatDate(o.fechaProgramada)}
+            {bloque ? ` · ${bloque.nombre}` : ''}
+            {esExtraordinaria(o) ? <ExtraBadge /> : null}
+          </div>
+        </Link>
+      )
+    }
+    const e = item.e
+    const act = actividadMap[e.actividadId]
+    if (!act) return null
+    return (
+      <Link key={`evt-${e.id}`} className="card card-click dash-item" to={`/eventos/${e.id}`}>
+        <div className="row-spread">
+          <strong>
+            <ActividadTitle actividad={act} />
+          </strong>
+          <StatusBadge estado={e.estado} />
+        </div>
+        <div className="muted occ-meta">
+          {formatDate(e.fechaProgramada)}
+          {' · '}
+          <TipoBadge tipo={act.tipo} />
+          {esExtraordinaria(e) ? <ExtraBadge /> : null}
+        </div>
+      </Link>
+    )
+  }
 
   const totallyEmpty =
     loaded &&
@@ -270,8 +319,18 @@ export function DashboardPage() {
             <Wrench size={16} aria-hidden />
             <div className="label">Actividades</div>
           </div>
-          <div className="value">
-            {ready ? <CountUp value={counts.actividades} ready /> : <span className="count-wait">—</span>}
+          <div className="value kpi-frac">
+            {ready ? (
+              <>
+                <CountUp value={counts.actividadesHechas} ready />
+                <span className="kpi-slash">/</span>
+                <span className="kpi-den">
+                  <CountUp value={counts.actividades} ready />
+                </span>
+              </>
+            ) : (
+              <span className="count-wait">—</span>
+            )}
           </div>
         </Link>
         <Link className="card kpi card-click tone-correctiva" to="/historicos">
@@ -306,73 +365,30 @@ export function DashboardPage() {
       </div>
 
       <div className="page-head">
-        <h2 className="title-sm">Agenda</h2>
-        <Link to="/cronograma">Ver cronograma</Link>
+        <h2 className="title-sm">Pendientes</h2>
+        <Link to="/cronograma?estado=pendiente">Ver cronograma</Link>
       </div>
-      {agenda.length === 0 ? (
+      {pendientes.length === 0 ? (
         <div className="card muted">
-          No hay actividades en este {label('trimestre', aliases)}.
+          No hay pendientes en este {label('trimestre', aliases)}.
         </div>
       ) : (
         <div className="list">
-          {agenda.map((item) => {
-            if (item.kind === 'occ') {
-              const o = item.o
-              const ficha = fichaMap[o.fichaId]
-              const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
-              return (
-                <Link
-                  key={`occ-${o.id}`}
-                  className="card card-click item dash-item"
-                  to={`/ocurrencias/${o.id}`}
-                >
-                  <span className="bar" style={{ background: bloqueColorVar(bloque?.color) }} />
-                  <div className="grow">
-                    <div className="row-spread">
-                      <strong>
-                        <FichaTitle ficha={ficha} color={bloque?.color} />
-                      </strong>
-                      <StatusBadge estado={o.estado} />
-                    </div>
-                    <div className="muted occ-meta">
-                      {formatDate(o.fechaProgramada)}
-                      {bloque ? ` · ${bloque.nombre}` : ''}
-                      {esExtraordinaria(o) ? <ExtraBadge /> : null}
-                    </div>
-                  </div>
-                </Link>
-              )
-            }
-            const e = item.e
-            const act = actividadMap[e.actividadId]
-            if (!act) return null
-            return (
-              <Link
-                key={`evt-${e.id}`}
-                className="card card-click item dash-item"
-                to={`/eventos/${e.id}`}
-              >
-                <span
-                  className="bar"
-                  style={{ background: bloqueColorVar(tipoActividadColor(act.tipo, tipos)) }}
-                />
-                <div className="grow">
-                  <div className="row-spread">
-                    <strong>
-                      <ActividadTitle actividad={act} />
-                    </strong>
-                    <StatusBadge estado={e.estado} />
-                  </div>
-                  <div className="muted occ-meta">
-                    {formatDate(e.fechaProgramada)}
-                    {' · '}
-                    <TipoBadge tipo={act.tipo} />
-                    {esExtraordinaria(e) ? <ExtraBadge /> : null}
-                  </div>
-                </div>
-              </Link>
-            )
-          })}
+          {pendientes.slice(0, 5).map((item) => renderDashItem(item))}
+        </div>
+      )}
+
+      <div className="page-head" style={{ marginTop: '1.25rem' }}>
+        <h2 className="title-sm">Ejecutadas</h2>
+        <Link to="/historicos">Ver histórico</Link>
+      </div>
+      {ejecutadas.length === 0 ? (
+        <div className="card muted">
+          Aún no hay ejecuciones en este {label('trimestre', aliases)}.
+        </div>
+      ) : (
+        <div className="list">
+          {ejecutadas.slice(0, 5).map((item) => renderDashItem(item))}
         </div>
       )}
 

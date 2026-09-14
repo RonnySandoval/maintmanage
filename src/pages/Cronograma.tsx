@@ -17,7 +17,8 @@ import { formatFechaProgramada, formatDateLong } from '../lib/dates'
 import { compareFichasByNumero, fichaTitulo } from '../lib/fichas'
 import { accionHref, estadoAgendaCorrectiva } from '../lib/acciones'
 import { compareActividadesByTitulo } from '../lib/actividades'
-import { EmptyState, ExtraBadge, LeyendaSimbolos, StatusBadge, TipoBadge } from '../components/ui'
+import { EmptyState, ExtraBadge, LeyendaSimbolos, StatusBadge, StatusWordsToggle, TipoBadge } from '../components/ui'
+import { useStatusLabels } from '../hooks/useStatusLabels'
 import { SIMBOLOS_ESTADO } from '../lib/simbolos'
 import { GrillaAnual } from '../components/GrillaAnual'
 import { FichaTitle } from '../components/FichaTitle'
@@ -47,6 +48,7 @@ export function CronogramaPage() {
   const ambito: Ambito = params.get('ambito') === 'actividades' ? 'actividades' : 'fichas'
   const year = Number(params.get('anio')) || new Date().getFullYear()
   const showBloque = params.get('verBloque') !== '0'
+  const { showLabels } = useStatusLabels()
 
   const ocurrencias = useLiveQuery(() => db.ocurrencias.orderBy('fechaProgramada').toArray()) ?? []
   const eventos = useLiveQuery(() => db.eventos.orderBy('fechaProgramada').toArray()) ?? []
@@ -410,26 +412,29 @@ export function CronogramaPage() {
         ) : null}
       </div>
 
-      <div className="estado-toggle" role="group" aria-label="Estado">
-        <button type="button" className={!estado ? 'active' : ''} onClick={() => set('estado', '')}>
-          <span className="sym" aria-hidden>
-            ∗
-          </span>
-          <span>Todas</span>
-        </button>
-        {ESTADOS.map((e) => (
-          <button
-            key={e.id}
-            type="button"
-            className={estado === e.id ? 'active' : ''}
-            onClick={() => set('estado', e.id)}
-          >
+      <div className="estado-toolbar">
+        <div className={`estado-toggle${showLabels ? '' : ' is-icons'}`} role="group" aria-label="Estado">
+          <button type="button" className={!estado ? 'active' : ''} onClick={() => set('estado', '')}>
             <span className="sym" aria-hidden>
-              {SIMBOLOS_ESTADO[e.id].glyph}
+              ∗
             </span>
-            <span>{e.label}</span>
+            <span>Todas</span>
           </button>
-        ))}
+          {ESTADOS.map((e) => (
+            <button
+              key={e.id}
+              type="button"
+              className={estado === e.id ? 'active' : ''}
+              onClick={() => set('estado', e.id)}
+            >
+              <span className="sym" aria-hidden>
+                {SIMBOLOS_ESTADO[e.id].glyph}
+              </span>
+              <span>{e.label}</span>
+            </button>
+          ))}
+        </div>
+        <StatusWordsToggle />
       </div>
 
       <label className="search-field" htmlFor="crono-q">

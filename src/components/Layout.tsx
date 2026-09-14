@@ -16,6 +16,7 @@ import {
 import { FilterDrawer, FilterDrawerToggle } from './FilterDrawer'
 import { NuevoFab } from './NuevoFab'
 import { ThemeQuickToggle } from './ThemeQuickToggle'
+import { StatusWordsToggle } from './ui'
 import { AppLogo } from './AppLogo'
 import { FilterDrawerProvider } from '../hooks/useFilterDrawer'
 import { useAppHistory } from '../hooks/useAppHistory'
@@ -105,6 +106,7 @@ function NavItems() {
             key={link.to}
             to={link.to}
             end={link.end}
+            replace={link.to === '/'}
             className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
           >
             <Icon size={18} />
@@ -132,7 +134,7 @@ function LayoutShell() {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <Link className="brand" to="/">
+        <Link className="brand" to="/" replace>
           <AppLogo className="brand-mark" />
           MaintManage
         </Link>
@@ -146,7 +148,7 @@ function LayoutShell() {
       <div className="content">
         <header className="topbar">
           <div className="topbar-lead">
-            <Link className="topbar-logo" to="/" aria-label="Inicio">
+            <Link className="topbar-logo" to="/" replace aria-label="Inicio">
               <AppLogo />
             </Link>
             <div className="nav-hist">
@@ -174,6 +176,7 @@ function LayoutShell() {
             </h1>
           </div>
           <div className="topbar-actions">
+            <StatusWordsToggle />
             <FilterDrawerToggle />
             <ThemeQuickToggle />
           </div>

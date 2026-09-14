@@ -402,7 +402,7 @@ export function GrillaAnual({
           </thead>
           <tbody>
             {modo === 'fichas'
-              ? fichasOrdenadas.map((ficha, index) => {
+              ? fichasOrdenadas.map((ficha) => {
                   const bloque = bloqueMap[ficha.grupoId] ?? {
                     id: ficha.grupoId,
                     nombre: 'Sin bloque',
@@ -415,7 +415,6 @@ export function GrillaAnual({
                       key={ficha.id}
                       ficha={ficha}
                       bloque={bloque}
-                      index={index}
                       monthIndexes={monthIndexes}
                       start={start}
                       currentMonth={currentMonth}
@@ -431,11 +430,10 @@ export function GrillaAnual({
                 })
               : null}
             {modo === 'actividades'
-              ? actividadesOrdenadas.map((actividad, index) => (
+              ? actividadesOrdenadas.map((actividad) => (
                   <ActividadRow
                     key={actividad.id}
                     actividad={actividad}
-                    index={index}
                     monthIndexes={monthIndexes}
                     start={start}
                     currentMonth={currentMonth}
@@ -450,13 +448,12 @@ export function GrillaAnual({
                 ))
               : null}
             {modo === 'actividades'
-              ? correctivasFechadas.map((accion, index) => (
+              ? correctivasFechadas.map((accion) => (
                   <CorrectivaRow
                     key={accion.id}
                     accion={accion}
                     ficha={accion.fichaId ? fichaById[accion.fichaId] : undefined}
                     actividad={accion.actividadId ? actividadById[accion.actividadId] : undefined}
-                    index={actividadesOrdenadas.length + index}
                     monthIndexes={monthIndexes}
                     start={start}
                     currentMonth={currentMonth}
@@ -477,7 +474,6 @@ export function GrillaAnual({
 function FichaRow({
   ficha,
   bloque,
-  index,
   monthIndexes,
   start,
   currentMonth,
@@ -491,7 +487,6 @@ function FichaRow({
 }: {
   ficha: Ficha
   bloque: Bloque
-  index: number
   monthIndexes: number[]
   start: number
   currentMonth: number
@@ -504,7 +499,7 @@ function FichaRow({
   correctivaFicha: Set<string>
 }) {
   return (
-    <tr className={`ficha-row${index % 2 ? ' is-alt' : ''}`}>
+    <tr className="ficha-row">
       <th className="ficha-col" scope="row">
         <Link to={`/fichas/${ficha.id}`}>
           <FichaTitle ficha={ficha} color={bloque.color} />
@@ -555,7 +550,6 @@ function FichaRow({
 
 function ActividadRow({
   actividad,
-  index,
   monthIndexes,
   start,
   currentMonth,
@@ -568,7 +562,6 @@ function ActividadRow({
   correctivaActividad,
 }: {
   actividad: Actividad
-  index: number
   monthIndexes: number[]
   start: number
   currentMonth: number
@@ -581,7 +574,7 @@ function ActividadRow({
   correctivaActividad: Set<string>
 }) {
   return (
-    <tr className={`ficha-row${index % 2 ? ' is-alt' : ''}`}>
+    <tr className="ficha-row">
       <th className="ficha-col" scope="row">
         <Link to={`/actividades/${actividad.id}`}>
           <ActividadTitle actividad={actividad} />
@@ -638,7 +631,6 @@ function CorrectivaRow({
   accion,
   ficha,
   actividad,
-  index,
   monthIndexes,
   start,
   currentMonth,
@@ -648,7 +640,6 @@ function CorrectivaRow({
   accion: AccionCorrectiva
   ficha?: Ficha
   actividad?: Actividad
-  index: number
   monthIndexes: number[]
   start: number
   currentMonth: number
@@ -662,7 +653,7 @@ function CorrectivaRow({
   const href = accionHref(accion)
   const parent = actividad ? actividad.titulo : ficha ? fichaTitulo(ficha) : ''
   return (
-    <tr className={`ficha-row${index % 2 ? ' is-alt' : ''}`}>
+    <tr className="ficha-row">
       <th className="ficha-col" scope="row">
         <Link to={href}>{accion.texto}</Link>
         <span className="ficha-meta">{tipoAccionLabel('correctiva', aliases)}</span>

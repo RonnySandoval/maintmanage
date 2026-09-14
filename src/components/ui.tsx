@@ -3,7 +3,8 @@ import { ESTADOS, tipoActividadColor, tipoActividadLabel, type EstadoOcurrencia 
 import { useTiposActividad } from '../hooks/useTiposActividad'
 import { label, useAliases } from '../lib/labels'
 import { bloqueColorVar } from '../lib/colors'
-import { SIMBOLOS_ESTADO, SIMBOLO_CORRECTIVA } from '../lib/simbolos'
+import { useStatusLabels } from '../hooks/useStatusLabels'
+import { SIMBOLO_CORRECTIVA, SIMBOLOS_ESTADO } from '../lib/simbolos'
 
 export function ExtraBadge() {
   return <span className="badge badge-extra">Extraordinaria</span>
@@ -33,14 +34,32 @@ export function StatusBadge({
   estado: EstadoOcurrencia
   iconOnly?: boolean
 }) {
+  const { showLabels } = useStatusLabels()
   const meta = SIMBOLOS_ESTADO[estado]
+  const hideWords = iconOnly || !showLabels
   return (
-    <span className={`badge badge-${estado}${iconOnly ? ' badge-icon' : ''}`} title={meta.label}>
+    <span className={`badge badge-${estado}${hideWords ? ' badge-icon' : ''}`} title={meta.label}>
       <span className="sym" aria-hidden>
         {meta.glyph}
       </span>
-      {iconOnly ? <span className="sr-only">{meta.label}</span> : meta.label}
+      {hideWords ? <span className="sr-only">{meta.label}</span> : meta.label}
     </span>
+  )
+}
+
+export function StatusWordsToggle({ className }: { className?: string }) {
+  const { showLabels, toggleLabels } = useStatusLabels()
+  return (
+    <button
+      type="button"
+      className={`estado-words-btn${className ? ` ${className}` : ''}${showLabels ? '' : ' is-off'}`}
+      onClick={toggleLabels}
+      aria-pressed={showLabels}
+      aria-label={showLabels ? 'Ocultar nombres de estado' : 'Mostrar nombres de estado'}
+      title={showLabels ? 'Ocultar nombres de estado' : 'Mostrar nombres de estado'}
+    >
+      Aa
+    </button>
   )
 }
 

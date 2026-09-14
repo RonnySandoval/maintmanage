@@ -3,6 +3,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { Splash } from './components/Splash'
 import { ThemeProvider } from './hooks/useTheme'
+import { StatusLabelsProvider } from './hooks/useStatusLabels'
 import { ensureHorizon } from './db/occurrences'
 import { notifyIfNeeded } from './lib/notifications'
 import { AccionDetailPage } from './pages/AccionDetail'
@@ -38,8 +39,9 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <Splash />
-      <HashRouter>
+      <StatusLabelsProvider>
+        <Splash />
+        <HashRouter>
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<DashboardPage />} />
@@ -63,7 +65,8 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
-      </HashRouter>
+        </HashRouter>
+      </StatusLabelsProvider>
     </ThemeProvider>
   )
 }

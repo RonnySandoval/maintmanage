@@ -4,12 +4,10 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import {
   ArrowUpDown,
   CalendarDays,
-  ChevronDown,
   CircleDot,
   FolderTree,
   History,
   Layers,
-  Pencil,
 } from 'lucide-react'
 import { db } from '../db'
 import {
@@ -22,11 +20,7 @@ import {
   type AccionCorrectiva,
   type Actividad,
   type EstadoOcurrencia,
-  type Ejecucion,
-  type Encargado,
-  type Evento,
   type Ficha,
-  type Ocurrencia,
 } from '../db/types'
 import { bloqueColorVar } from '../lib/colors'
 import { formatDate, formatFechaProgramada } from '../lib/dates'
@@ -36,9 +30,7 @@ import { fichaTitulo } from '../lib/fichas'
 import { ActividadTitle } from '../components/ActividadTitle'
 import { FichaTitle } from '../components/FichaTitle'
 import { PrioridadMark } from '../components/PrioridadMark'
-import { EjecucionModal } from '../components/EjecucionForm'
-import { ShareMenu } from '../components/ShareMenu'
-import { EmptyState, ExtraBadge, StatusBadge, TipoBadge } from '../components/ui'
+import { EmptyState, ExtraBadge, StatusBadge, StatusWordsToggle, TipoBadge } from '../components/ui'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
 import { useTiposActividad } from '../hooks/useTiposActividad'
 
@@ -119,7 +111,7 @@ export function HistoricosPage() {
   const [estadoAcc, setEstadoAcc] = useState<EstadoOcurrencia | ''>('')
   const [groupAcc, setGroupAcc] = useState<AccGroup>('lista')
   const [sortAcc, setSortAcc] = useState<AccSort>('fecha')
-  const [openOcc, setOpenOcc] = useState<string | null>(null)
+  const tipos = useTiposActividad()
 
   const ocurrencias =
     useLiveQuery(async () => {
@@ -134,8 +126,6 @@ export function HistoricosPage() {
   const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
   const actividades = useLiveQuery(() => db.actividades.toArray()) ?? []
   const bloques = useLiveQuery(() => db.grupos.toArray()) ?? []
-  const encargados = useLiveQuery(() => db.encargados.toArray()) ?? []
-  const ejecuciones = useLiveQuery(() => db.ejecuciones.toArray()) ?? []
   const acciones =
     useLiveQuery(async () => {
       const rows = await db.accionesCorrectivas.toArray()
@@ -148,26 +138,6 @@ export function HistoricosPage() {
     [actividades],
   )
   const bloqueMap = useMemo(() => Object.fromEntries(bloques.map((b) => [b.id, b])), [bloques])
-  const encargadoMap = useMemo(
-    () => Object.fromEntries(encargados.map((e) => [e.id, e])),
-    [encargados],
-  )
-  const ejecucionMap = useMemo(
-    () =>
-      Object.fromEntries(
-        ejecuciones
-          .filter((e) => e.ocurrenciaId)
-          .map((e) => [e.ocurrenciaId as string, e]),
-      ),
-    [ejecuciones],
-  )
-  const ejecucionEventoMap = useMemo(
-    () =>
-      Object.fromEntries(
-        ejecuciones.filter((e) => e.eventoId).map((e) => [e.eventoId as string, e]),
-      ),
-    [ejecuciones],
-  )
 
   const accionesPorOcc = useMemo(() => {
     const map = new Map<string, AccionCorrectiva[]>()
@@ -353,10 +323,6 @@ export function HistoricosPage() {
     )
   }
 
-  function toggleOcc(id: string) {
-    setOpenOcc((current) => (current === id ? null : id))
-  }
-
   return (
     <div>
       <FilterDrawerSlot
@@ -377,7 +343,8 @@ export function HistoricosPage() {
           setGroupBy('ficha')
         }}
       />
-      <div className="seg-toggle" role="tablist" aria-label="Histórico">
+      <div className="hist-toolbar">
+        <div className="seg-toggle" role="tablist" aria-label="Histórico">
         <button
           type="button"
           role="tab"
@@ -397,6 +364,8 @@ export function HistoricosPage() {
           Correctivas
         </button>
       </div>
+        <StatusWordsToggle />
+      </div>
 
       {tab === 'ocurrencias' ? (
         <>
@@ -405,12 +374,7 @@ export function HistoricosPage() {
               <p className="table-empty">Aún no hay inspecciones ni actividades ejecutadas.</p>
             </div>
           ) : groupBy === 'ficha' ? (
-            <div className="table-card">
-              <div className="table-head table-cols-hist-occ">
-                <span className="table-bar" aria-hidden />
-                <span>Fecha</span>
-                <span className="sr-only">Detalle</span>
-              </div>
+            <div className="ejec-groups">
               {fichasOrdenadas.map((fichaId) => {
                 const ficha = fichaMap[fichaId]
                 const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
@@ -418,24 +382,25 @@ export function HistoricosPage() {
                   b.fechaProgramada.localeCompare(a.fechaProgramada),
                 )
                 return (
-                  <section key={fichaId}>
-                    <div className="table-section">
+                  <section key={fichaId} className="ejec-group">
+                    <h3 className="ejec-group-title">
                       <FichaTitle ficha={ficha} color={bloque?.color} />
+                    </h3>
+                    <div className="ejec-tiles">
+                      {rows.map((o) => (
+                        <EjecutadaTile
+                          key={o.id}
+                          href={`/ocurrencias/${o.id}`}
+                          label={formatFechaProgramada(
+                            o.fechaProgramada,
+                            ficha?.fechaPrecision === 'dia' ? 'dia' : 'mes',
+                          )}
+                          color={bloque?.color}
+                          extra={esExtraordinaria(o)}
+                          acciones={accionesPorOcc.get(o.id)?.length ?? 0}
+                        />
+                      ))}
                     </div>
-                    {rows.map((o) => (
-                      <EjecutadaRow
-                        key={o.id}
-                        occ={o}
-                        ficha={ficha}
-                        color={bloque?.color}
-                        encargado={ficha ? encargadoMap[ficha.encargadoId ?? ''] : undefined}
-                        ejecucion={ejecucionMap[o.id]}
-                        variant="fecha"
-                        acciones={accionesPorOcc.get(o.id) ?? []}
-                        open={openOcc === o.id}
-                        onToggle={() => toggleOcc(o.id)}
-                      />
-                    ))}
                   </section>
                 )
               })}
@@ -445,34 +410,32 @@ export function HistoricosPage() {
                   b.fechaProgramada.localeCompare(a.fechaProgramada),
                 )
                 return (
-                  <section key={actId}>
-                    <div className="table-section">
+                  <section key={actId} className="ejec-group">
+                    <h3 className="ejec-group-title">
                       <ActividadTitle actividad={act} />
+                    </h3>
+                    <div className="ejec-tiles">
+                      {rows.map((e) => (
+                        <EjecutadaTile
+                          key={e.id}
+                          href={`/eventos/${e.id}`}
+                          label={formatFechaProgramada(
+                            e.fechaProgramada,
+                            act?.fechaPrecision === 'dia' ? 'dia' : 'mes',
+                          )}
+                          color={act ? tipoActividadColor(act.tipo, tipos) : undefined}
+                          extra={esExtraordinaria(e)}
+                          tipo={act?.tipo}
+                          acciones={accionesPorEvento.get(e.id)?.length ?? 0}
+                        />
+                      ))}
                     </div>
-                    {rows.map((e) => (
-                      <EjecutadaRow
-                        key={e.id}
-                        evento={e}
-                        actividad={act}
-                        encargado={act ? encargadoMap[act.encargadoId ?? ''] : undefined}
-                        ejecucion={ejecucionEventoMap[e.id]}
-                        variant="fecha"
-                        acciones={accionesPorEvento.get(e.id) ?? []}
-                        open={openOcc === e.id}
-                        onToggle={() => toggleOcc(e.id)}
-                      />
-                    ))}
                   </section>
                 )
               })}
             </div>
           ) : (
-            <div className="table-card">
-              <div className="table-head table-cols-hist-occ">
-                <span className="table-bar" aria-hidden />
-                <span>Ítem</span>
-                <span className="sr-only">Detalle</span>
-              </div>
+            <div className="ejec-groups">
               {fechasOrdenadas.map((day) => {
                 const occRows = byFechaOcc.get(day) ?? []
                 const evtRows = byFechaEvt.get(day) ?? []
@@ -482,42 +445,38 @@ export function HistoricosPage() {
                     ? 'dia'
                     : 'mes'
                 return (
-                  <section key={day}>
-                    <div className="table-section">{formatFechaProgramada(day, precision)}</div>
-                    {occRows.map((o) => {
-                      const ficha = fichaMap[o.fichaId]
-                      const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
-                      return (
-                        <EjecutadaRow
-                          key={o.id}
-                          occ={o}
-                          ficha={ficha}
-                          color={bloque?.color}
-                          encargado={ficha ? encargadoMap[ficha.encargadoId ?? ''] : undefined}
-                          ejecucion={ejecucionMap[o.id]}
-                          variant="ficha"
-                          acciones={accionesPorOcc.get(o.id) ?? []}
-                          open={openOcc === o.id}
-                          onToggle={() => toggleOcc(o.id)}
-                        />
-                      )
-                    })}
-                    {evtRows.map((e) => {
-                      const act = actividadMap[e.actividadId]
-                      return (
-                        <EjecutadaRow
-                          key={e.id}
-                          evento={e}
-                          actividad={act}
-                          encargado={act ? encargadoMap[act.encargadoId ?? ''] : undefined}
-                          ejecucion={ejecucionEventoMap[e.id]}
-                          variant="ficha"
-                          acciones={accionesPorEvento.get(e.id) ?? []}
-                          open={openOcc === e.id}
-                          onToggle={() => toggleOcc(e.id)}
-                        />
-                      )
-                    })}
+                  <section key={day} className="ejec-group">
+                    <h3 className="ejec-group-title">{formatFechaProgramada(day, precision)}</h3>
+                    <div className="ejec-tiles">
+                      {occRows.map((o) => {
+                        const ficha = fichaMap[o.fichaId]
+                        const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
+                        return (
+                          <EjecutadaTile
+                            key={o.id}
+                            href={`/ocurrencias/${o.id}`}
+                            label={ficha ? fichaTitulo(ficha) : 'Ficha'}
+                            color={bloque?.color}
+                            extra={esExtraordinaria(o)}
+                            acciones={accionesPorOcc.get(o.id)?.length ?? 0}
+                          />
+                        )
+                      })}
+                      {evtRows.map((e) => {
+                        const act = actividadMap[e.actividadId]
+                        return (
+                          <EjecutadaTile
+                            key={e.id}
+                            href={`/eventos/${e.id}`}
+                            label={act ? actividadTitulo(act) : 'Actividad'}
+                            color={act ? tipoActividadColor(act.tipo, tipos) : undefined}
+                            extra={esExtraordinaria(e)}
+                            tipo={act?.tipo}
+                            acciones={accionesPorEvento.get(e.id)?.length ?? 0}
+                          />
+                        )
+                      })}
+                    </div>
                   </section>
                 )
               })}
@@ -585,155 +544,30 @@ export function HistoricosPage() {
   )
 }
 
-function EjecutadaRow({
-  occ,
-  evento,
-  ficha,
-  actividad,
+function EjecutadaTile({
+  href,
+  label,
   color,
-  encargado,
-  ejecucion,
-  variant,
+  extra,
+  tipo,
   acciones,
-  open,
-  onToggle,
 }: {
-  occ?: Ocurrencia
-  evento?: Evento
-  ficha?: Ficha
-  actividad?: Actividad
+  href: string
+  label: string
   color?: string
-  encargado?: Encargado
-  ejecucion?: Ejecucion
-  variant: 'fecha' | 'ficha'
-  acciones: AccionCorrectiva[]
-  open: boolean
-  onToggle: () => void
+  extra?: boolean
+  tipo?: string
+  acciones: number
 }) {
-  const tipos = useTiposActividad()
-  const [editOpen, setEditOpen] = useState(false)
-  const item = occ ?? evento
-  if (!item) return null
-  const href = occ ? `/ocurrencias/${occ.id}` : `/eventos/${evento?.id}`
-  const precision =
-    (ficha?.fechaPrecision ?? actividad?.fechaPrecision) === 'dia' ? 'dia' : 'mes'
-  const barColor = actividad ? tipoActividadColor(actividad.tipo, tipos) : color
-  const shareTitle = ficha ? fichaTitulo(ficha) : actividad ? actividadTitulo(actividad) : 'Ejecución'
-  const shareText = [
-    ficha ? `Ficha: ${fichaTitulo(ficha)}` : '',
-    actividad ? `Actividad: ${actividadTitulo(actividad)}` : '',
-    `Programada: ${item.fechaProgramada}`,
-    ejecucion?.fechaReal ? `Realizada: ${ejecucion.fechaReal}` : '',
-    ejecucion?.realizadoPor ? `Realizado por: ${ejecucion.realizadoPor}` : '',
-    encargado ? `Encargado: ${encargado.nombre}` : '',
-    ejecucion?.observaciones ? `Observaciones: ${ejecucion.observaciones}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n')
-
   return (
-    <div className={`hist-occ-item${open ? ' is-open' : ''}`}>
-      <div className="table-row table-cols-hist-occ">
-        <span className="table-bar" style={{ background: bloqueColorVar(barColor) }} />
-        <Link className="table-cell hist-occ-main" to={href}>
-          {variant === 'fecha' ? (
-            <span className="occ-meta">
-              {formatFechaProgramada(item.fechaProgramada, precision)}
-              {esExtraordinaria(item) ? <ExtraBadge /> : null}
-              {actividad ? <TipoBadge tipo={actividad.tipo} /> : null}
-            </span>
-          ) : (
-            <span className="occ-meta">
-              {ficha ? <FichaTitle ficha={ficha} color={color} /> : null}
-              {actividad ? <ActividadTitle actividad={actividad} /> : null}
-              {esExtraordinaria(item) ? <ExtraBadge /> : null}
-              {actividad ? <TipoBadge tipo={actividad.tipo} /> : null}
-            </span>
-          )}
-        </Link>
-        <span className="table-nowrap hist-occ-end">
-          <button
-            type="button"
-            className="icon-btn hist-occ-toggle"
-            aria-expanded={open}
-            aria-label={open ? 'Ocultar detalle' : 'Ver detalle de la ejecución'}
-            onClick={onToggle}
-          >
-            {acciones.length ? <span className="muted">{acciones.length}</span> : null}
-            <ChevronDown size={16} className={open ? 'is-open' : ''} />
-          </button>
-          <StatusBadge estado="ejecutada" iconOnly />
-        </span>
-      </div>
-      {open ? (
-        <div className="hist-occ-acciones">
-          <div className="hist-occ-ejecucion">
-            <div className="row-spread" style={{ marginBottom: 6 }}>
-              <strong>Ejecución</strong>
-              <span className="row" style={{ gap: 2 }}>
-                {ficha || actividad ? (
-                  <>
-                    <button
-                      type="button"
-                      className="icon-btn icon-btn-edit"
-                      aria-label="Editar ejecución"
-                      title="Editar ejecución"
-                      onClick={() => setEditOpen(true)}
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <ShareMenu title={shareTitle} text={shareText} iconOnly />
-                  </>
-                ) : null}
-              </span>
-            </div>
-            {ejecucion ? (
-              <>
-                <p>
-                  Realizada el <strong>{formatDate(ejecucion.fechaReal)}</strong>
-                  {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
-                </p>
-                {ejecucion.observaciones ? (
-                  <p>{ejecucion.observaciones}</p>
-                ) : (
-                  <p className="muted">Sin observaciones.</p>
-                )}
-              </>
-            ) : (
-              <p className="muted">Sin registro de ejecución.</p>
-            )}
-          </div>
-          {acciones.length ? (
-            acciones.map((a) => (
-              <Link key={a.id} className="hist-occ-accion" to={accionHref(a)}>
-                <PrioridadMark prioridad={prioridadOf(a)} />
-                <span className="grow">{a.texto}</span>
-                <StatusBadge estado={estadoAgendaCorrectiva(a)} />
-              </Link>
-            ))
-          ) : (
-            <p className="muted" style={{ margin: 0 }}>
-              Sin acciones correctivas.
-            </p>
-          )}
-        </div>
-      ) : null}
-      {ficha && occ ? (
-        <EjecucionModal
-          open={editOpen}
-          ocurrenciaId={occ.id}
-          fichaId={ficha.id}
-          onClose={() => setEditOpen(false)}
-        />
-      ) : null}
-      {actividad && evento ? (
-        <EjecucionModal
-          open={editOpen}
-          eventoId={evento.id}
-          actividadId={actividad.id}
-          onClose={() => setEditOpen(false)}
-        />
-      ) : null}
-    </div>
+    <Link className="ejec-tile" to={href}>
+      <span className="ejec-tile-bar" style={{ background: bloqueColorVar(color) }} />
+      <span className="ejec-tile-label">{label}</span>
+      <span className="ejec-tile-meta">
+        {extra ? <ExtraBadge /> : null}
+        {tipo ? <TipoBadge tipo={tipo} /> : null}
+        {acciones ? <span className="ejec-tile-acc">▴ {acciones}</span> : null}
+      </span>
+    </Link>
   )
 }
