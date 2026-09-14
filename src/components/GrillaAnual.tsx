@@ -107,9 +107,9 @@ export function GrillaAnual({
   )
   const [detail, setDetail] = useState<DetailLevel>(0)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const headScrollRef = useRef<HTMLDivElement>(null)
   const chromeRef = useRef<HTMLDivElement>(null)
-  const qHeadRowRef = useRef<HTMLTableRowElement>(null)
-  const shellRef = useRef<HTMLDivElement>(null)
+  const syncScrollRef = useRef(false)
   const pinchRef = useRef({ dx: 0, dy: 0, dist: 0, locked: false })
   const aliases = useAliases()
   const trimestreWord = label('trimestre', aliases)
@@ -345,22 +345,23 @@ export function GrillaAnual({
     return () => observer.disconnect()
   }, [vacia])
 
-  useEffect(() => {
-    if (vacia) return
-    const shell = shellRef.current
-    const chrome = chromeRef.current
-    const qRow = qHeadRowRef.current
-    if (!shell || !chrome) return
-    const apply = () => {
-      shell.style.setProperty('--year-chrome-h', `${chrome.offsetHeight}px`)
-      if (qRow) shell.style.setProperty('--year-qhead-h', `${qRow.offsetHeight}px`)
-    }
-    apply()
-    const observer = new ResizeObserver(apply)
-    observer.observe(chrome)
-    if (qRow) observer.observe(qRow)
-    return () => observer.disconnect()
-  }, [vacia, span, visible, start, modo])
+  function syncHeadFromBody() {
+    const head = headScrollRef.current
+    const body = wrapRef.current
+    if (!head || !body || syncScrollRef.current) return
+    syncScrollRef.current = true
+    head.scrollLeft = body.scrollLeft
+    syncScrollRef.current = false
+  }
+
+  function syncBodyFromHead() {
+    const head = headScrollRef.current
+    const body = wrapRef.current
+    if (!head || !body || syncScrollRef.current) return
+    syncScrollRef.current = true
+    body.scrollLeft = head.scrollLeft
+    syncScrollRef.current = false
+  }
 
   if (vacia) {
     return (
@@ -372,208 +373,226 @@ export function GrillaAnual({
     )
   }
 
+  const gridStyle = {
+    ['--ficha-col-w' as string]: `${nameCol.width}px`,
+    ['--month-col-min' as string]: `${nameCol.monthMin}px`,
+  }
+  const gridClass = `year-grid mode-${span} detail-${detail}${nameCol.showFullText ? ' is-name-wide' : ''}${resizing ? ' is-resizing' : ''}`
+
+  const headRows = (
+    <>
+      <tr>
+        <th className="ficha-col" rowSpan={2}>
+          {modo === 'actividades' ? 'Actividad' : 'Ficha'}
+          {nameCol.canResize ? (
+            <button
+              type="button"
+              className={`ficha-col-resizer${resizing ? ' is-dragging' : ''}`}
+              aria-label="Redimensionar columna de nombre"
+              title="Arrastra para ver el nombre completo. Doble clic restablece."
+              aria-valuemin={nameCol.min}
+              aria-valuemax={nameCol.max}
+              aria-valuenow={nameCol.width}
+              onPointerDown={onNameColPointerDown}
+              onPointerMove={onNameColPointerMove}
+              onPointerUp={onNameColPointerUp}
+              onPointerCancel={onNameColPointerUp}
+              onDoubleClick={nameCol.reset}
+              onKeyDown={onNameColKeyDown}
+            />
+          ) : null}
+        </th>
+        {visibleTrimestres.map((t, i) => (
+          <th
+            key={t.id}
+            className={`q-head q-${t.id}${i > 0 ? ' q-gap' : ''}`}
+            colSpan={t.months.length}
+          >
+            {trimestreHead(t.ordinal)}
+          </th>
+        ))}
+      </tr>
+      <tr>
+        {monthIndexes.map((m) => (
+          <th
+            key={m}
+            className={`month-col ${monthClass(m, start, currentMonth)}`.trim()}
+            aria-current={m === currentMonth ? 'true' : undefined}
+          >
+            {MESES[m]}
+          </th>
+        ))}
+      </tr>
+    </>
+  )
+
   return (
     <div>
-      <div className="year-grid-shell" ref={shellRef}>
-        <div className="year-grid-chrome" ref={chromeRef}>
-          {span !== 'year' ? (
-            <div className="row-spread grid-window">
-              <button
-                type="button"
-                className="btn"
-                disabled={!canPrev}
-                onClick={() => step(-3)}
-                aria-label="Periodo anterior"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <strong>{rangeLabel}</strong>
-              <button
-                type="button"
-                className="btn"
-                disabled={!canNext}
-                onClick={() => step(3)}
-                aria-label="Periodo siguiente"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          ) : (
-            <strong className="grid-year-label">{year}</strong>
-          )}
-          <div className="zoom-stack">
-            <div className="zoom-controls" role="group" aria-label="Zoom de meses">
-              <button
-                type="button"
-                className="btn"
-                disabled={zoom === 0}
-                onClick={zoomOut}
-                aria-label="Ver más meses"
-              >
-                <Minus size={14} />
-              </button>
-              <span className="zoom-label">Mes</span>
-              <button
-                type="button"
-                className="btn"
-                disabled={zoom === ZOOM_IN_MAX}
-                onClick={zoomIn}
-                aria-label="Ver menos meses"
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-            <div className="zoom-controls" role="group" aria-label="Detalle de ficha">
-              <button
-                type="button"
-                className="btn"
-                disabled={detail === 0}
-                onClick={detailOut}
-                aria-label="Menos detalle de ficha"
-              >
-                <Minus size={14} />
-              </button>
-              <span className="zoom-label">Ficha</span>
-              <button
-                type="button"
-                className="btn"
-                disabled={detail === DETAIL_MAX}
-                onClick={detailIn}
-                aria-label="Más detalle de ficha"
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-            {onToggleBloque ? (
-              <div className="zoom-controls">
+      <div className="year-grid-shell">
+        <div className="year-grid-pin">
+          <div className="year-grid-chrome" ref={chromeRef}>
+            {span !== 'year' ? (
+              <div className="row-spread grid-window">
                 <button
                   type="button"
-                  className={`zoom-toggle${showBloque ? ' is-on' : ''}`}
-                  onClick={onToggleBloque}
-                  aria-pressed={showBloque}
-                  title={showBloque ? 'Ocultar nombre del bloque' : 'Mostrar nombre del bloque'}
+                  className="btn"
+                  disabled={!canPrev}
+                  onClick={() => step(-3)}
+                  aria-label="Periodo anterior"
                 >
-                  Bloque
+                  <ChevronLeft size={16} />
+                </button>
+                <strong>{rangeLabel}</strong>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={!canNext}
+                  onClick={() => step(3)}
+                  aria-label="Periodo siguiente"
+                >
+                  <ChevronRight size={16} />
                 </button>
               </div>
-            ) : null}
-          </div>
-        </div>
-        <div className={`year-grid-wrap${resizing ? ' is-resizing' : ''}`} ref={wrapRef}>
-          <table
-            className={`year-grid mode-${span} detail-${detail}${nameCol.showFullText ? ' is-name-wide' : ''}${resizing ? ' is-resizing' : ''}`}
-            style={{
-              ['--ficha-col-w' as string]: `${nameCol.width}px`,
-              ['--month-col-min' as string]: `${nameCol.monthMin}px`,
-            }}
-          >
-          <thead>
-            <tr ref={qHeadRowRef}>
-              <th className="ficha-col" rowSpan={2}>
-                {modo === 'actividades' ? 'Actividad' : 'Ficha'}
-                {nameCol.canResize ? (
+            ) : (
+              <strong className="grid-year-label">{year}</strong>
+            )}
+            <div className="zoom-stack">
+              <div className="zoom-controls" role="group" aria-label="Zoom de meses">
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={zoom === 0}
+                  onClick={zoomOut}
+                  aria-label="Ver más meses"
+                >
+                  <Minus size={14} />
+                </button>
+                <span className="zoom-label">Mes</span>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={zoom === ZOOM_IN_MAX}
+                  onClick={zoomIn}
+                  aria-label="Ver menos meses"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+              <div className="zoom-controls" role="group" aria-label="Detalle de ficha">
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={detail === 0}
+                  onClick={detailOut}
+                  aria-label="Menos detalle de ficha"
+                >
+                  <Minus size={14} />
+                </button>
+                <span className="zoom-label">Ficha</span>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={detail === DETAIL_MAX}
+                  onClick={detailIn}
+                  aria-label="Más detalle de ficha"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+              {onToggleBloque ? (
+                <div className="zoom-controls">
                   <button
                     type="button"
-                    className={`ficha-col-resizer${resizing ? ' is-dragging' : ''}`}
-                    aria-label="Redimensionar columna de nombre"
-                    title="Arrastra para ver el nombre completo. Doble clic restablece."
-                    aria-valuemin={nameCol.min}
-                    aria-valuemax={nameCol.max}
-                    aria-valuenow={nameCol.width}
-                    onPointerDown={onNameColPointerDown}
-                    onPointerMove={onNameColPointerMove}
-                    onPointerUp={onNameColPointerUp}
-                    onPointerCancel={onNameColPointerUp}
-                    onDoubleClick={nameCol.reset}
-                    onKeyDown={onNameColKeyDown}
-                  />
-                ) : null}
-              </th>
-              {visibleTrimestres.map((t, i) => (
-                <th
-                  key={t.id}
-                  className={`q-head q-${t.id}${i > 0 ? ' q-gap' : ''}`}
-                  colSpan={t.months.length}
-                >
-                  {trimestreHead(t.ordinal)}
-                </th>
-              ))}
-            </tr>
-            <tr>
-              {monthIndexes.map((m) => (
-                <th
-                  key={m}
-                  className={`month-col ${monthClass(m, start, currentMonth)}`.trim()}
-                  aria-current={m === currentMonth ? 'true' : undefined}
-                >
-                  {MESES[m]}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {modo === 'fichas'
-              ? fichasOrdenadas.map((ficha) => {
-                  const bloque = bloqueMap[ficha.grupoId] ?? {
-                    id: ficha.grupoId,
-                    nombre: 'Sin bloque',
-                    color: 'teal',
-                    createdAt: 0,
-                    updatedAt: 0,
-                  }
-                  return (
-                    <FichaRow
-                      key={ficha.id}
-                      ficha={ficha}
-                      bloque={bloque}
+                    className={`zoom-toggle${showBloque ? ' is-on' : ''}`}
+                    onClick={onToggleBloque}
+                    aria-pressed={showBloque}
+                    title={showBloque ? 'Ocultar nombre del bloque' : 'Mostrar nombre del bloque'}
+                  >
+                    Bloque
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <div
+            className="year-grid-head-scroll"
+            ref={headScrollRef}
+            onScroll={syncBodyFromHead}
+          >
+            <table className={`${gridClass} year-grid-head`} style={gridStyle}>
+              <thead>{headRows}</thead>
+            </table>
+          </div>
+        </div>
+        <div
+          className={`year-grid-wrap${resizing ? ' is-resizing' : ''}`}
+          ref={wrapRef}
+          onScroll={syncHeadFromBody}
+        >
+          <table className={`${gridClass} year-grid-body`} style={gridStyle}>
+            <tbody>
+              {modo === 'fichas'
+                ? fichasOrdenadas.map((ficha) => {
+                    const bloque = bloqueMap[ficha.grupoId] ?? {
+                      id: ficha.grupoId,
+                      nombre: 'Sin bloque',
+                      color: 'teal',
+                      createdAt: 0,
+                      updatedAt: 0,
+                    }
+                    return (
+                      <FichaRow
+                        key={ficha.id}
+                        ficha={ficha}
+                        bloque={bloque}
+                        monthIndexes={monthIndexes}
+                        start={start}
+                        currentMonth={currentMonth}
+                        byFichaMonth={byFichaMonth}
+                        encargado={ficha.encargadoId ? encargadoMap[ficha.encargadoId] : undefined}
+                        showBloque={showBloque}
+                        showMeta={detail >= 1}
+                        showFrecuencia={detail >= 2}
+                        correctivaOcc={correctivaOcc}
+                        correctivaFicha={correctivaFicha}
+                      />
+                    )
+                  })
+                : null}
+              {modo === 'actividades'
+                ? actividadesOrdenadas.map((actividad) => (
+                    <ActividadRow
+                      key={actividad.id}
+                      actividad={actividad}
                       monthIndexes={monthIndexes}
                       start={start}
                       currentMonth={currentMonth}
-                      byFichaMonth={byFichaMonth}
-                      encargado={ficha.encargadoId ? encargadoMap[ficha.encargadoId] : undefined}
-                      showBloque={showBloque}
+                      byActividadMonth={byActividadMonth}
+                      encargado={actividad.encargadoId ? encargadoMap[actividad.encargadoId] : undefined}
                       showMeta={detail >= 1}
                       showFrecuencia={detail >= 2}
-                      correctivaOcc={correctivaOcc}
-                      correctivaFicha={correctivaFicha}
+                      correctivaEvt={correctivaEvt}
+                      correctivaActividad={correctivaActividad}
                     />
-                  )
-                })
-              : null}
-            {modo === 'actividades'
-              ? actividadesOrdenadas.map((actividad) => (
-                  <ActividadRow
-                    key={actividad.id}
-                    actividad={actividad}
-                    monthIndexes={monthIndexes}
-                    start={start}
-                    currentMonth={currentMonth}
-                    byActividadMonth={byActividadMonth}
-                    encargado={actividad.encargadoId ? encargadoMap[actividad.encargadoId] : undefined}
-                    showMeta={detail >= 1}
-                    showFrecuencia={detail >= 2}
-                    correctivaEvt={correctivaEvt}
-                    correctivaActividad={correctivaActividad}
-                  />
-                ))
-              : null}
-            {modo === 'actividades'
-              ? correctivasFechadas.map((accion) => (
-                  <CorrectivaRow
-                    key={accion.id}
-                    accion={accion}
-                    ficha={accion.fichaId ? fichaById[accion.fichaId] : undefined}
-                    actividad={accion.actividadId ? actividadById[accion.actividadId] : undefined}
-                    monthIndexes={monthIndexes}
-                    start={start}
-                    currentMonth={currentMonth}
-                    year={year}
-                    showMeta={detail >= 1}
-                  />
-                ))
-              : null}
-          </tbody>
-        </table>
+                  ))
+                : null}
+              {modo === 'actividades'
+                ? correctivasFechadas.map((accion) => (
+                    <CorrectivaRow
+                      key={accion.id}
+                      accion={accion}
+                      ficha={accion.fichaId ? fichaById[accion.fichaId] : undefined}
+                      actividad={accion.actividadId ? actividadById[accion.actividadId] : undefined}
+                      monthIndexes={monthIndexes}
+                      start={start}
+                      currentMonth={currentMonth}
+                      year={year}
+                      showMeta={detail >= 1}
+                    />
+                  ))
+                : null}
+            </tbody>
+          </table>
         </div>
       </div>
       <LeyendaSimbolos />

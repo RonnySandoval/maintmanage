@@ -3491,9 +3491,6 @@ a.table-row:focus-visible {
 }
 
 .year-grid-shell {
-  --year-chrome-h: 2.75rem;
-  --year-qhead-h: 1.45rem;
-  --year-monthhead-h: 1.2rem;
   width: 100%;
   max-width: 100%;
   border: 1px solid var(--border);
@@ -3505,10 +3502,17 @@ a.table-row:focus-visible {
     var(--shadow);
 }
 
-.year-grid-chrome {
+/* Controles ± + cabecera: anclados bajo el topbar. El scroll vertical es el de la página. */
+.year-grid-pin {
   position: sticky;
   top: var(--top-h);
   z-index: 14;
+  background: var(--bg-elev);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 1px 0 var(--border);
+}
+
+.year-grid-chrome {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
@@ -3516,7 +3520,6 @@ a.table-row:focus-visible {
   gap: 0.28rem 0.35rem;
   padding: 0.26rem 0.32rem;
   border-bottom: 1px solid var(--border);
-  border-radius: 16px 16px 0 0;
   background:
     linear-gradient(
       180deg,
@@ -3525,11 +3528,22 @@ a.table-row:focus-visible {
     );
 }
 
+.year-grid-head-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  background: color-mix(in srgb, var(--bg-muted) 70%, var(--bg-elev));
+}
+
+.year-grid-head-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 .year-grid-wrap {
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
-  overflow-y: clip;
+  overflow-y: visible;
   background: var(--bg-elev);
   border-radius: 0 0 16px 16px;
   touch-action: pan-x pan-y;
@@ -3562,25 +3576,16 @@ a.table-row:focus-visible {
 .year-grid thead th {
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--bg-muted) 70%, var(--bg-elev));
-  position: sticky;
-  z-index: 11;
 }
 
 .year-grid thead tr:first-child th {
-  top: calc(var(--top-h) + var(--year-chrome-h));
-  z-index: 12;
   border-bottom-color: color-mix(in srgb, var(--border) 82%, transparent);
 }
 
-.year-grid thead tr:nth-child(2) th {
-  top: calc(var(--top-h) + var(--year-chrome-h) + var(--year-qhead-h));
-  z-index: 11;
-}
-
-.year-grid thead .ficha-col {
-  top: calc(var(--top-h) + var(--year-chrome-h));
+.year-grid-head .ficha-col {
+  position: sticky;
   left: 0;
-  z-index: 13;
+  z-index: 2;
   background: color-mix(in srgb, var(--bg-muted) 70%, var(--bg-elev));
 }
 
