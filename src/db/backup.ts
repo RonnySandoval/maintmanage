@@ -131,40 +131,47 @@ export async function importBackup(file: Blob, mode: 'replace' | 'merge'): Promi
     throw new Error('Versión de copia no compatible.')
   }
 
+  // Extraer blobs del ZIP antes de abrir IndexedDB: await de JSZip dentro
+  // de la transacción provoca "Transaction committed too early".
+  const adjuntos: Adjunto[] = []
+  for (const meta of payload.adjuntosMeta ?? []) {
+    const entry = zip.file(`files/${meta.id}`)
+    let blob: Blob = new Blob([], { type: meta.mimeType })
+    if (entry) {
+      const buffer = await entry.async('arraybuffer')
+      blob = new Blob([buffer], { type: meta.mimeType })
+    }
+    adjuntos.push({ ...meta, blob })
+  }
+
+  const encargados = payload.encargados ?? []
+  const bloques = payload.bloques?.length ? payload.bloques : (payload.grupos ?? [])
+  const fichas = (payload.fichas ?? []).map((ficha) => ({
+    ...ficha,
+    numero: ficha.numero?.trim() ? ficha.numero : '',
+  }))
+  const ocurrencias = payload.ocurrencias ?? []
+  const ejecuciones = payload.ejecuciones ?? []
+  const accionesCorrectivas = payload.accionesCorrectivas ?? []
+  const actividades = payload.actividades ?? []
+  const eventos = payload.eventos ?? []
+  const ajustes = payload.ajustes ?? []
+
   await withoutDataTouch(async () => {
     await db.transaction('rw', db.tables, async () => {
       if (mode === 'replace') {
         await Promise.all(db.tables.map((table) => table.clear()))
       }
-      if (payload.encargados?.length) await db.encargados.bulkPut(payload.encargados)
-      const bloques = payload.bloques?.length ? payload.bloques : payload.grupos
-      if (bloques?.length) await db.grupos.bulkPut(bloques)
-      if (payload.fichas?.length) {
-        await db.fichas.bulkPut(
-          payload.fichas.map((ficha) => ({
-            ...ficha,
-            numero: ficha.numero?.trim() ? ficha.numero : '',
-          })),
-        )
-      }
-      if (payload.ocurrencias?.length) await db.ocurrencias.bulkPut(payload.ocurrencias)
-      if (payload.ejecuciones?.length) await db.ejecuciones.bulkPut(payload.ejecuciones)
-      if (payload.accionesCorrectivas?.length) {
-        await db.accionesCorrectivas.bulkPut(payload.accionesCorrectivas)
-      }
-      if (payload.actividades?.length) await db.actividades.bulkPut(payload.actividades)
-      if (payload.eventos?.length) await db.eventos.bulkPut(payload.eventos)
-      if (payload.ajustes?.length) await db.ajustes.bulkPut(payload.ajustes)
-
-      for (const meta of payload.adjuntosMeta ?? []) {
-        const entry = zip.file(`files/${meta.id}`)
-        let blob: Blob = new Blob([], { type: meta.mimeType })
-        if (entry) {
-          const buffer = await entry.async('arraybuffer')
-          blob = new Blob([buffer], { type: meta.mimeType })
-        }
-        await db.adjuntos.put({ ...meta, blob })
-      }
+      if (encargados.length) await db.encargados.bulkPut(encargados)
+      if (bloques.length) await db.grupos.bulkPut(bloques)
+      if (fichas.length) await db.fichas.bulkPut(fichas)
+      if (ocurrencias.length) await db.ocurrencias.bulkPut(ocurrencias)
+      if (ejecuciones.length) await db.ejecuciones.bulkPut(ejecuciones)
+      if (accionesCorrectivas.length) await db.accionesCorrectivas.bulkPut(accionesCorrectivas)
+      if (actividades.length) await db.actividades.bulkPut(actividades)
+      if (eventos.length) await db.eventos.bulkPut(eventos)
+      if (ajustes.length) await db.ajustes.bulkPut(ajustes)
+      if (adjuntos.length) await db.adjuntos.bulkPut(adjuntos)
     })
 
     const now = Date.now()
