@@ -47,6 +47,7 @@ import {
   useAliases,
 } from '../lib/labels'
 import { requestNotificaciones } from '../lib/notifications'
+import { EntityCard } from '../components/EntityCard'
 import { RestorePanel } from '../components/RestorePanel'
 import { ThemeModePicker } from '../components/ThemeQuickToggle'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
@@ -100,7 +101,7 @@ export function AjustesPage() {
   const folderOk = canUseFolderBackup()
   const pendingChanges =
     !!ajustes?.lastChangedAt &&
-    (!ajustes.lastBackupAt || ajustes.lastChangedAt > ajustes.lastBackupAt)
+    (!ajustes.lastBackupAt || ajustes.lastChangedAt > ajustes.lastChangedAt)
 
   async function exportNow() {
     setBusy(true)
@@ -263,18 +264,14 @@ export function AjustesPage() {
   }
 
   return (
-    <div className="stack">
-      <section className="card">
-        <h2 className="title-sm">
-          <span className="accordion-label">
-            <Monitor size={16} />
-            Apariencia
-          </span>
-        </h2>
-        <p className="muted">Claro, oscuro o el tema del sistema. El tamaño de letra se cambia en la barra superior.</p>
-        <ThemeModePicker />
-      </section>
-      <div className="seg-toggle tabs-5" role="tablist" aria-label="Secciones de ajustes">
+    <div className="stack ajustes-page">
+      <SettingsAccordion title="Apariencia" icon={Monitor} defaultOpen>
+        <div className="ajustes-apariencia-row">
+          <ThemeModePicker />
+        </div>
+      </SettingsAccordion>
+
+      <div className="seg-toggle tabs-5 icon-only" role="tablist" aria-label="Secciones de ajustes">
         {AJUSTES_TABS.map((item) => {
           const Icon = item.icon
           return (
@@ -283,308 +280,336 @@ export function AjustesPage() {
               type="button"
               role="tab"
               aria-selected={tab === item.id}
+              aria-label={item.label}
+              title={item.label}
               className={tab === item.id ? 'active' : ''}
               onClick={() => setTab(item.id)}
             >
               <Icon size={16} />
-              {item.label}
             </button>
           )
         })}
       </div>
 
       {tab === 'avisos' ? (
-        <section className="card">
-          <h2 className="title-sm">
-            <span className="accordion-label">
-              <Bell size={16} />
-              Avisos e instalación
-            </span>
-          </h2>
-        <h3 className="title-sm">Recordatorios</h3>
-        <p className="muted">
-          Sin servidor no hay avisos con la app cerrada. Al abrirla (o volver a ella) se puede
-          notificar si hay vencidas o pendientes del mes, una vez al día.
-        </p>
-        <button type="button" className="btn" onClick={() => void enableNotifs()}>
-          <Bell size={16} />
-          {ajustes?.notificaciones ? 'Permiso concedido — volver a pedir' : 'Activar avisos al abrir'}
-        </button>
-        <h3 className="title-sm" style={{ marginTop: '1rem' }}>
-          Instalar en este dispositivo
-        </h3>
-        {installed ? (
-          <p className="muted">La app ya está en modo instalado (PWA).</p>
-        ) : canInstall ? (
-          <button type="button" className="btn btn-primary" onClick={() => void install()}>
-            <Smartphone size={16} />
-            Instalar MaintManage
-          </button>
-        ) : (
+        <EntityCard
+          title={
+            <h2 className="title-sm">
+              <span className="accordion-label">
+                <Bell size={16} />
+                Avisos e instalación
+              </span>
+            </h2>
+          }
+          footer={
+            <div className="row card-toolbar-actions">
+              <button type="button" className="btn" onClick={() => void enableNotifs()}>
+                <Bell size={16} />
+                {ajustes?.notificaciones ? 'Volver a pedir permiso' : 'Activar avisos'}
+              </button>
+              {!installed && canInstall ? (
+                <button type="button" className="btn btn-primary" onClick={() => void install()}>
+                  <Smartphone size={16} />
+                  Instalar
+                </button>
+              ) : null}
+            </div>
+          }
+        >
           <p className="muted">
-            En el móvil: menú del navegador → <strong>Añadir a pantalla de inicio</strong>. En el
-            PC: icono de instalar en la barra de direcciones, si el navegador lo ofrece.
+            Sin servidor no hay avisos con la app cerrada. Al abrirla se puede notificar vencidas o
+            pendientes del mes, una vez al día.
           </p>
-        )}
-        </section>
+          {installed ? (
+            <p className="muted">La app ya está en modo instalado (PWA).</p>
+          ) : canInstall ? null : (
+            <p className="muted">
+              En el móvil: menú → <strong>Añadir a pantalla de inicio</strong>. En el PC: icono de
+              instalar en la barra de direcciones.
+            </p>
+          )}
+          {message ? <div className="hint">{message}</div> : null}
+        </EntityCard>
       ) : null}
 
       {tab === 'copia' ? (
-        <section className="card">
-          <h2 className="title-sm">
-            <span className="accordion-label">
-              <DatabaseBackup size={16} />
-              Copia de seguridad
-            </span>
-          </h2>
-        <p className="muted">
-          Al abrir la app se revisa si hay datos nuevos. Si pasó el intervalo y cambió algo, se
-          actualiza la copia. En el PC elige una carpeta (OneDrive o Drive, si puedes) para que
-          sobreviva si borras la app. En el móvil guarda el ZIP fuera del navegador.
-        </p>
-        <div className="backup-fields">
-          <div className="field">
-            <label htmlFor="backup-interval">Intervalo (horas)</label>
-            <input
-              id="backup-interval"
-              className="input"
-              type="number"
-              min={MIN_BACKUP_INTERVAL_HOURS}
-              max={MAX_BACKUP_INTERVAL_HOURS}
-              step={1}
-              defaultValue={intervalHours}
-              key={intervalHours}
-              onBlur={(e) => void saveIntervalHours(e.target.value)}
-            />
-            <p className="muted file-picker-hint">
-              Por defecto {DEFAULT_BACKUP_INTERVAL_HOURS} horas. Entre {MIN_BACKUP_INTERVAL_HOURS} y{' '}
-              {MAX_BACKUP_INTERVAL_HOURS}.
-            </p>
-          </div>
-          <div className="field">
-            <label htmlFor="backup-next">Próxima copia</label>
-            <input
-              id="backup-next"
-              className="input"
-              type="datetime-local"
-              value={toDatetimeLocalValue(nextBackupAt)}
-              onChange={(e) => void saveNextBackup(e.target.value)}
-            />
-            <p className="muted file-picker-hint">
-              {pendingChanges && nextBackupAt <= (ajustes?.lastChangedAt ?? nextBackupAt)
-                ? 'Hay cambios: se intentará al abrir la app.'
-                : `Programada para ${formatDateTime(nextBackupAt)}.`}
-            </p>
-          </div>
-        </div>
-        <ul className="backup-status">
-          <li>
-            Última copia:{' '}
-            <strong>
-              {ajustes?.lastBackupAt ? formatDateTime(ajustes.lastBackupAt) : 'aún no hay'}
-            </strong>
-            {ajustes?.lastBackupKind === 'folder' ? ' (carpeta)' : null}
-            {ajustes?.lastBackupKind === 'download' ? ' (ZIP descargado)' : null}
-          </li>
-          <li>
-            Carpeta:{' '}
-            <strong>
-              {ajustes?.backupFolderName ? `«${ajustes.backupFolderName}»` : 'ninguna'}
-            </strong>
-          </li>
-          <li>
-            Estado:{' '}
-            <strong>{pendingChanges ? 'hay cambios sin copiar' : 'al día'}</strong>
-          </li>
-        </ul>
-        <label className="backup-toggle">
-          <input
-            type="checkbox"
-            checked={ajustes?.autoBackup !== false}
-            onChange={() => void toggleAutoBackup()}
-          />
-          Copia automática (según el intervalo, solo si hay cambios)
-        </label>
-        <div className="row" style={{ flexWrap: 'wrap' }}>
-          {folderOk ? (
-            <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void chooseFolder()}>
-              <FolderOpen size={16} />
-              {ajustes?.backupFolderName ? 'Cambiar carpeta' : 'Elegir carpeta de copias'}
-            </button>
-          ) : null}
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void saveNow()}>
-            <Download size={16} />
-            Guardar copia ahora
-          </button>
-          <button type="button" className="btn" disabled={busy} onClick={() => void exportNow()}>
-            <Download size={16} />
-            Descargar ZIP
-          </button>
-          {ajustes?.backupFolderName ? (
-            <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void forgetFolder()}>
-              <FolderX size={16} />
-              Dejar de usar la carpeta
-            </button>
-          ) : null}
-        </div>
-        {message ? <div className="hint">{message}</div> : null}
+        <>
+          <EntityCard
+            title={
+              <h2 className="title-sm">
+                <span className="accordion-label">
+                  <DatabaseBackup size={16} />
+                  Copia de seguridad
+                </span>
+              </h2>
+            }
+            footer={
+              <div className="row card-toolbar-actions">
+                {folderOk ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={busy}
+                    onClick={() => void chooseFolder()}
+                  >
+                    <FolderOpen size={16} />
+                    {ajustes?.backupFolderName ? 'Cambiar carpeta' : 'Elegir carpeta'}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={busy}
+                  onClick={() => void saveNow()}
+                >
+                  <Download size={16} />
+                  Guardar ahora
+                </button>
+                <button type="button" className="btn" disabled={busy} onClick={() => void exportNow()}>
+                  <Download size={16} />
+                  ZIP
+                </button>
+                {ajustes?.backupFolderName ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={busy}
+                    onClick={() => void forgetFolder()}
+                  >
+                    <FolderX size={16} />
+                    Dejar carpeta
+                  </button>
+                ) : null}
+              </div>
+            }
+          >
+            <div className="backup-fields">
+              <div className="field">
+                <label htmlFor="backup-interval">Intervalo (horas)</label>
+                <input
+                  id="backup-interval"
+                  className="input"
+                  type="number"
+                  min={MIN_BACKUP_INTERVAL_HOURS}
+                  max={MAX_BACKUP_INTERVAL_HOURS}
+                  step={1}
+                  defaultValue={intervalHours}
+                  key={intervalHours}
+                  onBlur={(e) => void saveIntervalHours(e.target.value)}
+                />
+                <p className="muted file-picker-hint">
+                  Por defecto {DEFAULT_BACKUP_INTERVAL_HOURS} h · {MIN_BACKUP_INTERVAL_HOURS}–
+                  {MAX_BACKUP_INTERVAL_HOURS}
+                </p>
+              </div>
+              <div className="field">
+                <label htmlFor="backup-next">Próxima copia</label>
+                <input
+                  id="backup-next"
+                  className="input"
+                  type="datetime-local"
+                  value={toDatetimeLocalValue(nextBackupAt)}
+                  onChange={(e) => void saveNextBackup(e.target.value)}
+                />
+                <p className="muted file-picker-hint">
+                  {pendingChanges && nextBackupAt <= (ajustes?.lastChangedAt ?? nextBackupAt)
+                    ? 'Hay cambios: se intentará al abrir la app.'
+                    : `Programada para ${formatDateTime(nextBackupAt)}.`}
+                </p>
+              </div>
+            </div>
+            <ul className="backup-status">
+              <li>
+                Última:{' '}
+                <strong>
+                  {ajustes?.lastBackupAt ? formatDateTime(ajustes.lastBackupAt) : 'aún no hay'}
+                </strong>
+                {ajustes?.lastBackupKind === 'folder' ? ' (carpeta)' : null}
+                {ajustes?.lastBackupKind === 'download' ? ' (ZIP)' : null}
+              </li>
+              <li>
+                Carpeta:{' '}
+                <strong>
+                  {ajustes?.backupFolderName ? `«${ajustes.backupFolderName}»` : 'ninguna'}
+                </strong>
+              </li>
+              <li>
+                Estado: <strong>{pendingChanges ? 'cambios sin copiar' : 'al día'}</strong>
+              </li>
+            </ul>
+            <label className="backup-toggle">
+              <input
+                type="checkbox"
+                checked={ajustes?.autoBackup !== false}
+                onChange={() => void toggleAutoBackup()}
+              />
+              Copia automática (solo si hay cambios)
+            </label>
+            {message ? <div className="hint">{message}</div> : null}
+          </EntityCard>
 
-        <SettingsAccordion
-          title="Importar y recuperar"
-          icon={FolderInput}
-          summary="ZIP, carpeta o fusionar"
-          nested
-        >
-          <RestorePanel compact embedded />
-          <h3 className="title-sm" style={{ marginTop: '1rem' }}>
-            Importar en este dispositivo
-          </h3>
-          <p className="muted">
-            Reemplazar deja este aparato igual que la copia. Fusionar añade registros; si el id
-            coincide, gana el archivo.
-          </p>
-          <div className="row" style={{ flexWrap: 'wrap' }}>
-            {folderOk ? (
-              <button
-                type="button"
-                className="btn"
-                disabled={busy}
-                onClick={() => void restoreFolder('replace')}
-              >
-                <FolderOpen size={16} />
-                Restaurar desde carpeta
-              </button>
-            ) : null}
-            <label className="btn">
-              <Upload size={16} />
-              ZIP (reemplazar)
-              <input
-                className="sr-only"
-                type="file"
-                accept=".zip,application/zip"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  e.target.value = ''
-                  void importNow(file, 'replace')
-                }}
-              />
-            </label>
-            <label className="btn">
-              <Upload size={16} />
-              ZIP (fusionar)
-              <input
-                className="sr-only"
-                type="file"
-                accept=".zip,application/zip"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  e.target.value = ''
-                  void importNow(file, 'merge')
-                }}
-              />
-            </label>
-          </div>
-          <button type="button" className="btn btn-ghost" onClick={() => void loadQuota()}>
-            Ver espacio usado
-          </button>
-          {quota ? <p className="muted">{quota}</p> : null}
-        </SettingsAccordion>
-        </section>
+          <SettingsAccordion
+            title="Importar y recuperar"
+            icon={FolderInput}
+            summary="ZIP, carpeta o fusionar"
+          >
+            <RestorePanel compact embedded />
+            <h3 className="title-sm" style={{ marginTop: '0.75rem' }}>
+              Importar en este dispositivo
+            </h3>
+            <p className="muted">
+              Reemplazar deja este aparato igual que la copia. Fusionar añade; si el id coincide,
+              gana el archivo.
+            </p>
+            <div className="row" style={{ flexWrap: 'wrap' }}>
+              {folderOk ? (
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy}
+                  onClick={() => void restoreFolder('replace')}
+                >
+                  <FolderOpen size={16} />
+                  Desde carpeta
+                </button>
+              ) : null}
+              <label className="btn">
+                <Upload size={16} />
+                ZIP (reemplazar)
+                <input
+                  className="sr-only"
+                  type="file"
+                  accept=".zip,application/zip"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    void importNow(file, 'replace')
+                  }}
+                />
+              </label>
+              <label className="btn">
+                <Upload size={16} />
+                ZIP (fusionar)
+                <input
+                  className="sr-only"
+                  type="file"
+                  accept=".zip,application/zip"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    void importNow(file, 'merge')
+                  }}
+                />
+              </label>
+            </div>
+            <button type="button" className="btn btn-ghost" onClick={() => void loadQuota()}>
+              Ver espacio usado
+            </button>
+            {quota ? <p className="muted">{quota}</p> : null}
+          </SettingsAccordion>
+        </>
       ) : null}
 
       {tab === 'nombres' ? (
-        <section className="card">
-          <h2 className="title-sm">
-            <span className="accordion-label">
-              <Type size={16} />
-              Nombres en la app
-            </span>
-          </h2>
-        <p className="muted">
-          Cambia cómo se ven el {label('trimestre', aliases)}, las acciones y los tipos de
-          actividad. Se respeta mayúsculas y minúsculas tal como las escribas. Déjalo vacío y
-          sal del campo para volver al nombre original.
-        </p>
-        <div className="alias-grid">
-          {ALIAS_FIELDS.map((field) => (
-            <div key={field.id} className="field">
-              <label htmlFor={`alias-${field.id}`}>{DEFAULT_ALIASES[field.id]}</label>
-              <input
-                id={`alias-${field.id}`}
-                className="input"
-                value={aliasValue(field.id)}
-                placeholder={DEFAULT_ALIASES[field.id]}
-                spellCheck={false}
-                autoCapitalize="off"
-                autoCorrect="off"
-                onFocus={() => {
-                  setAliasFocus(field.id)
-                  setAliasDrafts((prev) => ({
-                    ...prev,
-                    [field.id]: aliases[field.id] ?? DEFAULT_ALIASES[field.id],
-                  }))
-                }}
-                onChange={(e) => {
-                  setAliasDrafts((prev) => ({ ...prev, [field.id]: e.target.value }))
-                }}
-                onBlur={() => {
-                  const raw = aliasDrafts[field.id]
-                  setAliasFocus(null)
-                  void saveAlias(field.id, raw ?? '')
-                }}
-              />
-              <p className="muted file-picker-hint">{field.hint}</p>
-            </div>
-          ))}
-        </div>
-        </section>
+        <EntityCard
+          title={
+            <h2 className="title-sm">
+              <span className="accordion-label">
+                <Type size={16} />
+                Nombres en la app
+              </span>
+            </h2>
+          }
+        >
+          <p className="muted">
+            Se respeta mayúsculas y minúsculas. Vacío + salir del campo = nombre original.
+          </p>
+          <div className="alias-grid">
+            {ALIAS_FIELDS.map((field) => (
+              <div key={field.id} className="field">
+                <label htmlFor={`alias-${field.id}`}>{DEFAULT_ALIASES[field.id]}</label>
+                <input
+                  id={`alias-${field.id}`}
+                  className="input"
+                  value={aliasValue(field.id)}
+                  placeholder={DEFAULT_ALIASES[field.id]}
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  onFocus={() => {
+                    setAliasFocus(field.id)
+                    setAliasDrafts((prev) => ({
+                      ...prev,
+                      [field.id]: aliases[field.id] ?? DEFAULT_ALIASES[field.id],
+                    }))
+                  }}
+                  onChange={(e) => {
+                    setAliasDrafts((prev) => ({ ...prev, [field.id]: e.target.value }))
+                  }}
+                  onBlur={() => {
+                    const raw = aliasDrafts[field.id]
+                    setAliasFocus(null)
+                    void saveAlias(field.id, raw ?? '')
+                  }}
+                />
+                <p className="muted file-picker-hint">{field.hint}</p>
+              </div>
+            ))}
+          </div>
+        </EntityCard>
       ) : null}
 
       {tab === 'estados' ? (
-        <section className="card">
-          <h2 className="title-sm">
-            <span className="accordion-label">
-              <CircleHelp size={16} />
-              Estados de la ficha
-            </span>
-          </h2>
-        <ul className="estado-help">
-          <li>
-            <strong>Pendiente</strong> — del mes actual y aún no ejecutada.
-          </li>
-          <li>
-            <strong>Programada</strong> — del {label('trimestre', aliases)}, en un mes que
-            todavía no llega.
-          </li>
-          <li>
-            <strong>Planificada</strong> — más allá del {label('trimestre', aliases)}. Se ve
-            en el cronograma, no en el dashboard.
-          </li>
-          <li>
-            <strong>Vencida</strong> — la fecha ya pasó y no se ejecutó.
-          </li>
-          <li>
-            <strong>Ejecutada</strong> — registrada como hecha.
-          </li>
-        </ul>
-        </section>
+        <EntityCard
+          title={
+            <h2 className="title-sm">
+              <span className="accordion-label">
+                <CircleHelp size={16} />
+                Estados de la ficha
+              </span>
+            </h2>
+          }
+        >
+          <ul className="estado-help">
+            <li>
+              <strong>Pendiente</strong> — del mes actual y aún no ejecutada.
+            </li>
+            <li>
+              <strong>Programada</strong> — del {label('trimestre', aliases)}, en un mes que todavía
+              no llega.
+            </li>
+            <li>
+              <strong>Planificada</strong> — más allá del {label('trimestre', aliases)}. Se ve en el
+              cronograma, no en el dashboard.
+            </li>
+            <li>
+              <strong>Vencida</strong> — la fecha ya pasó y no se ejecutó.
+            </li>
+            <li>
+              <strong>Ejecutada</strong> — registrada como hecha.
+            </li>
+          </ul>
+        </EntityCard>
       ) : null}
 
       {tab === 'acerca' ? (
-        <section className="card">
-          <h2 className="title-sm">
-            <span className="accordion-label">
-              <Info size={16} />
-              Acerca de
-            </span>
-          </h2>
-        <p className="muted">
-          MaintManage funciona sin servidor. GitHub Pages solo entrega la aplicación. La copia de
-          seguridad vive en la carpeta o el ZIP que elijas, no en la web. Fotos y documentos
-          grandes ocupan cuota del navegador. Word se almacena; la vista previa rica no está
-          incluida. iOS comparte peor archivos que Android.
-        </p>
-        </section>
+        <EntityCard
+          title={
+            <h2 className="title-sm">
+              <span className="accordion-label">
+                <Info size={16} />
+                Acerca de
+              </span>
+            </h2>
+          }
+        >
+          <p className="muted">
+            MaintManage funciona sin servidor. GitHub Pages solo entrega la aplicación. La copia
+            vive en la carpeta o el ZIP que elijas. Fotos y documentos grandes ocupan cuota del
+            navegador. Word se almacena; la vista previa rica no está incluida. iOS comparte peor
+            archivos que Android.
+          </p>
+        </EntityCard>
       ) : null}
     </div>
   )
@@ -595,40 +620,42 @@ function SettingsAccordion({
   icon: Icon,
   summary,
   defaultOpen = false,
-  nested = false,
   children,
 }: {
   title: string
   icon?: LucideIcon
   summary?: string
   defaultOpen?: boolean
-  nested?: boolean
   children: ReactNode
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <section className={`card accordion-panel${nested ? ' settings-nested' : ''}${open ? '' : ' is-collapsed'}`}>
-      <button
-        type="button"
-        className="accordion-trigger"
-        aria-expanded={open}
-        onClick={() => setOpen((was) => !was)}
-      >
-        <span className="accordion-label">
-          {Icon ? <Icon size={16} /> : null}
-          <span>
-            {title}
-            {!open && summary ? (
-              <span className="muted" style={{ fontWeight: 500 }}>
-                {' · '}
-                {summary}
-              </span>
-            ) : null}
+    <EntityCard
+      className={`accordion-panel${open ? '' : ' is-collapsed'}`}
+      title={
+        <button
+          type="button"
+          className="accordion-trigger ajustes-accordion-trigger"
+          aria-expanded={open}
+          onClick={() => setOpen((was) => !was)}
+        >
+          <span className="accordion-label">
+            {Icon ? <Icon size={16} /> : null}
+            <span>
+              {title}
+              {!open && summary ? (
+                <span className="muted" style={{ fontWeight: 500 }}>
+                  {' · '}
+                  {summary}
+                </span>
+              ) : null}
+            </span>
           </span>
-        </span>
-        <ChevronDown size={18} className={open ? 'is-open' : ''} />
-      </button>
-      {open ? <div className="accordion-body">{children}</div> : null}
-    </section>
+          <ChevronDown size={18} className={open ? 'is-open' : ''} />
+        </button>
+      }
+    >
+      {open ? children : null}
+    </EntityCard>
   )
 }

@@ -51,58 +51,90 @@
   --metal-cancel: #8d949c;
   --metal-delete: #4a4648;
   --metal-delete-hover: #3b383a;
-  --metal-ink: #f4f6f8;
-  --metal-ok-grad: linear-gradient(
-    165deg,
-    #9aa6b4 0%,
-    #6a7888 28%,
-    #4f5d6b 52%,
-    #3a4654 78%,
-    #6e7c8c 100%
-  );
-  --metal-ok-grad-hover: linear-gradient(
-    165deg,
-    #a8b3bf 0%,
-    #5c6a7a 30%,
-    #3f4c58 55%,
-    #323c48 80%,
-    #627080 100%
-  );
-  --metal-add-grad: linear-gradient(
-    165deg,
-    #9a948c 0%,
-    #726c64 28%,
-    #5d5954 52%,
-    #45423e 78%,
-    #7a746c 100%
-  );
-  --metal-add-grad-hover: linear-gradient(
-    165deg,
-    #a8a298 0%,
-    #635e58 30%,
-    #4b4844 55%,
-    #3a3734 80%,
-    #6e6860 100%
-  );
-  --metal-share-grad: linear-gradient(
-    165deg,
-    #9aa3b0 0%,
-    #6e7786 28%,
-    #5a6270 52%,
-    #434a56 78%,
-    #747c8a 100%
-  );
-  --metal-share-grad-hover: linear-gradient(
-    165deg,
-    #a8b0bc 0%,
-    #5e6776 30%,
-    #4a5260 55%,
-    #383e48 80%,
-    #68707e 100%
-  );
-  --metal-shine: inset 0 1px 0 rgb(255 255 255 / 0.34), inset 0 -1px 0 rgb(0 0 0 / 0.22);
-  --metal-shadow: 0 1px 0 rgb(255 255 255 / 0.2) inset, 0 2px 4px rgb(15 28 39 / 0.16),
-    0 8px 16px rgb(15 28 39 / 0.1);
+  --metal-ink: #12161c;
+  --metal-ok-grad:
+    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.72) 0%, transparent 42%),
+    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.42) 0%, transparent 40%),
+    radial-gradient(70% 55% at 50% 48%, rgb(232 238 244 / 0.55) 0%, transparent 62%),
+    linear-gradient(
+      180deg,
+      #1e242c 0%,
+      #4a5562 22%,
+      #9aa6b4 48%,
+      #dfe6ee 56%,
+      #7a8796 78%,
+      #2a323c 100%
+    );
+  --metal-ok-grad-hover:
+    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.8) 0%, transparent 44%),
+    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.5) 0%, transparent 42%),
+    radial-gradient(70% 55% at 50% 48%, rgb(242 246 250 / 0.62) 0%, transparent 64%),
+    linear-gradient(
+      180deg,
+      #262e36 0%,
+      #566270 22%,
+      #a8b4c2 48%,
+      #e8eef4 56%,
+      #8894a2 78%,
+      #343c48 100%
+    );
+  --metal-add-grad:
+    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.68) 0%, transparent 42%),
+    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.38) 0%, transparent 40%),
+    radial-gradient(70% 55% at 50% 48%, rgb(232 226 218 / 0.5) 0%, transparent 62%),
+    linear-gradient(
+      180deg,
+      #221f1c 0%,
+      #524e48 22%,
+      #a09a92 48%,
+      #e0dad2 56%,
+      #7c766e 78%,
+      #2e2a26 100%
+    );
+  --metal-add-grad-hover:
+    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.76) 0%, transparent 44%),
+    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.46) 0%, transparent 42%),
+    radial-gradient(70% 55% at 50% 48%, rgb(242 236 228 / 0.58) 0%, transparent 64%),
+    linear-gradient(
+      180deg,
+      #2a2622 0%,
+      #5e5a52 22%,
+      #aea8a0 48%,
+      #eae4dc 56%,
+      #8a847c 78%,
+      #383430 100%
+    );
+  --metal-share-grad:
+    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.7) 0%, transparent 42%),
+    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.4) 0%, transparent 40%),
+    radial-gradient(70% 55% at 50% 48%, rgb(232 238 244 / 0.52) 0%, transparent 62%),
+    linear-gradient(
+      180deg,
+      #1e242c 0%,
+      #4c5562 22%,
+      #9aa4b2 48%,
+      #dfe6ee 56%,
+      #7a8492 78%,
+      #2a323c 100%
+    );
+  --metal-share-grad-hover:
+    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.78) 0%, transparent 44%),
+    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.48) 0%, transparent 42%),
+    radial-gradient(70% 55% at 50% 48%, rgb(242 246 250 / 0.6) 0%, transparent 64%),
+    linear-gradient(
+      180deg,
+      #262e36 0%,
+      #586270 22%,
+      #a8b2c0 48%,
+      #e8eef4 56%,
+      #8892a0 78%,
+      #343c48 100%
+    );
+  --metal-shine:
+    inset 0 1px 0 rgb(255 255 255 / 0.7),
+    inset 0 -3px 6px rgb(0 0 0 / 0.38),
+    inset 0 0 0 1px rgb(255 255 255 / 0.1);
+  --metal-shadow: 0 2px 3px rgb(0 0 0 / 0.3), 0 8px 18px rgb(0 0 0 / 0.2);
   --app-texture:
     radial-gradient(980px 520px at 10% -12%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 60%),
     radial-gradient(720px 400px at 96% 6%, color-mix(in srgb, var(--bg-muted) 72%, transparent), transparent 55%),
@@ -152,57 +184,89 @@
   --metal-delete: #7a7476;
   --metal-delete-hover: #8b8587;
   --metal-ink: #10151c;
-  --metal-ok-grad: linear-gradient(
-    165deg,
-    #c4ced8 0%,
-    #8e9ba8 28%,
-    #7d8b99 52%,
-    #5f6c7a 78%,
-    #a0acb8 100%
-  );
-  --metal-ok-grad-hover: linear-gradient(
-    165deg,
-    #d0d8e0 0%,
-    #9aa7b4 30%,
-    #8e9ba8 55%,
-    #6e7b88 80%,
-    #aeb8c4 100%
-  );
-  --metal-add-grad: linear-gradient(
-    165deg,
-    #c4bfb6 0%,
-    #9a958e 28%,
-    #8a857e 52%,
-    #6a6660 78%,
-    #a8a398 100%
-  );
-  --metal-add-grad-hover: linear-gradient(
-    165deg,
-    #d0cbc2 0%,
-    #a8a398 30%,
-    #9a958e 55%,
-    #78746c 80%,
-    #b4aea4 100%
-  );
-  --metal-share-grad: linear-gradient(
-    165deg,
-    #c6ced8 0%,
-    #98a2b0 28%,
-    #8892a0 52%,
-    #667080 78%,
-    #a8b0bc 100%
-  );
-  --metal-share-grad-hover: linear-gradient(
-    165deg,
-    #d2dae2 0%,
-    #a8b0bc 30%,
-    #98a2b0 55%,
-    #748090 80%,
-    #b4bcc8 100%
-  );
-  --metal-shine: inset 0 1px 0 rgb(255 255 255 / 0.28), inset 0 -1px 0 rgb(0 0 0 / 0.28);
-  --metal-shadow: 0 1px 0 rgb(255 255 255 / 0.16) inset, 0 2px 4px rgb(0 0 0 / 0.35),
-    0 8px 18px rgb(0 0 0 / 0.28);
+  --metal-ok-grad:
+    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.75) 0%, transparent 42%),
+    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.45) 0%, transparent 40%),
+    radial-gradient(70% 55% at 50% 48%, rgb(240 244 248 / 0.6) 0%, transparent 62%),
+    linear-gradient(
+      180deg,
+      #2c343e 0%,
+      #62707e 22%,
+      #b8c2ce 48%,
+      #eef2f6 56%,
+      #8e9aa8 78%,
+      #3a4450 100%
+    );
+  --metal-ok-grad-hover:
+    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.82) 0%, transparent 44%),
+    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.52) 0%, transparent 42%),
+    radial-gradient(70% 55% at 50% 48%, rgb(248 250 252 / 0.68) 0%, transparent 64%),
+    linear-gradient(
+      180deg,
+      #343c48 0%,
+      #6e7c8c 22%,
+      #c4ced8 48%,
+      #f4f7fa 56%,
+      #9aa6b4 78%,
+      #46505c 100%
+    );
+  --metal-add-grad:
+    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.7) 0%, transparent 42%),
+    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.4) 0%, transparent 40%),
+    radial-gradient(70% 55% at 50% 48%, rgb(240 234 226 / 0.55) 0%, transparent 62%),
+    linear-gradient(
+      180deg,
+      #302c28 0%,
+      #6a645c 22%,
+      #bcb6ae 48%,
+      #eee8e0 56%,
+      #908a82 78%,
+      #3e3a36 100%
+    );
+  --metal-add-grad-hover:
+    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.78) 0%, transparent 44%),
+    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.48) 0%, transparent 42%),
+    radial-gradient(70% 55% at 50% 48%, rgb(248 242 234 / 0.62) 0%, transparent 64%),
+    linear-gradient(
+      180deg,
+      #383430 0%,
+      #78726a 22%,
+      #cac4bc 48%,
+      #f4eee6 56%,
+      #9e9890 78%,
+      #484440 100%
+    );
+  --metal-share-grad:
+    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.72) 0%, transparent 42%),
+    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.42) 0%, transparent 40%),
+    radial-gradient(70% 55% at 50% 48%, rgb(240 244 248 / 0.56) 0%, transparent 62%),
+    linear-gradient(
+      180deg,
+      #2c343e 0%,
+      #64707e 22%,
+      #bcc6d0 48%,
+      #eef2f6 56%,
+      #8e98a6 78%,
+      #3a4450 100%
+    );
+  --metal-share-grad-hover:
+    radial-gradient(120% 90% at 12% 42%, rgb(255 255 255 / 0.8) 0%, transparent 44%),
+    radial-gradient(110% 85% at 88% 58%, rgb(255 255 255 / 0.5) 0%, transparent 42%),
+    radial-gradient(70% 55% at 50% 48%, rgb(248 250 252 / 0.64) 0%, transparent 64%),
+    linear-gradient(
+      180deg,
+      #343c48 0%,
+      #707c8c 22%,
+      #c8d2dc 48%,
+      #f4f7fa 56%,
+      #9aa4b2 78%,
+      #46505c 100%
+    );
+  --metal-shine:
+    inset 0 1px 0 rgb(255 255 255 / 0.65),
+    inset 0 -3px 6px rgb(0 0 0 / 0.42),
+    inset 0 0 0 1px rgb(255 255 255 / 0.1);
+  --metal-shadow: 0 2px 3px rgb(0 0 0 / 0.42), 0 10px 20px rgb(0 0 0 / 0.3);
   --kind-actividad: #e0a36a;
   --app-texture:
     radial-gradient(980px 520px at 10% -12%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
@@ -647,26 +711,29 @@ button.nuevo-fab-item {
 }
 
 .nuevo-fab-btn {
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 52px;
   height: 52px;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--metal-add) 55%, #fff);
+  border: 1px solid color-mix(in srgb, #12161c 70%, #fff);
   border-radius: 999px;
   background: var(--metal-add-grad);
   color: var(--metal-ink);
   font-weight: 750;
   font-size: 0.92rem;
   cursor: pointer;
-  box-shadow: var(--metal-shine), 0 10px 24px rgb(15 28 39 / 0.18);
+  box-shadow: var(--metal-shine), 0 3px 5px rgb(0 0 0 / 0.32), 0 12px 26px rgb(0 0 0 / 0.28);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.35);
 }
 
 .nuevo-fab-btn:hover,
 .nuevo-fab-btn.is-open {
   background: var(--metal-add-grad-hover);
-  border-color: color-mix(in srgb, var(--metal-add-hover) 45%, #fff);
+  border-color: color-mix(in srgb, #12161c 55%, #fff);
 }
 
 .nuevo-fab-btn:focus-visible {
@@ -921,6 +988,7 @@ button.nuevo-fab-item {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .row {
@@ -1010,20 +1078,30 @@ button.nuevo-fab-item {
 .btn-primary,
 .btn-add,
 .btn-share {
-  border-color: color-mix(in srgb, currentColor 12%, transparent);
+  position: relative;
+  overflow: hidden;
+  border-color: color-mix(in srgb, #0b1016 55%, transparent);
   color: var(--metal-ink);
   box-shadow: var(--metal-shine), var(--metal-shadow);
-  text-shadow: 0 1px 0 rgb(0 0 0 / 0.18);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.35);
+}
+
+.btn-primary > *,
+.btn-add > *,
+.btn-share > *,
+.nuevo-fab-btn > * {
+  position: relative;
+  z-index: 1;
 }
 
 .btn-primary {
   background: var(--metal-ok-grad);
-  border-color: color-mix(in srgb, var(--metal-ok) 55%, #fff);
+  border-color: color-mix(in srgb, #12161c 70%, #fff);
 }
 
 .btn-primary:hover {
   background: var(--metal-ok-grad-hover);
-  border-color: color-mix(in srgb, var(--metal-ok-hover) 45%, #fff);
+  border-color: color-mix(in srgb, #12161c 55%, #fff);
 }
 
 .btn-primary:focus-visible {
@@ -1032,12 +1110,12 @@ button.nuevo-fab-item {
 
 .btn-add {
   background: var(--metal-add-grad);
-  border-color: color-mix(in srgb, var(--metal-add) 55%, #fff);
+  border-color: color-mix(in srgb, #12161c 70%, #fff);
 }
 
 .btn-add:hover {
   background: var(--metal-add-grad-hover);
-  border-color: color-mix(in srgb, var(--metal-add-hover) 45%, #fff);
+  border-color: color-mix(in srgb, #12161c 55%, #fff);
 }
 
 .btn-add.is-open {
@@ -1046,19 +1124,19 @@ button.nuevo-fab-item {
 
 .btn-share {
   background: var(--metal-share-grad);
-  border-color: color-mix(in srgb, var(--metal-share) 55%, #fff);
+  border-color: color-mix(in srgb, #12161c 70%, #fff);
 }
 
 .btn-share:hover {
   background: var(--metal-share-grad-hover);
-  border-color: color-mix(in srgb, var(--metal-share-hover) 45%, #fff);
+  border-color: color-mix(in srgb, #12161c 55%, #fff);
 }
 
 [data-theme='dark'] .btn-primary,
 [data-theme='dark'] .btn-add,
 [data-theme='dark'] .btn-share,
 [data-theme='dark'] .nuevo-fab-btn {
-  text-shadow: 0 1px 0 rgb(255 255 255 / 0.22);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.4);
 }
 
 .btn-edit {
@@ -1543,16 +1621,24 @@ a.icon-btn:hover {
   font-size: 0.82rem;
 }
 
-.seg-toggle.tabs-4 button,
 .seg-toggle.tabs-5 button {
   gap: 0.25rem;
   font-size: 0.75rem;
   padding: 0 0.2rem;
 }
 
+.seg-toggle.tabs-5.icon-only button {
+  padding: 0;
+  min-height: 40px;
+}
+
+.seg-toggle.tabs-5.icon-only button svg {
+  flex-shrink: 0;
+}
+
 @media (max-width: 520px) {
   .seg-toggle.tabs-5 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
@@ -1806,6 +1892,49 @@ a.icon-btn:hover {
   border: 1px solid var(--border);
 }
 
+.ajustes-inline-card.entity-card {
+  gap: 0;
+}
+
+.ajustes-inline-card .entity-card-head {
+  align-items: center;
+}
+
+.ajustes-accordion-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ajustes-accordion-trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 8px;
+}
+
+.ajustes-apariencia-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.ajustes-apariencia-row .seg-toggle {
+  margin-bottom: 0;
+  width: auto;
+  max-width: 100%;
+}
+
 .entity-card.is-compact + .entity-card.is-compact {
   margin-top: 0.5rem;
 }
@@ -1813,6 +1942,7 @@ a.icon-btn:hover {
 .card-toolbar-actions {
   gap: 0.45rem;
   min-width: 0;
+  flex-wrap: wrap;
 }
 
 .card-toolbar-actions .btn {
@@ -2667,21 +2797,29 @@ a.table-row:focus-visible {
 
 .ficha-form.card {
   padding: 0.85rem 0.85rem 1rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 .ficha-form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.5rem), 1fr));
   gap: 0.55rem 0.55rem;
   align-items: start;
+  width: 100%;
+  min-width: 0;
 }
 
 .ficha-form-grid > .field {
   margin-bottom: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .ficha-form .field {
   gap: 0.28rem;
+  min-width: 0;
 }
 
 .ficha-form .field label {
@@ -2696,6 +2834,9 @@ a.table-row:focus-visible {
 .ficha-form .textarea,
 .ficha-form .form-seg button {
   min-height: 40px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 0.38rem 0.6rem;
   border-radius: 10px;
 }
@@ -2774,17 +2915,22 @@ a.table-row:focus-visible {
   display: flex;
   gap: 0.35rem;
   align-items: stretch;
+  width: 100%;
+  min-width: 0;
 }
 
-.combo-row .select {
-  flex: 1;
+.combo-row .select,
+.combo-row .bloque-select {
+  flex: 1 1 auto;
   min-width: 0;
+  max-width: 100%;
 }
 
 .combo-row .btn-icon {
   width: 40px;
+  min-width: 40px;
   min-height: 40px;
-  flex-shrink: 0;
+  flex: 0 0 auto;
 }
 
 .bloque-select {

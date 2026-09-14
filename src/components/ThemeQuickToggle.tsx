@@ -11,7 +11,7 @@ const MODES: { id: ThemeMode; label: string; icon: typeof Sun }[] = [
 export function ThemeModePicker() {
   const { mode, setTheme } = useTheme()
   return (
-    <div className="seg-toggle" role="radiogroup" aria-label="Tema">
+    <div className="seg-toggle compact icon-only" role="radiogroup" aria-label="Tema">
       {MODES.map((item) => {
         const Icon = item.icon
         return (
@@ -20,11 +20,12 @@ export function ThemeModePicker() {
             type="button"
             role="radio"
             aria-checked={mode === item.id}
+            aria-label={item.label}
+            title={item.label}
             className={mode === item.id ? 'active' : ''}
             onClick={() => setTheme(item.id)}
           >
             <Icon size={16} />
-            {item.label}
           </button>
         )
       })}

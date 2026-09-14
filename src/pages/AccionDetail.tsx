@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CircleCheck, Pencil, Trash2 } from 'lucide-react'
+import { CalendarClock, CircleCheck, Pencil, Trash2 } from 'lucide-react'
 import { db } from '../db'
 import { prioridadOf, tipoAccionLabel, tipoAccionOf } from '../db/types'
 import { estadoAgendaCorrectiva } from '../lib/acciones'
 import { formatDate, formatFechaProgramada } from '../lib/dates'
 import { accionLabel, useAliases } from '../lib/labels'
+import { AccionEditor, ProgramarFechaForm } from '../components/AccionesPanel'
 import { ActividadTitle } from '../components/ActividadTitle'
 import { EjecucionForm } from '../components/EjecucionForm'
 import { FichaTitle } from '../components/FichaTitle'
@@ -40,6 +41,7 @@ export function AccionDetailPage() {
   )
   const [ejecOpen, setEjecOpen] = useState(false)
   const [removing, setRemoving] = useState(false)
+  const [panel, setPanel] = useState<'none' | 'edit' | 'schedule'>('none')
 
   if (!id) return null
   if (accion === undefined) return <p className="muted">Cargando…</p>
@@ -63,6 +65,7 @@ export function AccionDetailPage() {
           ? `/fichas/${current.fichaId}`
           : '/historicos'
   const canExecute = Boolean(current.fechaObjetivo)
+  const needsSchedule = !current.fechaObjetivo && tipo === 'correctiva'
 
   async function removeAccion() {
     if (!confirm('¿Eliminar esta acción? No se modifica la inspección ni la actividad de origen.')) return
@@ -88,11 +91,33 @@ export function AccionDetailPage() {
         footer={
           <>
             <div className="row card-toolbar-actions">
-              {canExecute ? (
+              {needsSchedule ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setPanel((was) => (was === 'edit' ? 'none' : 'edit'))}
+                  >
+                    <Pencil size={16} />
+                    {panel === 'edit' ? 'Ocultar edición' : 'Editar'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => setPanel((was) => (was === 'schedule' ? 'none' : 'schedule'))}
+                  >
+                    <CalendarClock size={16} />
+                    {panel === 'schedule' ? 'Ocultar fecha' : 'Programar fecha'}
+                  </button>
+                </>
+              ) : canExecute ? (
                 <button
                   type="button"
                   className="btn btn-primary"
-                  onClick={() => setEjecOpen((was) => !was)}
+                  onClick={() => {
+                    setPanel('none')
+                    setEjecOpen((was) => !was)
+                  }}
                 >
                   {ejecucion ? <Pencil size={16} /> : <CircleCheck size={16} />}
                   {ejecucion
@@ -138,7 +163,17 @@ export function AccionDetailPage() {
           </Link>
           <span> · Estado propio, independiente del origen</span>
         </p>
-        {canExecute ? (
+        {panel === 'edit' ? (
+          <AccionEditor
+            accion={current}
+            onlyCorrectiva={tipo === 'correctiva'}
+            onDone={() => setPanel('none')}
+          />
+        ) : null}
+        {panel === 'schedule' ? (
+          <ProgramarFechaForm accion={current} onDone={() => setPanel('none')} />
+        ) : null}
+        {panel === 'none' && canExecute ? (
           ejecOpen ? (
             <EjecucionForm
               accionId={current.id}
@@ -152,11 +187,12 @@ export function AccionDetailPage() {
               {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
             </p>
           ) : null
-        ) : (
+        ) : null}
+        {panel === 'none' && !canExecute && !needsSchedule ? (
           <p className="muted">
             Añade una fecha programada para poder ejecutar esta {accionLabel(tipo, aliases).toLowerCase()}.
           </p>
-        )}
+        ) : null}
       </EntityCard>
     </div>
   )

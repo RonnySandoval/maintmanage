@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronDown, CircleCheck, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, CircleCheck, CalendarClock, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import {
@@ -59,6 +59,7 @@ export function AccionesPanel({
   const [prioridad, setPrioridad] = useState<PrioridadAccion>('media')
   const [error, setError] = useState('')
   const [editId, setEditId] = useState<string | null>(null)
+  const [scheduleId, setScheduleId] = useState<string | null>(null)
   const [filtroTipo, setFiltroTipo] = useState<'todas' | TipoAccion>('todas')
   const [filtroFecha, setFiltroFecha] = useState<'todas' | 'con' | 'sin'>('todas')
   const [open, setOpen] = useState(false)
@@ -109,6 +110,7 @@ export function AccionesPanel({
     }
     await db.accionesCorrectivas.delete(id)
     if (editId === id) setEditId(null)
+    if (scheduleId === id) setScheduleId(null)
   }
 
   const titulo = accionesTitulo(onlyCorrectiva, aliases)
@@ -270,7 +272,18 @@ export function AccionesPanel({
             {visibles.map((a) =>
             editId === a.id ? (
               <EntityCard key={a.id} compact nested title={<strong>{a.texto}</strong>}>
-                <AccionEditor accion={a} onDone={() => setEditId(null)} onlyCorrectiva={onlyCorrectiva} />
+                <AccionEditor
+                  accion={a}
+                  onDone={() => setEditId(null)}
+                  onlyCorrectiva={onlyCorrectiva}
+                />
+              </EntityCard>
+            ) : scheduleId === a.id ? (
+              <EntityCard key={a.id} compact nested title={<strong>{a.texto}</strong>}>
+                <ProgramarFechaForm
+                  accion={a}
+                  onDone={() => setScheduleId(null)}
+                />
               </EntityCard>
             ) : (
               <EntityCard
@@ -286,7 +299,32 @@ export function AccionesPanel({
                 footer={
                   <>
                     <div className="row card-toolbar-actions">
-                      {a.fechaObjetivo ? (
+                      {!a.fechaObjetivo && tipoAccionOf(a) === 'correctiva' ? (
+                        <>
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => {
+                              setScheduleId(null)
+                              setEditId(a.id)
+                            }}
+                          >
+                            <Pencil size={16} />
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => {
+                              setEditId(null)
+                              setScheduleId(a.id)
+                            }}
+                          >
+                            <CalendarClock size={16} />
+                            Programar fecha
+                          </button>
+                        </>
+                      ) : a.fechaObjetivo ? (
                         <Link
                           className="icon-btn"
                           to={accionHref(a)}
@@ -298,14 +336,19 @@ export function AccionesPanel({
                       ) : null}
                     </div>
                     <div className="row">
-                      <button
-                        type="button"
-                        className="icon-btn icon-btn-edit"
-                        aria-label="Editar"
-                        onClick={() => setEditId(a.id)}
-                      >
-                        <Pencil size={16} />
-                      </button>
+                      {a.fechaObjetivo || tipoAccionOf(a) !== 'correctiva' ? (
+                        <button
+                          type="button"
+                          className="icon-btn icon-btn-edit"
+                          aria-label="Editar"
+                          onClick={() => {
+                            setScheduleId(null)
+                            setEditId(a.id)
+                          }}
+                        >
+                          <Pencil size={16} />
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className="icon-btn icon-btn-delete"
@@ -326,7 +369,7 @@ export function AccionesPanel({
                       <PrioridadMark prioridad={prioridadOf(a)} />
                     </>
                   ) : null}
-                  {a.fechaObjetivo ? ` · ${formatDate(a.fechaObjetivo)}` : ''}
+                  {a.fechaObjetivo ? ` · ${formatDate(a.fechaObjetivo)}` : ' · Sin fecha'}
                 </p>
               </EntityCard>
             ),
@@ -340,7 +383,65 @@ export function AccionesPanel({
   )
 }
 
-function AccionEditor({
+export function ProgramarFechaForm({
+  accion,
+  onDone,
+}: {
+  accion: AccionCorrectiva
+  onDone: () => void
+}) {
+  const [fecha, setFecha] = useState(accion.fechaObjetivo || '')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    setError('')
+    if (!fecha) {
+      setError('Elige una fecha.')
+      return
+    }
+    setSaving(true)
+    try {
+      const next: AccionCorrectiva = {
+        ...accion,
+        fechaObjetivo: fecha,
+        updatedAt: Date.now(),
+      }
+      if (next.estado !== 'ejecutada') next.estado = 'programada'
+      await db.accionesCorrectivas.put(next)
+      onDone()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div>
+      <div className="field">
+        <label htmlFor={`prog-${accion.id}`}>Fecha programada</label>
+        <input
+          id={`prog-${accion.id}`}
+          className="input"
+          type="date"
+          value={fecha}
+          autoFocus
+          onChange={(e) => setFecha(e.target.value)}
+        />
+      </div>
+      {error ? <p className="danger-text">{error}</p> : null}
+      <div className="row">
+        <button type="button" className="btn btn-primary" disabled={saving} onClick={() => void save()}>
+          {saving ? 'Guardando…' : 'Programar'}
+        </button>
+        <button type="button" className="btn" disabled={saving} onClick={onDone}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function AccionEditor({
   accion,
   onDone,
   onlyCorrectiva = false,
