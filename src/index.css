@@ -1703,6 +1703,24 @@ a.icon-btn:hover {
   box-shadow: inset 0 0 0 1px var(--border);
 }
 
+.adjuntos-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.adjuntos-mark svg {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
 .tipo-badge-inline {
   display: none;
 }
@@ -3475,14 +3493,12 @@ a.table-row:focus-visible {
 .year-grid-shell {
   --year-chrome-h: 2.75rem;
   --year-qhead-h: 1.45rem;
-  display: flex;
-  flex-direction: column;
+  --year-monthhead-h: 1.2rem;
   width: 100%;
   max-width: 100%;
-  max-height: calc(100dvh - var(--top-h) - var(--nav-h) - 1.25rem);
   border: 1px solid var(--border);
   border-radius: 16px;
-  overflow: hidden;
+  overflow: visible;
   background: var(--bg-elev);
   box-shadow:
     0 1px 0 rgb(255 255 255 / 0.72) inset,
@@ -3490,8 +3506,9 @@ a.table-row:focus-visible {
 }
 
 .year-grid-chrome {
-  z-index: 12;
-  flex-shrink: 0;
+  position: sticky;
+  top: var(--top-h);
+  z-index: 14;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
@@ -3509,11 +3526,10 @@ a.table-row:focus-visible {
 }
 
 .year-grid-wrap {
-  flex: 1 1 auto;
-  min-height: 0;
   width: 100%;
   max-width: 100%;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: clip;
   background: var(--bg-elev);
   border-radius: 0 0 16px 16px;
   touch-action: pan-x pan-y;
@@ -3547,23 +3563,24 @@ a.table-row:focus-visible {
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--bg-muted) 70%, var(--bg-elev));
   position: sticky;
-  z-index: 2;
+  z-index: 11;
 }
 
 .year-grid thead tr:first-child th {
-  top: 0;
-  z-index: 3;
+  top: calc(var(--top-h) + var(--year-chrome-h));
+  z-index: 12;
   border-bottom-color: color-mix(in srgb, var(--border) 82%, transparent);
 }
 
 .year-grid thead tr:nth-child(2) th {
-  top: var(--year-qhead-h);
-  z-index: 2;
+  top: calc(var(--top-h) + var(--year-chrome-h) + var(--year-qhead-h));
+  z-index: 11;
 }
 
 .year-grid thead .ficha-col {
-  top: 0;
-  z-index: 5;
+  top: calc(var(--top-h) + var(--year-chrome-h));
+  left: 0;
+  z-index: 13;
   background: color-mix(in srgb, var(--bg-muted) 70%, var(--bg-elev));
 }
 
@@ -3589,11 +3606,6 @@ a.table-row:focus-visible {
   padding: 0.28rem 0.42rem;
   border-right: 1px solid var(--border);
   overflow-wrap: anywhere;
-}
-
-.year-grid thead .ficha-col {
-  z-index: 3;
-  background: color-mix(in srgb, var(--bg-muted) 70%, var(--bg-elev));
 }
 
 .ficha-col-resizer {

@@ -274,6 +274,14 @@ export function GrillaAnual({
     ...t,
     months: t.months.filter((m) => m >= start && m < start + visible),
   })).filter((t) => t.months.length)
+  const compactTrimestre =
+    visibleTrimestres.length >= 4 && wrapWidth < 720
+  const trimestreHead = (ordinal: string) => {
+    if (!compactTrimestre) return `${ordinal} ${trimestreWord}`
+    const short =
+      trimestreWord.length <= 5 ? trimestreWord : `${trimestreWord.slice(0, 4)}.`
+    return `${ordinal} ${short}`
+  }
 
   const rangeLabel = `${MESES[start]}–${MESES[start + visible - 1]} ${year}`
   const canPrev = start > 0
@@ -487,7 +495,7 @@ export function GrillaAnual({
                   className={`q-head q-${t.id}${i > 0 ? ' q-gap' : ''}`}
                   colSpan={t.months.length}
                 >
-                  {`${t.ordinal} ${trimestreWord}`}
+                  {trimestreHead(t.ordinal)}
                 </th>
               ))}
             </tr>
