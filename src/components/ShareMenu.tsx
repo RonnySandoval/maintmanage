@@ -32,7 +32,7 @@ export function ShareMenu({
     <>
       <button
         type="button"
-        className={iconOnly ? 'icon-btn' : 'btn'}
+        className={iconOnly ? 'icon-btn' : 'btn btn-share'}
         aria-label="Compartir"
         title="Compartir"
         onClick={() => setOpen(true)}
@@ -42,7 +42,7 @@ export function ShareMenu({
       </button>
       <Modal open={open} title="Compartir" onClose={() => setOpen(false)}>
         <div className="stack">
-          <button type="button" className="btn btn-primary" onClick={() => void nativeShare()}>
+          <button type="button" className="btn btn-share" onClick={() => void nativeShare()}>
             <Share2 size={16} />
             Compartir desde el dispositivo
           </button>

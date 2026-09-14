@@ -11,6 +11,7 @@ import {
   FolderInput,
   FolderX,
   Info,
+  Monitor,
   Smartphone,
   Type,
   Upload,
@@ -47,6 +48,7 @@ import {
 } from '../lib/labels'
 import { requestNotificaciones } from '../lib/notifications'
 import { RestorePanel } from '../components/RestorePanel'
+import { ThemeModePicker } from '../components/ThemeQuickToggle'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 
 type AjustesTab = 'copia' | 'nombres' | 'avisos' | 'estados' | 'acerca'
@@ -261,7 +263,17 @@ export function AjustesPage() {
   }
 
   return (
-    <div>
+    <div className="stack">
+      <section className="card">
+        <h2 className="title-sm">
+          <span className="accordion-label">
+            <Monitor size={16} />
+            Apariencia
+          </span>
+        </h2>
+        <p className="muted">Claro, oscuro o el tema del sistema. El tamaño de letra se cambia en la barra superior.</p>
+        <ThemeModePicker />
+      </section>
       <div className="seg-toggle tabs-5" role="tablist" aria-label="Secciones de ajustes">
         {AJUSTES_TABS.map((item) => {
           const Icon = item.icon

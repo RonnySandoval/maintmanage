@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react'
 import type { Actividad, Bloque, Encargado, EstadoOcurrencia, Evento, Ficha, Ocurrencia } from '../db/types'
@@ -23,6 +23,7 @@ import {
   ZOOM_IN_MAX,
   type ZoomLevel,
 } from '../hooks/useGridSpan'
+import { useGridNameCol } from '../hooks/useGridNameCol'
 import { useAliases } from '../lib/labels'
 import { ActividadTitle } from './ActividadTitle'
 import { FichaTitle } from './FichaTitle'
@@ -110,6 +111,12 @@ export function GrillaAnual({
   const detailRef = useRef(detail)
   zoomRef.current = zoom
   detailRef.current = detail
+  const [wrapWidth, setWrapWidth] = useState(() =>
+    typeof window === 'undefined' ? 360 : Math.max(280, window.innerWidth - 48),
+  )
+  const nameCol = useGridNameCol(wrapWidth, span)
+  const dragRef = useRef<{ x: number; w: number } | null>(null)
+  const [resizing, setResizing] = useState(false)
 
   useEffect(() => {
     setStart((current) => Math.min(Math.max(0, Math.floor(current / 3) * 3), maxStart))
@@ -270,10 +277,60 @@ export function GrillaAnual({
     setStart((current) => Math.min(maxStart, Math.max(0, current + delta)))
   }
 
+  function onNameColPointerDown(e: ReactPointerEvent<HTMLButtonElement>) {
+    if (!nameCol.canResize) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    dragRef.current = { x: e.clientX, w: nameCol.width }
+    setResizing(true)
+  }
+
+  function onNameColPointerMove(e: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = dragRef.current
+    if (!drag) return
+    nameCol.setWidth(drag.w + (e.clientX - drag.x))
+  }
+
+  function onNameColPointerUp(e: ReactPointerEvent<HTMLButtonElement>) {
+    dragRef.current = null
+    setResizing(false)
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    }
+  }
+
+  function onNameColKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      nameCol.setWidth(nameCol.width - 12)
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      nameCol.setWidth(nameCol.width + 12)
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      nameCol.setWidth(nameCol.min)
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      nameCol.setWidth(nameCol.max)
+    }
+  }
+
   const vacia =
     modo === 'fichas'
       ? !fichas.length
       : !actividades.length && !correctivasFechadas.length
+
+  useEffect(() => {
+    if (vacia) return
+    const el = wrapRef.current
+    if (!el) return
+    const update = () => setWrapWidth(el.clientWidth)
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [vacia])
+
   if (vacia) {
     return (
       <div className="card muted">
@@ -371,12 +428,35 @@ export function GrillaAnual({
             ) : null}
           </div>
         </div>
-        <div className="year-grid-wrap" ref={wrapRef}>
-          <table className={`year-grid mode-${span} detail-${detail}`}>
+        <div className={`year-grid-wrap${resizing ? ' is-resizing' : ''}`} ref={wrapRef}>
+          <table
+            className={`year-grid mode-${span} detail-${detail}${nameCol.showFullText ? ' is-name-wide' : ''}${resizing ? ' is-resizing' : ''}`}
+            style={{
+              ['--ficha-col-w' as string]: `${nameCol.width}px`,
+              ['--month-col-min' as string]: `${nameCol.monthMin}px`,
+            }}
+          >
           <thead>
             <tr>
               <th className="ficha-col" rowSpan={2}>
                 {modo === 'actividades' ? 'Actividad' : 'Ficha'}
+                {nameCol.canResize ? (
+                  <button
+                    type="button"
+                    className={`ficha-col-resizer${resizing ? ' is-dragging' : ''}`}
+                    aria-label="Redimensionar columna de nombre"
+                    title="Arrastra para ver el nombre completo. Doble clic restablece."
+                    aria-valuemin={nameCol.min}
+                    aria-valuemax={nameCol.max}
+                    aria-valuenow={nameCol.width}
+                    onPointerDown={onNameColPointerDown}
+                    onPointerMove={onNameColPointerMove}
+                    onPointerUp={onNameColPointerUp}
+                    onPointerCancel={onNameColPointerUp}
+                    onDoubleClick={nameCol.reset}
+                    onKeyDown={onNameColKeyDown}
+                  />
+                ) : null}
               </th>
               {visibleTrimestres.map((t, i) => (
                 <th

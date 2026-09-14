@@ -37,17 +37,72 @@
   --top-h: 56px;
   --sidebar-w: 232px;
   --kind-actividad: #7c4a1e;
+  --font-scale: 1;
+  --grid-font-dampen: 1;
   --font: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
   --metal-ok: #4f5d6b;
   --metal-ok-hover: #3f4c58;
   --metal-add: #5d5954;
   --metal-add-hover: #4b4844;
+  --metal-share: #5a6270;
+  --metal-share-hover: #4a5260;
   --metal-edit: #6a6258;
   --metal-edit-hover: #574f47;
   --metal-cancel: #8d949c;
   --metal-delete: #4a4648;
   --metal-delete-hover: #3b383a;
   --metal-ink: #f4f6f8;
+  --metal-ok-grad: linear-gradient(
+    165deg,
+    #9aa6b4 0%,
+    #6a7888 28%,
+    #4f5d6b 52%,
+    #3a4654 78%,
+    #6e7c8c 100%
+  );
+  --metal-ok-grad-hover: linear-gradient(
+    165deg,
+    #a8b3bf 0%,
+    #5c6a7a 30%,
+    #3f4c58 55%,
+    #323c48 80%,
+    #627080 100%
+  );
+  --metal-add-grad: linear-gradient(
+    165deg,
+    #9a948c 0%,
+    #726c64 28%,
+    #5d5954 52%,
+    #45423e 78%,
+    #7a746c 100%
+  );
+  --metal-add-grad-hover: linear-gradient(
+    165deg,
+    #a8a298 0%,
+    #635e58 30%,
+    #4b4844 55%,
+    #3a3734 80%,
+    #6e6860 100%
+  );
+  --metal-share-grad: linear-gradient(
+    165deg,
+    #9aa3b0 0%,
+    #6e7786 28%,
+    #5a6270 52%,
+    #434a56 78%,
+    #747c8a 100%
+  );
+  --metal-share-grad-hover: linear-gradient(
+    165deg,
+    #a8b0bc 0%,
+    #5e6776 30%,
+    #4a5260 55%,
+    #383e48 80%,
+    #68707e 100%
+  );
+  --metal-shine: inset 0 1px 0 rgb(255 255 255 / 0.34), inset 0 -1px 0 rgb(0 0 0 / 0.22);
+  --metal-shadow: 0 1px 0 rgb(255 255 255 / 0.2) inset, 0 2px 4px rgb(15 28 39 / 0.16),
+    0 8px 16px rgb(15 28 39 / 0.1);
   --app-texture:
     radial-gradient(980px 520px at 10% -12%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 60%),
     radial-gradient(720px 400px at 96% 6%, color-mix(in srgb, var(--bg-muted) 72%, transparent), transparent 55%),
@@ -89,12 +144,65 @@
   --metal-ok-hover: #8e9ba8;
   --metal-add: #8a857e;
   --metal-add-hover: #9a958e;
+  --metal-share: #8892a0;
+  --metal-share-hover: #98a2b0;
   --metal-edit: #9a9084;
   --metal-edit-hover: #aaa091;
   --metal-cancel: #a8b0b8;
   --metal-delete: #7a7476;
   --metal-delete-hover: #8b8587;
   --metal-ink: #10151c;
+  --metal-ok-grad: linear-gradient(
+    165deg,
+    #c4ced8 0%,
+    #8e9ba8 28%,
+    #7d8b99 52%,
+    #5f6c7a 78%,
+    #a0acb8 100%
+  );
+  --metal-ok-grad-hover: linear-gradient(
+    165deg,
+    #d0d8e0 0%,
+    #9aa7b4 30%,
+    #8e9ba8 55%,
+    #6e7b88 80%,
+    #aeb8c4 100%
+  );
+  --metal-add-grad: linear-gradient(
+    165deg,
+    #c4bfb6 0%,
+    #9a958e 28%,
+    #8a857e 52%,
+    #6a6660 78%,
+    #a8a398 100%
+  );
+  --metal-add-grad-hover: linear-gradient(
+    165deg,
+    #d0cbc2 0%,
+    #a8a398 30%,
+    #9a958e 55%,
+    #78746c 80%,
+    #b4aea4 100%
+  );
+  --metal-share-grad: linear-gradient(
+    165deg,
+    #c6ced8 0%,
+    #98a2b0 28%,
+    #8892a0 52%,
+    #667080 78%,
+    #a8b0bc 100%
+  );
+  --metal-share-grad-hover: linear-gradient(
+    165deg,
+    #d2dae2 0%,
+    #a8b0bc 30%,
+    #98a2b0 55%,
+    #748090 80%,
+    #b4bcc8 100%
+  );
+  --metal-shine: inset 0 1px 0 rgb(255 255 255 / 0.28), inset 0 -1px 0 rgb(0 0 0 / 0.28);
+  --metal-shadow: 0 1px 0 rgb(255 255 255 / 0.16) inset, 0 2px 4px rgb(0 0 0 / 0.35),
+    0 8px 18px rgb(0 0 0 / 0.28);
   --kind-actividad: #e0a36a;
   --app-texture:
     radial-gradient(980px 520px at 10% -12%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
@@ -114,6 +222,7 @@ body,
 }
 
 html {
+  font-size: calc(16px * var(--font-scale, 1));
   background-color: var(--bg);
   background-image: var(--app-texture);
   background-size: auto, auto, 72px 36px;
@@ -123,6 +232,7 @@ html {
 body {
   margin: 0;
   font-family: var(--font);
+  font-size: 1rem;
   font-optical-sizing: auto;
   background: transparent;
   color: var(--text);
@@ -249,6 +359,54 @@ p {
   align-items: center;
   flex-shrink: 0;
   gap: 0.1rem;
+}
+
+.font-scale-wrap {
+  position: relative;
+}
+
+.font-scale-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 12.5rem;
+  padding: 0.5rem 0.65rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-hover);
+}
+
+.font-scale-pop input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.font-scale-pop-a {
+  font-weight: 800;
+  font-size: 0.78rem;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+.font-scale-pop-a.is-lg {
+  font-size: 1.12rem;
+  color: var(--text);
+}
+
+.font-scale-pop-pct {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 2.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .topbar-actions .estado-words-btn {
@@ -495,24 +653,25 @@ button.nuevo-fab-item {
   width: 52px;
   height: 52px;
   padding: 0;
-  border: 0;
+  border: 1px solid color-mix(in srgb, var(--metal-add) 55%, #fff);
   border-radius: 999px;
-  background: var(--metal-add);
+  background: var(--metal-add-grad);
   color: var(--metal-ink);
   font-weight: 750;
   font-size: 0.92rem;
   cursor: pointer;
-  box-shadow: 0 10px 24px rgb(15 28 39 / 0.16);
+  box-shadow: var(--metal-shine), 0 10px 24px rgb(15 28 39 / 0.18);
 }
 
 .nuevo-fab-btn:hover,
 .nuevo-fab-btn.is-open {
-  background: var(--metal-add-hover);
+  background: var(--metal-add-grad-hover);
+  border-color: color-mix(in srgb, var(--metal-add-hover) 45%, #fff);
 }
 
 .nuevo-fab-btn:focus-visible {
   outline: none;
-  box-shadow: var(--focus-ring);
+  box-shadow: var(--metal-shine), var(--focus-ring);
 }
 
 .bottom-nav {
@@ -848,15 +1007,23 @@ button.nuevo-fab-item {
   cursor: not-allowed;
 }
 
-.btn-primary {
-  background: var(--metal-ok);
-  border-color: transparent;
+.btn-primary,
+.btn-add,
+.btn-share {
+  border-color: color-mix(in srgb, currentColor 12%, transparent);
   color: var(--metal-ink);
+  box-shadow: var(--metal-shine), var(--metal-shadow);
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.18);
+}
+
+.btn-primary {
+  background: var(--metal-ok-grad);
+  border-color: color-mix(in srgb, var(--metal-ok) 55%, #fff);
 }
 
 .btn-primary:hover {
-  background: var(--metal-ok-hover);
-  border-color: transparent;
+  background: var(--metal-ok-grad-hover);
+  border-color: color-mix(in srgb, var(--metal-ok-hover) 45%, #fff);
 }
 
 .btn-primary:focus-visible {
@@ -864,18 +1031,34 @@ button.nuevo-fab-item {
 }
 
 .btn-add {
-  background: var(--metal-add);
-  border-color: transparent;
-  color: var(--metal-ink);
+  background: var(--metal-add-grad);
+  border-color: color-mix(in srgb, var(--metal-add) 55%, #fff);
 }
 
 .btn-add:hover {
-  background: var(--metal-add-hover);
-  border-color: transparent;
+  background: var(--metal-add-grad-hover);
+  border-color: color-mix(in srgb, var(--metal-add-hover) 45%, #fff);
 }
 
 .btn-add.is-open {
-  background: var(--metal-add-hover);
+  background: var(--metal-add-grad-hover);
+}
+
+.btn-share {
+  background: var(--metal-share-grad);
+  border-color: color-mix(in srgb, var(--metal-share) 55%, #fff);
+}
+
+.btn-share:hover {
+  background: var(--metal-share-grad-hover);
+  border-color: color-mix(in srgb, var(--metal-share-hover) 45%, #fff);
+}
+
+[data-theme='dark'] .btn-primary,
+[data-theme='dark'] .btn-add,
+[data-theme='dark'] .btn-share,
+[data-theme='dark'] .nuevo-fab-btn {
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.22);
 }
 
 .btn-edit {
@@ -1188,9 +1371,8 @@ a.icon-btn:hover {
   border-radius: 10px;
   background: var(--bg-elev);
   color: var(--text);
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: -0.04em;
+  display: grid;
+  place-items: center;
   cursor: pointer;
   box-shadow: var(--shadow);
 }
@@ -1206,7 +1388,6 @@ a.icon-btn:hover {
 
 .estado-words-btn.is-off {
   color: var(--text-muted);
-  text-decoration: line-through;
   background: var(--bg-muted);
 }
 
@@ -1407,6 +1588,7 @@ a.icon-btn:hover {
 
 .ficha-title {
   font-weight: 650;
+  font-size: 1rem;
 }
 
 .actividad-title {
@@ -1431,7 +1613,7 @@ a.icon-btn:hover {
   gap: 0.25rem;
   border-radius: 999px;
   padding: 0.15rem 0.55rem;
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -1470,6 +1652,14 @@ a.icon-btn:hover {
 .badge-extra {
   background: color-mix(in srgb, var(--accent) 16%, var(--bg-muted));
   color: var(--accent);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 650;
+}
+
+.badge-correctiva {
+  background: var(--warning-soft);
+  color: var(--warning);
   text-transform: none;
   letter-spacing: 0;
   font-weight: 650;
@@ -1811,10 +2001,6 @@ a.icon-btn:hover {
   padding-block: 0.4rem;
 }
 
-.hist-occ-item.is-open {
-  background: color-mix(in srgb, var(--accent) 5%, transparent);
-}
-
 .hist-occ-main {
   display: flex;
   flex-direction: column;
@@ -1826,7 +2012,7 @@ a.icon-btn:hover {
 }
 
 .hist-occ-when {
-  font-size: 0.82rem;
+  font-size: 0.92rem;
   line-height: 1.25;
 }
 
@@ -1939,7 +2125,7 @@ a.icon-btn:hover {
 
 .table-head {
   background: var(--bg-muted);
-  font-size: 0.7rem;
+  font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1973,7 +2159,7 @@ a.table-row:focus-visible {
   border-top: 1px solid var(--border);
   background: var(--bg-muted);
   padding: 0.4rem 0.8rem;
-  font-size: 0.78rem;
+  font-size: 0.92rem;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: capitalize;
@@ -2002,7 +2188,7 @@ a.table-row:focus-visible {
 
 .table-cell .muted {
   margin: 0.1rem 0 0;
-  font-size: 0.78rem;
+  font-size: 0.92rem;
 }
 
 .table-actions {
@@ -2113,7 +2299,7 @@ a.table-row:focus-visible {
 }
 
 .table-row .muted {
-  font-size: 0.82rem;
+  font-size: 0.92rem;
 }
 
 @media (max-width: 720px) {
@@ -3002,6 +3188,12 @@ a.table-row:focus-visible {
   touch-action: pan-x pan-y;
 }
 
+.year-grid-wrap.is-resizing {
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+}
+
 .year-grid {
   border-collapse: separate;
   border-spacing: 0;
@@ -3009,7 +3201,7 @@ a.table-row:focus-visible {
   max-width: 100%;
   table-layout: fixed;
   min-width: 0;
-  font-size: 0.72rem;
+  font-size: calc(0.78rem * var(--grid-font-dampen, 1));
 }
 
 .year-grid th,
@@ -3039,9 +3231,9 @@ a.table-row:focus-visible {
 }
 
 .year-grid .ficha-col {
-  width: 7.4rem;
-  min-width: 6.6rem;
-  max-width: 8.4rem;
+  width: var(--ficha-col-w, 7.4rem);
+  min-width: var(--ficha-col-w, 7.4rem);
+  max-width: var(--ficha-col-w, 7.4rem);
   text-align: left;
   position: sticky;
   left: 0;
@@ -3050,6 +3242,7 @@ a.table-row:focus-visible {
   font-weight: 650;
   padding: 0.28rem 0.42rem;
   border-right: 1px solid var(--border);
+  overflow-wrap: anywhere;
 }
 
 .year-grid thead .ficha-col {
@@ -3057,16 +3250,46 @@ a.table-row:focus-visible {
   background: color-mix(in srgb, var(--bg-muted) 70%, var(--bg-elev));
 }
 
-.year-grid.mode-year .ficha-col,
-.year-grid.mode-three_quarter .ficha-col {
-  width: 7.1rem;
-  min-width: 6.2rem;
-  max-width: 7.8rem;
+.ficha-col-resizer {
+  position: absolute;
+  top: 0;
+  right: -9px;
+  width: 18px;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 5;
+  touch-action: none;
+}
+
+.ficha-col-resizer::after {
+  content: '';
+  position: absolute;
+  top: 18%;
+  bottom: 18%;
+  left: 50%;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--text) 22%, var(--border));
+}
+
+.ficha-col-resizer:hover::after,
+.ficha-col-resizer:focus-visible::after,
+.ficha-col-resizer.is-dragging::after {
+  background: var(--accent);
+}
+
+.ficha-col-resizer:focus-visible {
+  outline: none;
 }
 
 .year-grid .month-col {
   width: auto;
-  min-width: 0;
+  min-width: var(--month-col-min, 0);
   padding: 0.14rem 0.02rem;
 }
 
@@ -3095,7 +3318,7 @@ a.table-row:focus-visible {
   -webkit-box-orient: vertical;
   line-clamp: 2;
   overflow: hidden;
-  font-size: 0.74rem;
+  font-size: 1em;
   line-height: 1.2;
 }
 
@@ -3112,6 +3335,20 @@ a.table-row:focus-visible {
   -webkit-box-orient: vertical;
   line-clamp: 2;
   overflow: hidden;
+}
+
+.year-grid.is-name-wide .ficha-title,
+.year-grid.is-name-wide .actividad-title-text {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  overflow: visible;
+}
+
+.year-grid.is-name-wide .ficha-meta {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
 }
 
 .ficha-meta {

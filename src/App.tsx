@@ -3,6 +3,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { Splash } from './components/Splash'
 import { ThemeProvider } from './hooks/useTheme'
+import { FontScaleProvider } from './hooks/useFontScale'
 import { StatusLabelsProvider } from './hooks/useStatusLabels'
 import { ensureHorizon } from './db/occurrences'
 import { notifyIfNeeded } from './lib/notifications'
@@ -39,6 +40,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
+      <FontScaleProvider>
       <StatusLabelsProvider>
         <Splash />
         <HashRouter>
@@ -67,6 +69,7 @@ export default function App() {
         </Routes>
         </HashRouter>
       </StatusLabelsProvider>
+      </FontScaleProvider>
     </ThemeProvider>
   )
 }

@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { FilterDrawer, FilterDrawerToggle } from './FilterDrawer'
 import { NuevoFab } from './NuevoFab'
-import { ThemeQuickToggle } from './ThemeQuickToggle'
+import { FontScaleToggle } from './FontScaleToggle'
 import { StatusWordsToggle } from './ui'
 import { AppLogo } from './AppLogo'
 import { FilterDrawerProvider } from '../hooks/useFilterDrawer'
@@ -178,7 +178,7 @@ function LayoutShell() {
           <div className="topbar-actions">
             <StatusWordsToggle />
             <FilterDrawerToggle />
-            <ThemeQuickToggle />
+            <FontScaleToggle />
           </div>
         </header>
         <main className="page">

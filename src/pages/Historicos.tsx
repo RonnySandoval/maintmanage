@@ -29,7 +29,7 @@ import {
   type Ocurrencia,
 } from '../db/types'
 import { bloqueColorVar, kindActividadVar } from '../lib/colors'
-import { formatDate, formatFechaProgramada } from '../lib/dates'
+import { formatDate, formatFechaProgramada, monthLabel, monthValue } from '../lib/dates'
 import { accionHref, estadoAgendaCorrectiva } from '../lib/acciones'
 import { actividadTitulo } from '../lib/actividades'
 import { fichaTitulo } from '../lib/fichas'
@@ -38,7 +38,7 @@ import { FichaTitle } from '../components/FichaTitle'
 import { PrioridadMark } from '../components/PrioridadMark'
 import { EjecucionModal } from '../components/EjecucionForm'
 import { ShareMenu } from '../components/ShareMenu'
-import { EmptyState, ExtraBadge, StatusBadge, StatusWordsToggle, TipoBadge } from '../components/ui'
+import { CorrectivaBadge, EmptyState, ExtraBadge, StatusBadge, StatusWordsToggle, TipoBadge } from '../components/ui'
 import { EntityCard } from '../components/EntityCard'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
 
@@ -199,9 +199,10 @@ export function HistoricosPage() {
 
   const byFechaOcc = new Map<string, typeof ocurrencias>()
   for (const o of ocurrencias) {
-    const list = byFechaOcc.get(o.fechaProgramada) ?? []
+    const key = monthValue(o.fechaProgramada)
+    const list = byFechaOcc.get(key) ?? []
     list.push(o)
-    byFechaOcc.set(o.fechaProgramada, list)
+    byFechaOcc.set(key, list)
   }
   const byActividad = new Map<string, typeof eventos>()
   for (const e of eventos) {
@@ -211,9 +212,10 @@ export function HistoricosPage() {
   }
   const byFechaEvt = new Map<string, typeof eventos>()
   for (const e of eventos) {
-    const list = byFechaEvt.get(e.fechaProgramada) ?? []
+    const key = monthValue(e.fechaProgramada)
+    const list = byFechaEvt.get(key) ?? []
     list.push(e)
-    byFechaEvt.set(e.fechaProgramada, list)
+    byFechaEvt.set(key, list)
   }
 
   const fichasOrdenadas = [...byFicha.keys()].sort((a, b) => {
@@ -534,19 +536,19 @@ export function HistoricosPage() {
                   ) : null}
                 </>
               ) : (
-                fechasOrdenadas.map((day) => {
-                  const occRows = byFechaOcc.get(day) ?? []
-                  const evtRows = byFechaEvt.get(day) ?? []
-                  const precision =
-                    fichaMap[occRows[0]?.fichaId ?? '']?.fechaPrecision === 'dia' ||
-                    actividadMap[evtRows[0]?.actividadId ?? '']?.fechaPrecision === 'dia'
-                      ? 'dia'
-                      : 'mes'
+                fechasOrdenadas.map((month) => {
+                  const occRows = byFechaOcc.get(month) ?? []
+                  const evtRows = byFechaEvt.get(month) ?? []
+                  const mixed = [
+                    ...occRows.map((o) => ({ kind: 'occ' as const, fecha: o.fechaProgramada, o })),
+                    ...evtRows.map((e) => ({ kind: 'evt' as const, fecha: e.fechaProgramada, e })),
+                  ].sort((a, b) => b.fecha.localeCompare(a.fecha))
                   return (
-                    <section key={day}>
-                      <div className="table-section">{formatFechaProgramada(day, precision)}</div>
-                      {occRows.map((o) => renderOccRow(o, false))}
-                      {evtRows.map((e) => renderEvtRow(e, false))}
+                    <section key={month}>
+                      <div className="table-section">{monthLabel(month)}</div>
+                      {mixed.map((item) =>
+                        item.kind === 'occ' ? renderOccRow(item.o, false) : renderEvtRow(item.e, false),
+                      )}
                     </section>
                   )
                 })
@@ -676,12 +678,12 @@ function EjecutadaRow({
           <span className="muted hist-occ-when">
             {fecha}
             {encargado ? ` · ${encargado.nombre}` : ''}
-            {acciones.length ? ` · ▴ ${acciones.length}` : ''}
           </span>
-          {esExtraordinaria(item) || (hideTitle && actividad) ? (
+          {esExtraordinaria(item) || (hideTitle && actividad) || acciones.length ? (
             <span className="occ-meta">
               {esExtraordinaria(item) ? <ExtraBadge /> : null}
               {hideTitle && actividad ? <TipoBadge tipo={actividad.tipo} /> : null}
+              <CorrectivaBadge count={acciones.length} />
             </span>
           ) : null}
         </Link>

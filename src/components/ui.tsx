@@ -1,12 +1,28 @@
 import type { ReactNode } from 'react'
+import { Captions, CaptionsOff } from 'lucide-react'
 import { ESTADOS, tipoActividadLabel, type EstadoOcurrencia } from '../db/types'
 import { useTiposActividad } from '../hooks/useTiposActividad'
-import { label, useAliases } from '../lib/labels'
+import { accionesTitulo, accionLabel, label, useAliases } from '../lib/labels'
 import { useStatusLabels } from '../hooks/useStatusLabels'
 import { SIMBOLO_CORRECTIVA, SIMBOLOS_ESTADO } from '../lib/simbolos'
 
 export function ExtraBadge() {
   return <span className="badge badge-extra">Extraordinaria</span>
+}
+
+export function CorrectivaBadge({ count }: { count: number }) {
+  const aliases = useAliases()
+  if (count < 1) return null
+  const text =
+    count === 1 ? accionLabel('correctiva', aliases) : `${count} ${accionesTitulo(true, aliases)}`
+  return (
+    <span className="badge badge-correctiva">
+      <span className="sym" aria-hidden>
+        {SIMBOLO_CORRECTIVA}
+      </span>
+      {text}
+    </span>
+  )
 }
 
 export function TipoBadge({ tipo }: { tipo?: string | null }) {
@@ -46,7 +62,7 @@ export function StatusWordsToggle({ className }: { className?: string }) {
       aria-label={showLabels ? 'Ocultar nombres de estado' : 'Mostrar nombres de estado'}
       title={showLabels ? 'Ocultar nombres de estado' : 'Mostrar nombres de estado'}
     >
-      Aa
+      {showLabels ? <Captions size={18} /> : <CaptionsOff size={18} />}
     </button>
   )
 }

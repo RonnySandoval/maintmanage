@@ -1,36 +1,33 @@
 import { Monitor, Moon, Sun } from 'lucide-react'
 import type { ThemeMode } from '../db/types'
-import { resolvedTheme } from '../lib/theme'
 import { useTheme } from '../hooks/useTheme'
 
-const CYCLE: ThemeMode[] = ['light', 'dark', 'system']
+const MODES: { id: ThemeMode; label: string; icon: typeof Sun }[] = [
+  { id: 'light', label: 'Claro', icon: Sun },
+  { id: 'dark', label: 'Oscuro', icon: Moon },
+  { id: 'system', label: 'Sistema', icon: Monitor },
+]
 
-const NEXT_LABEL: Record<ThemeMode, string> = {
-  light: 'Activar modo oscuro',
-  dark: 'Usar el tema del sistema',
-  system: 'Activar modo claro',
-}
-
-export function ThemeQuickToggle() {
+export function ThemeModePicker() {
   const { mode, setTheme } = useTheme()
-  const resolved = resolvedTheme(mode)
-  const next = CYCLE[(CYCLE.indexOf(mode) + 1) % CYCLE.length]
-
   return (
-    <button
-      type="button"
-      className="icon-btn"
-      aria-label={NEXT_LABEL[next]}
-      title={
-        mode === 'system'
-          ? `Tema del sistema (${resolved === 'dark' ? 'oscuro' : 'claro'})`
-          : mode === 'dark'
-            ? 'Tema oscuro'
-            : 'Tema claro'
-      }
-      onClick={() => setTheme(next)}
-    >
-      {mode === 'system' ? <Monitor size={18} /> : resolved === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-    </button>
+    <div className="seg-toggle" role="radiogroup" aria-label="Tema">
+      {MODES.map((item) => {
+        const Icon = item.icon
+        return (
+          <button
+            key={item.id}
+            type="button"
+            role="radio"
+            aria-checked={mode === item.id}
+            className={mode === item.id ? 'active' : ''}
+            onClick={() => setTheme(item.id)}
+          >
+            <Icon size={16} />
+            {item.label}
+          </button>
+        )
+      })}
+    </div>
   )
 }
