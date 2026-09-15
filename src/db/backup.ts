@@ -1,6 +1,6 @@
 import JSZip from 'jszip'
 import { withoutDataTouch } from '../lib/changeTracker'
-import { todayISO } from '../lib/dates'
+import { formatBytes, todayISO } from '../lib/dates'
 import { clearFolderHandle, getFolderHandle, saveFolderHandle } from './folderHandle'
 import { db } from './index'
 import type {
@@ -195,7 +195,11 @@ export async function readBackupFile(
   file: Blob,
 ): Promise<{ kind: BackupFileKind; payload: BackupPayload; adjuntos: Adjunto[] }> {
   const name = 'name' in file && typeof (file as File).name === 'string' ? (file as File).name.toLowerCase() : ''
-  const prefersJson = name.endsWith('.json') || file.type.includes('json')
+  const prefersJson =
+    name.endsWith('.json') ||
+    name.endsWith('.txt') ||
+    file.type.includes('json') ||
+    file.type === 'text/plain'
 
   if (prefersJson) {
     const read = await readJsonBackup(file)
@@ -292,8 +296,24 @@ export type ShareBackupResult =
   | 'unsupported'
   | 'failed'
   | 'needs-gesture'
+  | 'rejected'
 
-/** ¿El navegador permite compartir un archivo ZIP por el menú nativo? */
+export type ShareBackupOutcome = {
+  status: ShareBackupResult
+  /** Detalle técnico para diagnosticar bloqueos del navegador. */
+  detail: string
+}
+
+export type PreparedShareZip = {
+  /** Bytes ya materializados (crear File solo en el click). */
+  buffer: ArrayBuffer
+  filename: string
+  size: number
+  /** MIME permitido por Chrome Web Share (p. ej. text/plain). */
+  mime: string
+}
+
+/** ¿El navegador permite compartir un archivo de texto por el menú nativo? */
 export function canShareZipFiles(): boolean {
   const nav = navigator as Navigator & {
     share?: (data: ShareData) => Promise<void>
@@ -301,8 +321,9 @@ export function canShareZipFiles(): boolean {
   }
   if (typeof nav.share !== 'function') return false
   try {
-    const probe = new File([new Uint8Array([0x50, 0x4b])], 'maintmanage-backup.zip', {
-      type: 'application/zip',
+    // Chrome solo permite ciertas extensiones (NO .zip). .txt sí está permitido.
+    const probe = new File([new Uint8Array([0x7b, 0x7d])], 'maintmanage-backup.txt', {
+      type: 'text/plain',
     })
     if (typeof nav.canShare === 'function') {
       return nav.canShare({ files: [probe] })
@@ -313,75 +334,142 @@ export function canShareZipFiles(): boolean {
   }
 }
 
-export function backupZipAsFile(blob: Blob, filename: string): File {
-  return new File([blob], filename, {
-    type: 'application/zip',
+export function backupZipAsFile(
+  data: Blob | ArrayBuffer,
+  filename: string,
+  mime = 'application/zip',
+): File {
+  return new File([data], filename, {
+    type: mime,
     lastModified: Date.now(),
   })
 }
 
-function asShareableZipFile(blob: Blob, filename: string, mime: string): File {
-  return new File([blob], filename, { type: mime, lastModified: Date.now() })
-}
-
 /**
- * Abre el menú nativo con el archivo.
- * Debe llamarse en el manejador de click sin awaits previos (el ZIP
- * tiene que estar ya preparado); si no, Android/Chrome revoca el gesto.
+ * Abre el menú nativo con un archivo permitido por Chrome.
+ * Nota: Chrome bloquea .zip en Web Share (lista blanca); por eso compartimos .txt.
  */
-export async function shareBackupFile(file: File): Promise<ShareBackupResult> {
+export async function sharePreparedBackupZip(
+  prepared: PreparedShareZip,
+): Promise<ShareBackupOutcome> {
   const nav = navigator as Navigator & {
     share?: (data: ShareData) => Promise<void>
+    canShare?: (data: ShareData) => boolean
+    userActivation?: { isActive: boolean; hasBeenActive: boolean }
   }
-  if (typeof nav.share !== 'function') return 'unsupported'
 
-  const candidates: File[] = [
-    file,
-    asShareableZipFile(file, file.name, 'application/octet-stream'),
-    asShareableZipFile(file, file.name, 'application/x-zip-compressed'),
+  const { buffer, filename, size, mime } = prepared
+  const hadGesture = Boolean(nav.userActivation?.isActive)
+  const baseDiag = [
+    `file=${filename}`,
+    `size=${formatBytes(size)}`,
+    `mime=${mime}`,
+    `secure=${String(window.isSecureContext)}`,
+    `gestoAlInicio=${nav.userActivation ? String(hadGesture) : 'n/d'}`,
   ]
 
-  let sawNotAllowed = false
-  let sawTypeError = false
+  if (typeof nav.share !== 'function') {
+    return {
+      status: 'unsupported',
+      detail: `navigator.share no existe. ${baseDiag.join(' · ')}`,
+    }
+  }
 
-  for (const candidate of candidates) {
+  if (nav.userActivation && !hadGesture) {
+    return {
+      status: 'needs-gesture',
+      detail: `Sin gesto de usuario al inicio. ${baseDiag.join(' · ')}`,
+    }
+  }
+
+  const file = backupZipAsFile(buffer, filename, mime)
+
+  if (typeof nav.canShare === 'function') {
     try {
-      // Solo files: title/text a veces rompen el envío a WhatsApp en Android.
-      await nav.share({ files: [candidate] })
-      await markBackupDone('zip')
-      return 'shared'
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return 'cancelled'
-      if (err instanceof DOMException && err.name === 'NotAllowedError') {
-        sawNotAllowed = true
-        break
+      if (!nav.canShare({ files: [file] })) {
+        return {
+          status: 'unsupported',
+          detail: `canShare(files)=false. ${baseDiag.join(' · ')}`,
+        }
       }
-      if (err instanceof TypeError) {
-        sawTypeError = true
-        continue
+    } catch (err) {
+      return {
+        status: 'unsupported',
+        detail: `canShare lanzó ${err instanceof Error ? err.name : 'error'}. ${baseDiag.join(' · ')}`,
       }
     }
   }
 
-  if (sawNotAllowed) return 'needs-gesture'
-  if (sawTypeError) return 'unsupported'
-  return 'failed'
+  try {
+    await nav.share({ files: [file] })
+    await markBackupDone('json')
+    return { status: 'shared', detail: `OK. ${baseDiag.join(' · ')}` }
+  } catch (err) {
+    const name = err instanceof Error ? err.name : 'Error'
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn('[sharePreparedBackupZip]', name, message, filename, size)
+
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      return { status: 'cancelled', detail: `${name}: ${message}` }
+    }
+
+    if (err instanceof DOMException && err.name === 'NotAllowedError') {
+      if (!hadGesture) {
+        return {
+          status: 'needs-gesture',
+          detail: `${name}: ${message}. ${baseDiag.join(' · ')}`,
+        }
+      }
+      return {
+        status: 'rejected',
+        detail: `${name}: ${message}. ${baseDiag.join(' · ')}`,
+      }
+    }
+
+    if (err instanceof TypeError) {
+      return {
+        status: 'unsupported',
+        detail: `${name}: ${message}. ${baseDiag.join(' · ')}`,
+      }
+    }
+
+    return {
+      status: 'failed',
+      detail: `${name}: ${message}. ${baseDiag.join(' · ')}`,
+    }
+  }
 }
 
-export async function prepareBackupZipForShare(): Promise<{
-  file: File
-  filename: string
-  size: number
-}> {
-  const { blob, filename } = await exportBackupZip()
-  const file = backupZipAsFile(blob, filename)
-  return { file, filename, size: blob.size }
+/** @deprecated Prefer sharePreparedBackupZip. */
+export async function shareBackupFile(file: File): Promise<ShareBackupOutcome> {
+  const buffer = await file.arrayBuffer()
+  return sharePreparedBackupZip({
+    buffer,
+    filename: file.name,
+    size: buffer.byteLength,
+    mime: file.type || 'text/plain',
+  })
+}
+
+/**
+ * Copia compartible por Web Share: JSON en un .txt
+ * (Chrome no permite compartir .zip ni .json).
+ */
+export async function prepareBackupZipForShare(): Promise<PreparedShareZip> {
+  const { blob } = await exportBackupJson()
+  const buffer = await blob.arrayBuffer()
+  return {
+    buffer,
+    filename: `${BACKUP_JSON_NAME_PREFIX}-${todayISO()}.txt`,
+    size: buffer.byteLength,
+    mime: 'text/plain',
+  }
 }
 
 /** Un solo paso: genera el ZIP y abre el menú nativo de compartir. */
-export async function buildAndShareBackupZip(): Promise<ShareBackupResult> {
-  const { file } = await prepareBackupZipForShare()
-  return shareBackupFile(file)
+export async function buildAndShareBackupZip(): Promise<ShareBackupOutcome> {
+  const prepared = await prepareBackupZipForShare()
+  return sharePreparedBackupZip(prepared)
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {

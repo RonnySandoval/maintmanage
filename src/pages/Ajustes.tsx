@@ -25,7 +25,6 @@ import {
   backupIntervalHoursOf,
   backupIntervalMsOf,
   canUseFolderBackup,
-  canShareZipFiles,
   DEFAULT_BACKUP_INTERVAL_HOURS,
   downloadBlob,
   exportBackupJson,
@@ -40,7 +39,7 @@ import {
   pickBackupFolder,
   prepareBackupZipForShare,
   restoreFromFolder,
-  shareBackupFile,
+  sharePreparedBackupZip,
   unlinkBackupFolder,
   writeBackupToFolder,
 } from '../db/backup'
@@ -92,8 +91,12 @@ export function AjustesPage() {
   const [copiaCamino, setCopiaCamino] = useState<'carpeta' | 'zip' | 'json'>(() =>
     canUseFolderBackup() ? 'carpeta' : 'zip',
   )
-  const zipShareSupported = canShareZipFiles()
-  const shareFileRef = useRef<File | null>(null)
+  const shareZipRef = useRef<{
+    buffer: ArrayBuffer
+    filename: string
+    size: number
+    mime: string
+  } | null>(null)
   const shareStampRef = useRef<number>(-1)
   const [sharePrep, setSharePrep] = useState<'idle' | 'preparing' | 'ready' | 'error'>('idle')
   const [shareWarmKey, setShareWarmKey] = useState(0)
@@ -108,15 +111,14 @@ export function AjustesPage() {
   const caminoActivo = copiaCamino === 'carpeta' && !folderOk ? 'zip' : copiaCamino
   const dataStamp = ajustes?.lastChangedAt ?? 0
 
-  // Prepara el ZIP en segundo plano para que el click solo abra el menú nativo
-  // (si se genera el ZIP en el click, Android/Chrome pierde el gesto y falla share).
+  // Prepara el blob en segundo plano; el File se crea en el click (Android).
   useEffect(() => {
     if (tab !== 'copia' || copiaPaso !== 'guardar' || caminoActivo !== 'zip') return
 
     let cancelled = false
 
     async function warm() {
-      if (shareFileRef.current && shareStampRef.current === dataStamp) {
+      if (shareZipRef.current && shareStampRef.current === dataStamp) {
         setSharePrep('ready')
         return
       }
@@ -124,12 +126,12 @@ export function AjustesPage() {
       try {
         const prepared = await prepareBackupZipForShare()
         if (cancelled) return
-        shareFileRef.current = prepared.file
+        shareZipRef.current = prepared
         shareStampRef.current = dataStamp
         setSharePrep('ready')
       } catch {
         if (!cancelled) {
-          shareFileRef.current = null
+          shareZipRef.current = null
           setSharePrep('error')
         }
       }
@@ -142,8 +144,8 @@ export function AjustesPage() {
   }, [tab, copiaPaso, caminoActivo, dataStamp, shareWarmKey])
 
   async function shareZip() {
-    const file = shareFileRef.current
-    if (!file || sharePrep !== 'ready') {
+    const prepared = shareZipRef.current
+    if (!prepared || sharePrep !== 'ready') {
       setMessage(
         sharePrep === 'preparing'
           ? 'El ZIP se está preparando… espera un momento y pulsa de nuevo.'
@@ -152,35 +154,40 @@ export function AjustesPage() {
       return
     }
 
-    // Sin setState ni awaits previos: hace falta conservar el gesto del toque.
-    const result = await shareBackupFile(file)
+    // Sin awaits previos al share: File se crea dentro de sharePreparedBackupZip.
+    const outcome = await sharePreparedBackupZip(prepared)
+    const result = outcome.status
 
     if (result === 'cancelled') {
       setMessage('')
       return
     }
     if (result === 'shared') {
-      shareFileRef.current = null
+      shareZipRef.current = null
       shareStampRef.current = -1
       setShareWarmKey((k) => k + 1)
-      setMessage('ZIP compartido. En el otro dispositivo restáuralo con «Elegir ZIP».')
+      setMessage(
+        'Datos compartidos (sin fotos). En el otro dispositivo restáuralos con «Elegir JSON» o eligiendo el .txt.',
+      )
       return
     }
     if (result === 'needs-gesture') {
+      setMessage(`El navegador perdió el gesto del toque. Detalle: ${outcome.detail}`)
+      return
+    }
+    if (result === 'rejected') {
       setMessage(
-        'El navegador bloqueó el menú de compartir. Espera a ver el botón listo y pulsa de nuevo sin cambiar de pantalla.',
+        `No se pudo compartir. Usa «Descargar ZIP» (completo con fotos) y adjúntalo desde Descargas. Detalle: ${outcome.detail}`,
       )
       return
     }
     if (result === 'unsupported') {
       setMessage(
-        'Este navegador no puede adjuntar un ZIP al menú de compartir. Usa «Descargar ZIP» y adjúntalo en WhatsApp.',
+        `No se puede compartir este ZIP en este navegador. Usa «Descargar ZIP». Detalle: ${outcome.detail}`,
       )
       return
     }
-    setMessage(
-      'No se pudo abrir el menú de compartir. Usa «Descargar ZIP» y adjúntalo en WhatsApp.',
-    )
+    setMessage(`No se pudo abrir el menú de compartir. Detalle: ${outcome.detail}`)
   }
 
   async function loadQuota() {
@@ -212,7 +219,7 @@ export function AjustesPage() {
       const { blob, filename } = await exportBackupZip()
       downloadBlob(blob, filename)
       await markBackupDone('zip')
-      shareFileRef.current = null
+      shareZipRef.current = null
       shareStampRef.current = -1
       setShareWarmKey((k) => k + 1)
       setMessage(
@@ -622,33 +629,32 @@ export function AjustesPage() {
                       void shareZip()
                       return
                     }
-                    shareFileRef.current = null
+                    shareZipRef.current = null
                     shareStampRef.current = -1
                     setShareWarmKey((k) => k + 1)
                   }}
-                  title={
-                    zipShareSupported
-                      ? 'Abre el menú nativo con el ZIP ya preparado'
-                      : 'En este navegador puede no estar disponible; usa Descargar ZIP'
-                  }
+                  title="Chrome no permite compartir .zip; envía los datos (sin fotos) por WhatsApp"
                 >
                   <Share2 size={16} />
                   {sharePrep === 'preparing'
                     ? 'Preparando…'
                     : sharePrep === 'ready'
-                      ? 'Compartir ZIP'
+                      ? 'Compartir datos'
                       : sharePrep === 'error'
                         ? 'Reintentar preparar'
-                        : 'Compartir ZIP'}
+                        : 'Compartir datos'}
                 </button>
               </div>
             ) : null}
 
             {copiaPaso === 'guardar' && caminoActivo === 'zip' && sharePrep === 'ready' ? (
-              <p className="muted backup-camino-hint">ZIP listo: al pulsar «Compartir ZIP» se abre el menú para enviarlo.</p>
+              <p className="muted backup-camino-hint">
+                Chrome bloquea compartir archivos .zip. «Compartir datos» envía la copia sin fotos
+                por WhatsApp. Para fotos usa «Descargar ZIP» y adjúntalo desde Descargas.
+              </p>
             ) : null}
             {copiaPaso === 'guardar' && caminoActivo === 'zip' && sharePrep === 'preparing' ? (
-              <p className="muted backup-camino-hint">Preparando ZIP en segundo plano…</p>
+              <p className="muted backup-camino-hint">Preparando datos para compartir…</p>
             ) : null}
 
             {copiaPaso === 'guardar' && caminoActivo === 'json' ? (
