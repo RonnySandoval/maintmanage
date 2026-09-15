@@ -66,7 +66,7 @@ function isCurrentGmailBackup(
   return lastChangedAt <= lastBackupAt
 }
 
-export function GoogleAccountPanel() {
+export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } = {}) {
   const auth = useGoogleAuth()
   const ajustes = useLiveQuery(() => db.ajustes.get('app'))
   const { session, run, dismiss } = useDataProcess()
@@ -190,19 +190,8 @@ export function GoogleAccountPanel() {
     }
   }
 
-  return (
+  const body = (
     <>
-      <DataProcessOverlay session={session} onDismiss={dismiss} />
-      <EntityCard
-        title={
-          <h2 className="title-sm">
-            <span className="accordion-label">
-              {connected ? <Cloud size={16} /> : <CloudOff size={16} />}
-              Cuenta Google
-            </span>
-          </h2>
-        }
-      >
         <p className="backup-status-line muted">{statusLabel(auth.status, auth.email)}</p>
         {!auth.configured ? (
           <p className="muted" style={{ marginTop: 0 }}>
@@ -380,7 +369,28 @@ export function GoogleAccountPanel() {
             {localError || auth.error}
           </div>
         ) : null}
-      </EntityCard>
+    </>
+  )
+
+  return (
+    <>
+      <DataProcessOverlay session={session} onDismiss={dismiss} />
+      {embedded ? (
+        body
+      ) : (
+        <EntityCard
+          title={
+            <h2 className="title-sm">
+              <span className="accordion-label">
+                {connected ? <Cloud size={16} /> : <CloudOff size={16} />}
+                Cuenta Google
+              </span>
+            </h2>
+          }
+        >
+          {body}
+        </EntityCard>
+      )}
     </>
   )
 }

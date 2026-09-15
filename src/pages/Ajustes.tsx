@@ -5,6 +5,8 @@ import {
   Bell,
   ChevronDown,
   CircleHelp,
+  Clock,
+  Cloud,
   DatabaseBackup,
   Download,
   FileJson,
@@ -69,18 +71,18 @@ import {
   SAVE_BACKUP_STEPS,
 } from '../lib/dataProcess'
 
-type AjustesTab = 'copia' | 'nombres' | 'avisos' | 'estados' | 'acerca'
+type AjustesTab = 'gmail' | 'copia' | 'programa' | 'nombres' | 'avisos' | 'estados' | 'acerca'
 
-const AJUSTES_TABS: { id: AjustesTab; label: string; icon: LucideIcon }[] = [
-  { id: 'copia', label: 'Copia', icon: DatabaseBackup },
-  { id: 'nombres', label: 'Nombres', icon: Type },
-  { id: 'avisos', label: 'Avisos', icon: Bell },
-  { id: 'estados', label: 'Estados', icon: CircleHelp },
-  { id: 'acerca', label: 'Acerca', icon: Info },
-]
-
-function tabFromParam(value: string | null): AjustesTab {
-  if (value === 'nombres' || value === 'avisos' || value === 'estados' || value === 'acerca') {
+function tabFromParam(value: string | null): AjustesTab | null {
+  if (value === 'none') return null
+  if (
+    value === 'gmail' ||
+    value === 'programa' ||
+    value === 'nombres' ||
+    value === 'avisos' ||
+    value === 'estados' ||
+    value === 'acerca'
+  ) {
     return value
   }
   return 'copia'
@@ -472,11 +474,20 @@ export function AjustesPage() {
     )
   }
 
-  function setTab(next: AjustesTab) {
+  function setTab(next: AjustesTab | null) {
     const nextParams = new URLSearchParams(params)
-    if (next === 'copia') nextParams.delete('tab')
-    else nextParams.set('tab', next)
+    if (!next || next === 'copia') {
+      if (!next) nextParams.set('tab', 'none')
+      else nextParams.delete('tab')
+    } else {
+      nextParams.set('tab', next)
+    }
     setParams(nextParams, { replace: true })
+  }
+
+  function toggleSection(next: AjustesTab) {
+    setTab(tab === next ? null : next)
+    setMessage('')
   }
 
   return (
@@ -497,81 +508,23 @@ export function AjustesPage() {
         badge={<ThemeModePicker />}
       />
 
-      <div className="seg-toggle tabs-5 icon-only" role="tablist" aria-label="Secciones de ajustes">
-        {AJUSTES_TABS.map((item) => {
-          const Icon = item.icon
-          return (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === item.id}
-              aria-label={item.label}
-              title={item.label}
-              className={tab === item.id ? 'active' : ''}
-              onClick={() => setTab(item.id)}
-            >
-              <Icon size={16} />
-            </button>
-          )
-        })}
-      </div>
+      <SettingsAccordion
+        title="Copia en Google"
+        icon={Cloud}
+        summary="Gmail entre dispositivos"
+        open={tab === 'gmail'}
+        onToggle={() => toggleSection('gmail')}
+      >
+        <GoogleAccountPanel embedded />
+      </SettingsAccordion>
 
-      {tab === 'avisos' ? (
-        <EntityCard
-          title={
-            <h2 className="title-sm">
-              <span className="accordion-label">
-                <Bell size={16} />
-                Avisos e instalación
-              </span>
-            </h2>
-          }
-          footer={
-            <div className="row card-toolbar-actions">
-              <button type="button" className="btn" onClick={() => void enableNotifs()}>
-                <Bell size={16} />
-                {ajustes?.notificaciones ? 'Volver a pedir permiso' : 'Activar avisos'}
-              </button>
-              {!installed && canInstall ? (
-                <button type="button" className="btn btn-primary" onClick={() => void install()}>
-                  <Smartphone size={16} />
-                  Instalar
-                </button>
-              ) : null}
-            </div>
-          }
-        >
-          <p className="muted">
-            Sin servidor no hay avisos con la app cerrada. Al abrirla se puede notificar vencidas o
-            pendientes del mes, una vez al día.
-          </p>
-          {installed ? (
-            <p className="muted">La app ya está en modo instalado (PWA).</p>
-          ) : canInstall ? null : (
-            <p className="muted">
-              En el móvil: menú → <strong>Añadir a pantalla de inicio</strong>. En el PC: icono de
-              instalar en la barra de direcciones.
-            </p>
-          )}
-          {message ? <div className="hint">{message}</div> : null}
-        </EntityCard>
-      ) : null}
-
-      {tab === 'copia' ? (
-        <>
-          <GoogleAccountPanel />
-
-          <EntityCard
-            title={
-              <h2 className="title-sm">
-                <span className="accordion-label">
-                  <DatabaseBackup size={16} />
-                  Copia de seguridad
-                </span>
-              </h2>
-            }
-          >
+      <SettingsAccordion
+        title="Copia local"
+        icon={DatabaseBackup}
+        summary="Carpeta, ZIP o JSON"
+        open={tab === 'copia'}
+        onToggle={() => toggleSection('copia')}
+      >
             <p className="backup-status-line muted">
               Última:{' '}
               <strong>
@@ -853,10 +806,16 @@ export function AjustesPage() {
               </div>
             ) : null}
 
-            {message ? <div className="hint">{message}</div> : null}
-          </EntityCard>
+            {message && tab === 'copia' ? <div className="hint">{message}</div> : null}
+      </SettingsAccordion>
 
-          <SettingsAccordion title="Programación automática" icon={DatabaseBackup} summary="Intervalo y próxima copia">
+      <SettingsAccordion
+        title="Programación automática"
+        icon={Clock}
+        summary="Intervalo y próxima copia"
+        open={tab === 'programa'}
+        onToggle={() => toggleSection('programa')}
+      >
             <div className="backup-fields">
               <div className="field">
                 <label htmlFor="backup-interval">Intervalo (horas)</label>
@@ -904,21 +863,15 @@ export function AjustesPage() {
               Ver espacio usado
             </button>
             {quota ? <p className="muted">{quota}</p> : null}
-          </SettingsAccordion>
-        </>
-      ) : null}
+      </SettingsAccordion>
 
-      {tab === 'nombres' ? (
-        <EntityCard
-          title={
-            <h2 className="title-sm">
-              <span className="accordion-label">
-                <Type size={16} />
-                Nombres en la app
-              </span>
-            </h2>
-          }
-        >
+      <SettingsAccordion
+        title="Nombres en la app"
+        icon={Type}
+        summary="Etiquetas y textos"
+        open={tab === 'nombres'}
+        onToggle={() => toggleSection('nombres')}
+      >
           <p className="muted">
             Se respeta mayúsculas y minúsculas. Vacío + salir del campo = nombre original.
           </p>
@@ -954,20 +907,49 @@ export function AjustesPage() {
               </div>
             ))}
           </div>
-        </EntityCard>
-      ) : null}
+      </SettingsAccordion>
 
-      {tab === 'estados' ? (
-        <EntityCard
-          title={
-            <h2 className="title-sm">
-              <span className="accordion-label">
-                <CircleHelp size={16} />
-                Estados de la ficha
-              </span>
-            </h2>
-          }
-        >
+      <SettingsAccordion
+        title="Avisos e instalación"
+        icon={Bell}
+        summary="Notificaciones y PWA"
+        open={tab === 'avisos'}
+        onToggle={() => toggleSection('avisos')}
+      >
+          <p className="muted">
+            Sin servidor no hay avisos con la app cerrada. Al abrirla se puede notificar vencidas o
+            pendientes del mes, una vez al día.
+          </p>
+          {installed ? (
+            <p className="muted">La app ya está en modo instalado (PWA).</p>
+          ) : canInstall ? null : (
+            <p className="muted">
+              En el móvil: menú → <strong>Añadir a pantalla de inicio</strong>. En el PC: icono de
+              instalar en la barra de direcciones.
+            </p>
+          )}
+          <div className="row card-toolbar-actions" style={{ marginTop: '0.55rem' }}>
+            <button type="button" className="btn" onClick={() => void enableNotifs()}>
+              <Bell size={16} />
+              {ajustes?.notificaciones ? 'Volver a pedir permiso' : 'Activar avisos'}
+            </button>
+            {!installed && canInstall ? (
+              <button type="button" className="btn btn-primary" onClick={() => void install()}>
+                <Smartphone size={16} />
+                Instalar
+              </button>
+            ) : null}
+          </div>
+          {message && tab === 'avisos' ? <div className="hint">{message}</div> : null}
+      </SettingsAccordion>
+
+      <SettingsAccordion
+        title="Estados de la ficha"
+        icon={CircleHelp}
+        summary="Pendiente, vencida…"
+        open={tab === 'estados'}
+        onToggle={() => toggleSection('estados')}
+      >
           <ul className="estado-help">
             <li>
               <strong>Pendiente</strong> — del mes actual y aún no ejecutada.
@@ -987,28 +969,22 @@ export function AjustesPage() {
               <strong>Ejecutada</strong> — registrada como hecha.
             </li>
           </ul>
-        </EntityCard>
-      ) : null}
+      </SettingsAccordion>
 
-      {tab === 'acerca' ? (
-        <EntityCard
-          title={
-            <h2 className="title-sm">
-              <span className="accordion-label">
-                <Info size={16} />
-                Acerca de
-              </span>
-            </h2>
-          }
-        >
+      <SettingsAccordion
+        title="Acerca de"
+        icon={Info}
+        summary="Cómo funciona la app"
+        open={tab === 'acerca'}
+        onToggle={() => toggleSection('acerca')}
+      >
           <p className="muted">
             MaintManage funciona sin servidor. GitHub Pages solo entrega la aplicación. La copia
             vive en la carpeta, el ZIP o el JSON que elijas. El ZIP y la carpeta incluyen fotos; el
             JSON solo datos. Fotos y documentos grandes ocupan cuota del navegador. Word se
             almacena; la vista previa rica no está incluida. iOS comparte peor archivos que Android.
           </p>
-        </EntityCard>
-      ) : null}
+      </SettingsAccordion>
     </div>
     </>
   )
@@ -1018,25 +994,26 @@ function SettingsAccordion({
   title,
   icon: Icon,
   summary,
-  defaultOpen = false,
+  open,
+  onToggle,
   children,
 }: {
   title: string
   icon?: LucideIcon
   summary?: string
-  defaultOpen?: boolean
+  open: boolean
+  onToggle: () => void
   children: ReactNode
 }) {
-  const [open, setOpen] = useState(defaultOpen)
   return (
     <EntityCard
-      className={`accordion-panel${open ? '' : ' is-collapsed'}`}
+      className={`accordion-panel ajustes-section${open ? '' : ' is-collapsed'}`}
       title={
         <button
           type="button"
           className="accordion-trigger ajustes-accordion-trigger"
           aria-expanded={open}
-          onClick={() => setOpen((was) => !was)}
+          onClick={onToggle}
         >
           <span className="accordion-label">
             {Icon ? <Icon size={16} /> : null}
@@ -1054,7 +1031,7 @@ function SettingsAccordion({
         </button>
       }
     >
-      {open ? children : null}
+      {open ? <div className="accordion-body ajustes-accordion-body">{children}</div> : null}
     </EntityCard>
   )
 }

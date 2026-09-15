@@ -2393,6 +2393,23 @@ a.icon-btn:hover {
   border-radius: 8px;
 }
 
+.ajustes-page {
+  gap: 0.55rem;
+}
+
+.ajustes-section.entity-card.card {
+  gap: 0;
+}
+
+.ajustes-section.is-collapsed.entity-card.card {
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
+}
+
+.ajustes-accordion-body {
+  padding-top: 0.15rem;
+}
+
 .ajustes-apariencia.is-inline {
   padding-block: 0.65rem;
 }

@@ -328,7 +328,7 @@ Ciclo de `run()`:
 |---------|-----------------|
 | `config.ts` | Resolución Client ID (env → json → bundled) |
 | `bundledClientId.ts` | ID embebido para PWA cacheada en Pages |
-| `GoogleAuth.ts` | GIS Token model, token en memoria |
+| `GoogleAuth.ts` | GIS Token model; access token en localStorage hasta caducar |
 | `GmailClient.ts` | Fetch wrapper Gmail REST v1 |
 | `mime.ts` | Construcción MIME multipart para insert |
 | `GmailBackupProvider.ts` | Implementación `BackupProvider` |
@@ -395,7 +395,7 @@ CI: secret `VITE_GOOGLE_CLIENT_ID` en `.github/workflows/deploy.yml`.
 | `origin_mismatch` | Origen no registrado | Añadir origen exacto (sin `/maintmanage`) |
 | `access_denied` 403 | Usuario no tester | Añadir en OAuth consent screen |
 | «Copia en Google no configurada» en móvil | PWA con JS viejo | Forzar actualización / reinstalar PWA |
-| Token caducado (~1 h) | Sin refresh token (by design) | «Volver a conectar» |
+| Token caducado (~1 h) | Sin refresh token (by design) | «Volver a conectar» (la recarga no desconecta si el token sigue válido) |
 
 ---
 
@@ -403,7 +403,7 @@ CI: secret `VITE_GOOGLE_CLIENT_ID` en `.github/workflows/deploy.yml`.
 
 | Tema | Decisión |
 |------|----------|
-| OAuth | GIS Token model — **sin** refresh token, **sin** backend |
+| OAuth | GIS Token model — **sin** refresh token, **sin** backend; sesión persistida en `localStorage` (~1 h) |
 | Tamaño Gmail | Hard max ~24 MB; warn ~18 MB |
 | Cifrado | No (Fase 8 opcional: AES-GCM) |
 | Retención Gmail | No se borran copias antiguas automáticamente (futuro: últimos N) |

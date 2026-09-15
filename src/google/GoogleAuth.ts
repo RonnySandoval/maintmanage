@@ -1,6 +1,10 @@
 import { getGoogleClientId, isGoogleAuthConfigured } from './config'
 import { loadGis } from './loadGis'
 import {
+  createLocalGoogleSessionStore,
+  type GoogleSessionStore,
+} from './sessionStore'
+import {
   GOOGLE_BACKUP_SCOPES,
   type GoogleAuthSnapshot,
   type GoogleAuthStatus,
@@ -14,6 +18,8 @@ export type GoogleAuthDeps = {
   loadApi?: () => Promise<GoogleIdentityApi>
   fetchEmail?: (accessToken: string) => Promise<string | null>
   now?: () => number
+  /** Persistencia del access token entre recargas. Por defecto localStorage. */
+  sessionStore?: GoogleSessionStore
 }
 
 const DEFAULT_SKEW_MS = 60_000
@@ -48,7 +54,8 @@ function friendlyAuthError(code?: string, description?: string): string {
 
 /**
  * Autenticación Google (GIS Token model) sin servidor ni refresh token.
- * El access token vive solo en memoria.
+ * El access token se guarda en localStorage para sobrevivir a recargas
+ * hasta que expire (~1 h).
  */
 export class GoogleAuth {
   private status: GoogleAuthStatus = 'disconnected'
@@ -56,6 +63,8 @@ export class GoogleAuth {
   private accessToken: string | null = null
   private expiresAt: number | null = null
   private error: string | null = null
+  /** Ya hubo un consentimiento previo en este dispositivo (evita prompt agresivo). */
+  private hadConsent = false
   private listeners = new Set<() => void>()
   private tokenClient: GoogleTokenClient | null = null
   private cachedSnapshot: GoogleAuthSnapshot | null = null
@@ -67,9 +76,12 @@ export class GoogleAuth {
       loadApi: deps.loadApi ?? loadGis,
       fetchEmail: deps.fetchEmail ?? defaultFetchEmail,
       now: deps.now ?? (() => Date.now()),
+      sessionStore: deps.sessionStore ?? createLocalGoogleSessionStore(),
     }
     if (!this.deps.getClientId()) {
       this.status = 'unavailable'
+    } else {
+      this.restoreSession()
     }
   }
 
@@ -82,13 +94,14 @@ export class GoogleAuth {
   refreshConfiguration(): void {
     if (this.deps.getClientId()) {
       if (this.status === 'unavailable') {
-        this.setState({ status: 'disconnected', error: null })
-      } else {
-        this.cachedSnapshot = null
-        for (const listener of this.listeners) listener()
+        this.status = 'disconnected'
+        this.error = null
+        this.restoreSession()
       }
+      this.cachedSnapshot = null
+      for (const listener of this.listeners) listener()
     } else if (this.status !== 'unavailable') {
-      this.clearToken({ status: 'unavailable', error: null })
+      this.clearToken({ status: 'unavailable', error: null, clearStorage: false })
     }
   }
 
@@ -132,7 +145,7 @@ export class GoogleAuth {
     return Boolean(this.accessToken) && !this.isTokenExpired()
   }
 
-  /** Access token en memoria, o null si no hay / expiró. */
+  /** Access token válido, o null si no hay / expiró. */
   getAccessToken(): string | null {
     if (!this.accessToken || this.isTokenExpired()) return null
     return this.accessToken
@@ -186,20 +199,22 @@ export class GoogleAuth {
           },
           error_callback: (err) => {
             const message = friendlyAuthError(err.type, err.message)
-            this.clearToken({ status: 'error', error: message })
+            this.clearToken({ status: 'error', error: message, clearStorage: false })
             finish(() => reject(new Error(message)))
           },
         })
 
+        // Primera vez: consent. Si ya hubo sesión en este dispositivo, prompt vacío
+        // (GIS reutiliza el grant sin pantalla completa).
         this.tokenClient.requestAccessToken({
-          prompt: this.isAuthenticated() ? '' : 'consent',
+          prompt: this.hadConsent || this.email ? '' : 'consent',
         })
       })
     } catch (err) {
       if (this.status === 'connecting') {
         const message =
           err instanceof Error ? err.message : 'No se pudo conectar con Google.'
-        this.clearToken({ status: 'error', error: message })
+        this.clearToken({ status: 'error', error: message, clearStorage: false })
       }
       throw err instanceof Error ? err : new Error(String(err))
     }
@@ -207,7 +222,8 @@ export class GoogleAuth {
 
   async disconnect(): Promise<void> {
     const token = this.accessToken
-    this.clearToken({ status: 'disconnected', error: null })
+    this.clearToken({ status: 'disconnected', error: null, clearStorage: true })
+    this.hadConsent = false
     if (!token) return
     try {
       const api = await this.deps.loadApi()
@@ -221,10 +237,40 @@ export class GoogleAuth {
     }
   }
 
+  private restoreSession(): void {
+    const stored = this.deps.sessionStore.load()
+    if (!stored) return
+
+    this.hadConsent = true
+    this.email = stored.email
+    this.expiresAt = stored.expiresAt
+    this.accessToken = stored.accessToken
+
+    if (this.isTokenExpired()) {
+      this.accessToken = null
+      this.status = 'expired'
+      this.error = null
+      // Conservamos email/expiresAt en storage para «Volver a conectar».
+      return
+    }
+
+    this.status = 'connected'
+    this.error = null
+  }
+
+  private persistSession(): void {
+    if (!this.accessToken || !this.expiresAt) return
+    this.deps.sessionStore.save({
+      accessToken: this.accessToken,
+      expiresAt: this.expiresAt,
+      email: this.email,
+    })
+  }
+
   private async handleTokenResponse(response: GoogleTokenResponse): Promise<void> {
     if (response.error || !response.access_token) {
       const message = friendlyAuthError(response.error, response.error_description)
-      this.clearToken({ status: 'error', error: message })
+      this.clearToken({ status: 'error', error: message, clearStorage: false })
       throw new Error(message)
     }
 
@@ -238,6 +284,8 @@ export class GoogleAuth {
     this.accessToken = response.access_token
     this.expiresAt = expiresAt
     this.email = email
+    this.hadConsent = true
+    this.persistSession()
     this.setState({ status: 'connected', error: null })
   }
 
@@ -246,11 +294,18 @@ export class GoogleAuth {
     return this.deps.now() >= this.expiresAt - DEFAULT_SKEW_MS
   }
 
-  private clearToken(partial: { status: GoogleAuthStatus; error: string | null }): void {
+  private clearToken(partial: {
+    status: GoogleAuthStatus
+    error: string | null
+    clearStorage: boolean
+  }): void {
     this.accessToken = null
     this.expiresAt = null
     if (partial.status === 'disconnected' || partial.status === 'unavailable') {
       this.email = null
+    }
+    if (partial.clearStorage) {
+      this.deps.sessionStore.clear()
     }
     this.setState(partial)
   }
