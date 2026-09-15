@@ -1,22 +1,17 @@
-import JSZip from 'jszip'
+import {
+  packAndVerify,
+  replaceWithRollback,
+  rollbackUserMessage,
+  unpackBackupZip,
+  type BackupPayload,
+} from '../backup'
 import { withoutDataTouch } from '../lib/changeTracker'
 import { formatBytes, todayISO } from '../lib/dates'
 import { clearFolderHandle, getFolderHandle, saveFolderHandle } from './folderHandle'
 import { db } from './index'
-import type {
-  AccionCorrectiva,
-  Actividad,
-  Adjunto,
-  Ajustes,
-  Encargado,
-  Ejecucion,
-  Evento,
-  Bloque,
-  Ficha,
-  Ocurrencia,
-} from './types'
+import type { Adjunto, Ajustes } from './types'
 
-type AdjuntoMeta = Omit<Adjunto, 'blob'>
+export type { BackupPayload, AdjuntoMeta } from '../backup'
 
 export const BACKUP_FILE_NAME = 'maintmanage-backup.zip'
 export const BACKUP_JSON_NAME_PREFIX = 'maintmanage'
@@ -26,11 +21,12 @@ export const MIN_BACKUP_INTERVAL_HOURS = 1
 export const MAX_BACKUP_INTERVAL_HOURS = 168
 
 export type BackupFileKind = 'zip' | 'json'
-export type BackupSaveKind = 'folder' | BackupFileKind | 'download'
+export type BackupSaveKind = 'folder' | BackupFileKind | 'download' | 'gmail'
 
 export function backupKindLabel(kind?: string | null): string {
   if (kind === 'folder') return 'carpeta'
   if (kind === 'json') return 'JSON'
+  if (kind === 'gmail') return 'Google'
   if (kind === 'zip' || kind === 'download') return 'ZIP'
   return ''
 }
@@ -51,22 +47,6 @@ export function nextBackupAtOf(
   if (ajustes?.nextBackupAt && ajustes.nextBackupAt > 0) return ajustes.nextBackupAt
   if (ajustes?.lastBackupAt) return ajustes.lastBackupAt + backupIntervalMsOf(ajustes.backupIntervalHours)
   return now
-}
-
-export interface BackupPayload {
-  version: 1
-  exportedAt: string
-  encargados: Encargado[]
-  grupos: Bloque[]
-  bloques?: Bloque[]
-  fichas: Ficha[]
-  ocurrencias: Ocurrencia[]
-  ejecuciones: Ejecucion[]
-  accionesCorrectivas: AccionCorrectiva[]
-  actividades?: Actividad[]
-  eventos?: Evento[]
-  ajustes: Ajustes[]
-  adjuntosMeta: AdjuntoMeta[]
 }
 
 export function canUseFolderBackup(): boolean {
@@ -125,27 +105,15 @@ async function buildPayload(): Promise<{ payload: BackupPayload; adjuntos: Adjun
   return { payload, adjuntos }
 }
 
-function assertPayload(payload: BackupPayload): void {
-  if (!payload || payload.version !== 1) {
-    throw new Error('Versión de copia no compatible.')
-  }
-}
-
 export async function exportBackup(): Promise<{ blob: Blob; filename: string }> {
   return exportBackupZip()
 }
 
-/** ZIP completo: datos + fotos/documentos. */
+/** ZIP completo: datos + fotos/documentos + manifest/checksum (verificado). */
 export async function exportBackupZip(): Promise<{ blob: Blob; filename: string }> {
   const { payload, adjuntos } = await buildPayload()
-  const zip = new JSZip()
-  zip.file('backup.json', JSON.stringify(payload))
-  const folder = zip.folder('files')
-  for (const adjunto of adjuntos) {
-    folder?.file(adjunto.id, adjunto.blob)
-  }
-  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' })
-  return { blob, filename: `${BACKUP_JSON_NAME_PREFIX}-${todayISO()}.zip` }
+  const { packed } = await packAndVerify(payload, adjuntos, { kind: 'manual' })
+  return { blob: packed.blob, filename: `${BACKUP_JSON_NAME_PREFIX}-${todayISO()}.zip` }
 }
 
 /** JSON ligero: solo datos (sin fotos ni documentos). */
@@ -156,31 +124,16 @@ export async function exportBackupJson(): Promise<{ blob: Blob; filename: string
 }
 
 async function readZipBackup(file: Blob): Promise<{ payload: BackupPayload; adjuntos: Adjunto[] }> {
-  const zip = await JSZip.loadAsync(file)
-  const jsonFile = zip.file('backup.json')
-  if (!jsonFile) {
-    throw new Error('El ZIP no es una copia de MaintManage (falta backup.json).')
-  }
-  const payload = JSON.parse(await jsonFile.async('string')) as BackupPayload
-  assertPayload(payload)
-
-  const adjuntos: Adjunto[] = []
-  for (const meta of payload.adjuntosMeta ?? []) {
-    const entry = zip.file(`files/${meta.id}`)
-    let blob: Blob = new Blob([], { type: meta.mimeType })
-    if (entry) {
-      const buffer = await entry.async('arraybuffer')
-      blob = new Blob([buffer], { type: meta.mimeType })
-    }
-    adjuntos.push({ ...meta, blob })
-  }
-  return { payload, adjuntos }
+  const unpacked = await unpackBackupZip(file)
+  return { payload: unpacked.payload, adjuntos: unpacked.adjuntos }
 }
 
 async function readJsonBackup(file: Blob): Promise<{ payload: BackupPayload; adjuntos: Adjunto[] }> {
   const text = await file.text()
   const payload = JSON.parse(text) as BackupPayload
-  assertPayload(payload)
+  if (!payload || payload.version !== 1) {
+    throw new Error('Versión de copia no compatible.')
+  }
   return { payload, adjuntos: [] }
 }
 
@@ -286,7 +239,30 @@ async function applyBackupPayload(
 
 export async function importBackup(file: Blob, mode: 'replace' | 'merge'): Promise<BackupFileKind> {
   const { kind, payload, adjuntos } = await readBackupFile(file)
-  await applyBackupPayload(payload, adjuntos, mode)
+
+  if (mode === 'merge') {
+    await applyBackupPayload(payload, adjuntos, mode)
+    return kind
+  }
+
+  const needsSnapshot = await hasUserData()
+  const result = await replaceWithRollback({
+    needsSnapshot,
+    createSnapshotBlob: async () => {
+      const current = await buildPayload()
+      const { packed } = await packAndVerify(current.payload, current.adjuntos, { kind: 'manual' })
+      return packed.blob
+    },
+    applyIncoming: () => applyBackupPayload(payload, adjuntos, 'replace'),
+    restoreSnapshotBlob: async (blob) => {
+      const unpacked = await unpackBackupZip(blob, { requireManifest: true })
+      await applyBackupPayload(unpacked.payload, unpacked.adjuntos, 'replace')
+    },
+  })
+
+  if (result.status !== 'applied') {
+    throw new Error(rollbackUserMessage(result))
+  }
   return kind
 }
 

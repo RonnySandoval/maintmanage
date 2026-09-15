@@ -167,7 +167,7 @@ export interface Ajustes {
   /** Última mutación de datos de usuario (fichas, fotos, etc.). */
   lastChangedAt?: number
   lastBackupAt?: number
-  lastBackupKind?: 'folder' | 'zip' | 'json' | 'download'
+  lastBackupKind?: 'folder' | 'zip' | 'json' | 'download' | 'gmail'
   backupFolderName?: string
   /** Tipos de actividad añadidos por el usuario. */
   tiposActividad?: TipoActividadDef[]

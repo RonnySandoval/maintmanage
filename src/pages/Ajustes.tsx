@@ -56,6 +56,7 @@ import {
 } from '../lib/labels'
 import { requestNotificaciones } from '../lib/notifications'
 import { EntityCard } from '../components/EntityCard'
+import { GoogleAccountPanel } from '../components/GoogleAccountPanel'
 import { ThemeModePicker } from '../components/ThemeQuickToggle'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 
@@ -483,6 +484,8 @@ export function AjustesPage() {
 
       {tab === 'copia' ? (
         <>
+          <GoogleAccountPanel />
+
           <EntityCard
             title={
               <h2 className="title-sm">
