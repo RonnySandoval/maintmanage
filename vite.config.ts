@@ -17,6 +17,7 @@ export default defineConfig({
         'pwa-192.png',
         'pwa-512.png',
         'pwa-512-maskable.png',
+        'google-oauth.json',
       ],
       manifest: {
         name: 'MaintManage',
