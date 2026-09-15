@@ -28,21 +28,38 @@ export function fileKind(mime: string, nombre: string): 'image' | 'pdf' | 'word'
 export async function saveAdjuntos(
   files: File[],
   opts: { tipo: TipoAdjunto; fichaId?: string; actividadId?: string; ejecucionId?: string },
-): Promise<void> {
+): Promise<string[]> {
   const now = Date.now()
-  await db.adjuntos.bulkAdd(
-    files.map((file) => ({
-      id: createId(),
-      blob: file,
-      mimeType: file.type || 'application/octet-stream',
-      nombre: file.name,
-      fichaId: opts.fichaId,
-      actividadId: opts.actividadId,
-      ejecucionId: opts.ejecucionId,
-      tipo: opts.tipo,
-      createdAt: now,
-    })),
-  )
+  const rows = files.map((file) => ({
+    id: createId(),
+    blob: file,
+    mimeType: file.type || 'application/octet-stream',
+    nombre: file.name,
+    fichaId: opts.fichaId,
+    actividadId: opts.actividadId,
+    ejecucionId: opts.ejecucionId,
+    tipo: opts.tipo,
+    createdAt: now,
+  }))
+  await db.adjuntos.bulkAdd(rows)
+  return rows.map((row) => row.id)
+}
+
+/** Asigna o quita ficha de un adjunto (manual ↔ ficha). */
+export async function setAdjuntoFicha(id: string, fichaId: string | undefined): Promise<void> {
+  const adjunto = await db.adjuntos.get(id)
+  if (!adjunto) return
+  if (fichaId) {
+    await db.adjuntos.put({
+      ...adjunto,
+      fichaId,
+      tipo: adjunto.tipo === 'actividad' || adjunto.tipo === 'ejecucion' ? adjunto.tipo : 'ficha',
+    })
+    return
+  }
+  const next = { ...adjunto, tipo: 'manual' as const }
+  delete next.fichaId
+  await db.adjuntos.put(next)
 }
 
 export function openBlob(blob: Blob, nombre: string): void {

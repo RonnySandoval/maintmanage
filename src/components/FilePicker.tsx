@@ -153,10 +153,6 @@ export function FilePicker({
           />
         </label>
       </div>
-      <p className="muted file-picker-hint">
-        Elegir de galería (también fotos de WhatsApp). No se abre el chat: las imágenes compartidas
-        están en la galería del teléfono.
-      </p>
       {files?.length ? <PendingFileThumbs files={files} onRemove={onRemoveFile} /> : null}
     </div>
   )

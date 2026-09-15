@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { Ban, PanelRight, PanelRightClose } from 'lucide-react'
 import { useFilterDrawer } from '../hooks/useFilterDrawer'
+import { useOverlayPresence } from '../hooks/useOverlayPresence'
 
 export function FilterDrawerToggle() {
   const { available, open, toggle } = useFilterDrawer()
@@ -22,13 +24,23 @@ export function FilterDrawer() {
   const { available, open, title, tools, onClear, canClear, activeTool, setActiveTool } =
     useFilterDrawer()
   const current = tools.find((tool) => tool.id === activeTool)
+  const flyoutOpen = Boolean(available && open && current?.content)
+  const { mounted: flyoutMounted, shown: flyoutShown, onTransitionEnd } =
+    useOverlayPresence(flyoutOpen)
+  const [cached, setCached] = useState(current)
+
+  useEffect(() => {
+    if (current?.content) setCached(current)
+  }, [current])
+
+  const flyout = current?.content ? current : cached
 
   return (
     <>
-      {available && open && current?.content ? (
+      {flyoutMounted ? (
         <button
           type="button"
-          className="filter-drawer-backdrop"
+          className={`filter-drawer-backdrop${flyoutShown ? ' is-open' : ''}`}
           aria-label="Cerrar panel"
           onClick={() => setActiveTool(null)}
         />
@@ -63,10 +75,15 @@ export function FilterDrawer() {
           )
         })}
       </aside>
-      {available && open && current?.content ? (
-        <div className="filter-flyout" role="dialog" aria-label={current.label}>
+      {flyoutMounted && flyout?.content ? (
+        <div
+          className={`filter-flyout${flyoutShown ? ' is-open' : ''}`}
+          role="dialog"
+          aria-label={flyout.label}
+          onTransitionEnd={onTransitionEnd}
+        >
           <div className="filter-flyout-head">
-            <strong>{current.label}</strong>
+            <strong>{flyout.label}</strong>
             <div className="filter-flyout-actions">
               <button
                 type="button"
@@ -88,7 +105,7 @@ export function FilterDrawer() {
               </button>
             </div>
           </div>
-          <div className="filter-flyout-body">{current.content}</div>
+          <div className="filter-flyout-body">{flyout.content}</div>
         </div>
       ) : null}
     </>

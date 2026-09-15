@@ -1,23 +1,28 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ClipboardList, Layers, Paperclip, Plus, Search, SlidersHorizontal, Users, Wrench } from 'lucide-react'
+import { ClipboardList, ChevronDown, Layers, Paperclip, Plus, Search, SlidersHorizontal, Users, Wrench } from 'lucide-react'
 import { db } from '../db'
 import { frecuenciaLabel, mesesDeFrecuencia, type Adjunto } from '../db/types'
 import { bloqueColorVar } from '../lib/colors'
 import { compareFichasByNumero, congregacionDe, congregacionLabel, fichaTitulo } from '../lib/fichas'
+import { saveAdjuntos } from '../lib/files'
 import { ActividadesPanel } from '../components/ActividadesPanel'
 import { BloquesPanel } from '../components/BloquesPanel'
 import { EncargadosPanel } from '../components/EncargadosPanel'
 import { FichaTitle } from '../components/FichaTitle'
+import { FilePicker } from '../components/FilePicker'
 import { AdjuntosMark } from '../components/AdjuntosMark'
 import { DocumentosAgrupados, type DocumentosGrupo } from '../components/DocumentosAgrupados'
+import { DocumentosAsignacionPanel } from '../components/DocumentosAsignacionPanel'
 import { SortHeader } from '../components/SortHeader'
 import { EmptyState } from '../components/ui'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
 import { EMPTY_COUNTS, buildAdjuntoCounts } from '../lib/adjuntos'
 import { etiquetasOf } from '../lib/etiquetasAdjuntos'
 import type { Ficha } from '../db/types'
+
+const DOCS_LIBRES_KEY = '__sin_ficha__'
 
 type FichasTab = 'fichas' | 'actividades' | 'bloques' | 'encargados' | 'documentos'
 type GroupBy = 'bloque' | 'encargado' | 'congregacion'
@@ -56,7 +61,17 @@ export function FichasPage() {
   const bloqueId = params.get('bloque') ?? ''
   const encargadoId = params.get('encargado') ?? ''
   const q = params.get('q') ?? ''
+  const openNuevoDoc = params.get('nuevo') === '1'
+  const conFichaFromUrl = params.get('conFicha') === '1'
   const [searchText, setSearchText] = useState(q)
+  const [docsUploadOpen, setDocsUploadOpen] = useState(openNuevoDoc)
+  const [docRequireFicha, setDocRequireFicha] = useState(conFichaFromUrl)
+  const [docFichaId, setDocFichaId] = useState('')
+  const [docUploadError, setDocUploadError] = useState('')
+  const [assignIds, setAssignIds] = useState<string[]>([])
+  const [assignDefaultFichaId, setAssignDefaultFichaId] = useState('')
+  const [assignRequireFicha, setAssignRequireFicha] = useState(false)
+  const docsUploadRef = useRef<HTMLDivElement>(null)
   const groupBy = groupFromParam(params.get('agrupar'))
   const sortCol = sortColFromParam(params.get('col'))
   const sortDir = sortDirFromParam(params.get('dir'))
@@ -65,7 +80,10 @@ export function FichasPage() {
   const bloques = useLiveQuery(() => db.grupos.orderBy('nombre').toArray()) ?? []
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
   const adjuntos =
-    useLiveQuery(() => db.adjuntos.where('tipo').equals('ficha').toArray()) ?? []
+    useLiveQuery(async () => {
+      const all = await db.adjuntos.toArray()
+      return all.filter((a) => a.tipo === 'ficha' || a.tipo === 'manual')
+    }) ?? []
   const adjuntoCounts =
     useLiveQuery(async () => buildAdjuntoCounts(await db.adjuntos.toArray())) ?? EMPTY_COUNTS
 
@@ -78,6 +96,27 @@ export function FichasPage() {
     [encargados],
   )
   const fichaMap = useMemo(() => Object.fromEntries(fichas.map((f) => [f.id, f])), [fichas])
+  const fichasOrdenadas = useMemo(
+    () => fichas.slice().sort(compareFichasByNumero),
+    [fichas],
+  )
+
+  useEffect(() => {
+    if (tab !== 'documentos' || !openNuevoDoc) return
+    setDocsUploadOpen(true)
+    setDocRequireFicha(conFichaFromUrl)
+    if (!conFichaFromUrl) setDocFichaId('')
+    const frame = window.requestAnimationFrame(() => {
+      docsUploadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+    const next = new URLSearchParams(params)
+    next.delete('nuevo')
+    next.delete('conFicha')
+    setParams(next, { replace: true })
+    return () => window.cancelAnimationFrame(frame)
+    // Solo al llegar con ?nuevo=1 (p. ej. desde el FAB).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open once from URL
+  }, [tab, openNuevoDoc])
 
   function setTab(next: FichasTab) {
     const nextParams = new URLSearchParams()
@@ -89,6 +128,18 @@ export function FichasPage() {
       }
     }
     setParams(nextParams, { replace: true })
+  }
+
+  async function onUploadDocumentos(files: File[]) {
+    if (!files.length) return
+    setDocUploadError('')
+    const ids = docFichaId
+      ? await saveAdjuntos(files, { tipo: 'ficha', fichaId: docFichaId })
+      : await saveAdjuntos(files, { tipo: 'manual' })
+    setAssignDefaultFichaId(docFichaId)
+    setAssignRequireFicha(docRequireFicha)
+    setAssignIds(ids)
+    setDocsUploadOpen(false)
   }
 
   function patch(updates: Record<string, string | undefined>) {
@@ -146,19 +197,39 @@ export function FichasPage() {
   const documentosGrupos = useMemo(() => {
     const qLower = q.trim().toLowerCase()
     const byFicha = new Map<string, Adjunto[]>()
+    const libres: Adjunto[] = []
+    const filtroBloqueOEncargado = Boolean(bloqueId || encargadoId)
+
     for (const adj of adjuntos) {
-      if (!adj.fichaId) continue
+      if (!adjuntoMatchesQuery(adj, qLower)) continue
+
+      if (!adj.fichaId || !fichaMap[adj.fichaId]) {
+        // Documentos sin ficha: no aplican filtros de bloque/encargado.
+        if (filtroBloqueOEncargado) continue
+        libres.push(adj)
+        continue
+      }
+
       const ficha = fichaMap[adj.fichaId]
-      if (!ficha) continue
       if (bloqueId && ficha.grupoId !== bloqueId) continue
       if (encargadoId && ficha.encargadoId !== encargadoId) continue
-      if (!adjuntoMatchesQuery(adj, qLower)) continue
       const list = byFicha.get(adj.fichaId) ?? []
       list.push(adj)
       byFicha.set(adj.fichaId, list)
     }
 
     const groups: DocumentosGrupo[] = []
+
+    if (libres.length) {
+      groups.push({
+        key: DOCS_LIBRES_KEY,
+        title: 'Documentos generales',
+        shareTitle: 'Documentos generales',
+        meta: 'Sin ficha · puedes etiquetarlos',
+        adjuntos: libres.sort((a, b) => b.createdAt - a.createdAt),
+      })
+    }
+
     const fichaIds = [...byFicha.keys()].sort((a, b) => {
       const fa = fichaMap[a]
       const fb = fichaMap[b]
@@ -183,8 +254,10 @@ export function FichasPage() {
     return groups
   }, [adjuntos, fichaMap, bloqueMap, encargadoMap, bloqueId, encargadoId, q])
 
-  const docsCount = adjuntos.length
-  const docsFichasCount = documentosGrupos.length
+  const docsCount = documentosGrupos.reduce((n, g) => n + g.adjuntos.length, 0)
+  const docsLibresCount =
+    documentosGrupos.find((g) => g.key === DOCS_LIBRES_KEY)?.adjuntos.length ?? 0
+  const docsFichasCount = documentosGrupos.filter((g) => g.key !== DOCS_LIBRES_KEY).length
 
   const grouped = useMemo(() => {
     const dir = sortDir === 'desc' ? -1 : 1
@@ -428,48 +501,110 @@ export function FichasPage() {
           <div className="page-head">
             <p className="muted" style={{ margin: 0 }}>
               {docsCount} documento{docsCount === 1 ? '' : 's'}
+              {docsLibresCount
+                ? ` · ${docsLibresCount} general${docsLibresCount === 1 ? '' : 'es'}`
+                : ''}
               {docsFichasCount
                 ? ` · ${docsFichasCount} ficha${docsFichasCount === 1 ? '' : 's'}`
                 : ''}
             </p>
           </div>
-          {fichas.length > 0 ? (
-            <label className="search-field" htmlFor="fichas-docs-q">
-              <Search size={16} aria-hidden />
-              <input
-                id="fichas-docs-q"
-                className="input"
-                type="search"
-                placeholder="Buscar documento o etiqueta"
-                value={searchText}
-                onChange={(e) => onSearchChange(e.target.value)}
-                autoComplete="off"
-                enterKeyHint="search"
-                inputMode="search"
-              />
-            </label>
+
+          <div
+            ref={docsUploadRef}
+            className={`create-panel accordion-panel docs-upload-card${docsUploadOpen ? '' : ' is-collapsed'}`}
+          >
+            <button
+              type="button"
+              className="accordion-trigger"
+              aria-expanded={docsUploadOpen}
+              onClick={() =>
+                setDocsUploadOpen((was) => {
+                  if (was) {
+                    setDocRequireFicha(false)
+                    setDocUploadError('')
+                  }
+                  return !was
+                })
+              }
+            >
+              <span className="accordion-label">
+                <Plus size={16} />
+                Añadir documento
+              </span>
+              <ChevronDown size={18} className={docsUploadOpen ? 'is-open' : ''} />
+            </button>
+            {docsUploadOpen ? (
+              <div className="accordion-body">
+                <div className="field" style={{ marginBottom: '0.75rem' }}>
+                  <label htmlFor="docs-upload-ficha">
+                    Ficha por defecto{docRequireFicha ? '' : ' (opcional)'}
+                  </label>
+                  <select
+                    id="docs-upload-ficha"
+                    className="select"
+                    value={docFichaId}
+                    onChange={(e) => {
+                      setDocFichaId(e.target.value)
+                      setDocUploadError('')
+                    }}
+                  >
+                    <option value="">
+                      {docRequireFicha
+                        ? 'Asignar después en la tabla'
+                        : 'Sin ficha (se puede asignar después)'}
+                    </option>
+                    {fichasOrdenadas.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {fichaTitulo(f)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {docUploadError ? <p className="danger-text">{docUploadError}</p> : null}
+                <FilePicker onFiles={(files) => void onUploadDocumentos(files)} />
+              </div>
+            ) : null}
+          </div>
+
+          {assignIds.length ? (
+            <DocumentosAsignacionPanel
+              ids={assignIds}
+              fichas={fichasOrdenadas}
+              defaultFichaId={assignDefaultFichaId}
+              requireFicha={assignRequireFicha}
+              onDone={() => {
+                setAssignIds([])
+                setAssignDefaultFichaId('')
+                setAssignRequireFicha(false)
+                setDocRequireFicha(false)
+              }}
+            />
           ) : null}
-          {fichas.length === 0 ? (
-            <EmptyState
-              icon={<ClipboardList size={36} />}
-              title="Sin fichas"
-              text="Crea fichas para poder adjuntar documentos."
-              action={
-                <Link className="btn btn-add" to="/fichas/nueva">
-                  Crear ficha
-                </Link>
-              }
+
+          <label className="search-field" htmlFor="fichas-docs-q">
+            <Search size={16} aria-hidden />
+            <input
+              id="fichas-docs-q"
+              className="input"
+              type="search"
+              placeholder="Buscar documento o etiqueta"
+              value={searchText}
+              onChange={(e) => onSearchChange(e.target.value)}
+              autoComplete="off"
+              enterKeyHint="search"
+              inputMode="search"
             />
-          ) : (
-            <DocumentosAgrupados
-              groups={documentosGrupos}
-              emptyText={
-                q || bloqueId || encargadoId
-                  ? 'No hay documentos con esos filtros.'
-                  : 'Aún no hay documentos adjuntos en las fichas.'
-              }
-            />
-          )}
+          </label>
+
+          <DocumentosAgrupados
+            groups={documentosGrupos}
+            emptyText={
+              q || bloqueId || encargadoId
+                ? 'No hay documentos con esos filtros.'
+                : 'Aún no hay documentos. Añade uno arriba o desde una ficha.'
+            }
+          />
         </>
       ) : null}
 

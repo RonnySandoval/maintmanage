@@ -31,6 +31,9 @@
   --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
   --hover-fill: color-mix(in srgb, var(--accent) 8%, var(--bg-elev));
   --ease: 160ms ease;
+  --overlay-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --overlay-dur: 240ms;
+  --overlay-blur: 3px;
   --radius: 14px;
   --radius-sm: 10px;
   --nav-h: 64px;
@@ -572,6 +575,25 @@ p {
   font-size: 0.92rem;
 }
 
+.nuevo-fab-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 27;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  background: rgb(8 15 25 / 0.12);
+  backdrop-filter: blur(var(--overlay-blur));
+  -webkit-backdrop-filter: blur(var(--overlay-blur));
+  opacity: 0;
+  transition: opacity var(--overlay-dur) var(--overlay-ease);
+}
+
+.nuevo-fab-backdrop.is-open {
+  opacity: 1;
+}
+
 .nuevo-fab {
   position: fixed;
   right: 1rem;
@@ -593,24 +615,63 @@ p {
 .nuevo-fab-menu {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  min-width: 10.5rem;
+  gap: 0.1rem;
+  min-width: 9.75rem;
+  padding: 0.35rem;
+  border-radius: 14px;
+  background: var(--bg-elev);
+  border: 1.5px solid color-mix(in srgb, var(--accent) 72%, #fff);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent),
+    0 0 10px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 0 22px color-mix(in srgb, var(--accent) 28%, transparent),
+    0 8px 20px rgb(15 28 39 / 0.18);
+  opacity: 0;
+  transform: translateY(10px) scale(0.94);
+  transform-origin: bottom right;
+  pointer-events: none;
+  transition:
+    opacity var(--overlay-dur) var(--overlay-ease),
+    transform var(--overlay-dur) var(--overlay-ease);
+}
+
+.nuevo-fab-menu.is-open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+[data-theme='dark'] .nuevo-fab-menu {
+  background: color-mix(in srgb, var(--bg-elev) 92%, #fff);
+  border-color: color-mix(in srgb, var(--accent) 55%, #5eead4);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, #5eead4 28%, transparent),
+    0 0 12px color-mix(in srgb, var(--accent) 65%, transparent),
+    0 0 28px color-mix(in srgb, #2dd4bf 35%, transparent),
+    0 10px 24px rgb(0 0 0 / 0.45);
 }
 
 .nuevo-fab-item {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  min-height: 40px;
-  padding: 0 0.85rem;
-  border-radius: 12px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
+  gap: 0.4rem;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 34px;
+  padding: 0 0.65rem;
+  border-radius: 9px;
+  background: transparent;
+  border: 1px solid transparent;
   color: var(--text);
-  font-weight: 650;
-  font-size: 0.88rem;
+  font-family: var(--font);
+  font-weight: 600;
+  font-size: 0.74rem;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
   text-decoration: none;
-  box-shadow: 0 8px 20px rgb(15 28 39 / 0.08);
+  box-shadow: none;
+  cursor: pointer;
+  text-align: left;
 }
 
 .nuevo-fab-item:hover {
@@ -620,20 +681,18 @@ p {
 }
 
 button.nuevo-fab-item {
-  width: 100%;
-  font: inherit;
-  cursor: pointer;
-  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .nuevo-fab-caption {
-  margin: 0 0.2rem;
-  align-self: flex-end;
-  font-size: 0.7rem;
+  margin: 0.1rem 0.35rem 0.25rem;
+  align-self: flex-start;
+  font-size: 0.62rem;
   font-weight: 750;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 .nuevo-fab-btn {
@@ -1727,6 +1786,99 @@ a.icon-btn:hover {
   gap: 0.55rem;
 }
 
+.docs-upload-card.create-panel {
+  margin-bottom: 0.15rem;
+}
+
+.docs-assign-panel {
+  margin: 0.75rem 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.docs-assign-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.docs-assign-sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+}
+
+.docs-assign-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-muted) 70%, var(--bg-elev));
+  border: 1px solid var(--border);
+}
+
+.docs-assign-bulk-row {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.docs-assign-bulk-row .select,
+.docs-assign-bulk-row .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.docs-assign-group.entity-card.card {
+  margin: 0;
+}
+
+.adjunto-ficha-field {
+  display: block;
+  margin: 0.15rem 0 0.05rem;
+  min-width: 0;
+}
+
+.adjunto-ficha-select {
+  width: 100%;
+  min-height: 34px;
+  font-size: 0.8rem;
+  padding-block: 0.25rem;
+}
+
+.adjunto-card.has-ficha-select {
+  padding: 0.4rem 0.4rem 0.35rem;
+}
+
+.adjunto-card.has-ficha-select .adjunto-card-main {
+  gap: 0.12rem;
+}
+
+@media (max-width: 720px) {
+  .docs-assign-panel {
+    gap: 0.45rem;
+  }
+
+  .docs-assign-bulk {
+    gap: 0.4rem;
+    padding: 0.4rem 0.5rem;
+  }
+
+  .docs-assign-bulk .field label {
+    font-size: 0.72rem;
+    margin-bottom: 0.15rem;
+  }
+
+  .adjunto-ficha-select {
+    min-height: 32px;
+    font-size: 0.78rem;
+  }
+}
+
 .docs-group.entity-card.card {
   gap: 0.35rem;
   padding: 0.55rem 0.65rem;
@@ -2333,7 +2485,15 @@ a.icon-btn:hover {
   inset: 0;
   z-index: 24;
   border: 0;
-  background: rgb(8 15 25 / 0.28);
+  background: rgb(8 15 25 / 0.16);
+  backdrop-filter: blur(var(--overlay-blur));
+  -webkit-backdrop-filter: blur(var(--overlay-blur));
+  opacity: 0;
+  transition: opacity var(--overlay-dur) var(--overlay-ease);
+}
+
+.filter-drawer-backdrop.is-open {
+  opacity: 1;
 }
 
 .filter-rail {
@@ -2354,7 +2514,9 @@ a.icon-btn:hover {
   pointer-events: none;
   opacity: 0;
   transform: translateX(120%);
-  transition: transform var(--ease), opacity var(--ease);
+  transition:
+    transform var(--overlay-dur) var(--overlay-ease),
+    opacity var(--overlay-dur) var(--overlay-ease);
 }
 
 .filter-rail.is-open {
@@ -2403,6 +2565,19 @@ a.icon-btn:hover {
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: var(--shadow-hover);
+  opacity: 0;
+  transform: translateX(12px) scale(0.97);
+  transform-origin: top right;
+  pointer-events: none;
+  transition:
+    opacity var(--overlay-dur) var(--overlay-ease),
+    transform var(--overlay-dur) var(--overlay-ease);
+}
+
+.filter-flyout.is-open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
 }
 
 .filter-flyout-head {
@@ -3113,10 +3288,38 @@ a.table-row:focus-visible {
   position: fixed;
   inset: 0;
   z-index: 90;
-  background: rgb(8 15 25 / 0.5);
+  background: rgb(8 15 25 / 0.42);
+  backdrop-filter: blur(var(--overlay-blur));
+  -webkit-backdrop-filter: blur(var(--overlay-blur));
   display: grid;
   place-items: end center;
   padding: 0;
+  opacity: 0;
+  transition: opacity var(--overlay-dur) var(--overlay-ease);
+}
+
+.modal-backdrop.is-open {
+  opacity: 1;
+}
+
+.modal {
+  width: min(520px, 100%);
+  max-height: 92dvh;
+  overflow: auto;
+  background: var(--bg-elev);
+  border-radius: 18px 18px 0 0;
+  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateY(18px) scale(0.98);
+  transition:
+    opacity var(--overlay-dur) var(--overlay-ease),
+    transform var(--overlay-dur) var(--overlay-ease);
+}
+
+.modal-backdrop.is-open .modal {
+  opacity: 1;
+  transform: none;
 }
 
 /* Data process overlay (backup / restore / import) */
@@ -3127,13 +3330,13 @@ a.table-row:focus-visible {
   display: grid;
   place-items: center;
   padding: 1.25rem;
-  background: rgb(8 15 25 / 0.42);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  animation: data-process-fade-in 260ms ease-out;
+  background: rgb(8 15 25 / 0.38);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: overlay-fade-in var(--overlay-dur) var(--overlay-ease) both;
 }
 
-@keyframes data-process-fade-in {
+@keyframes overlay-fade-in {
   from {
     opacity: 0;
   }
@@ -3142,10 +3345,10 @@ a.table-row:focus-visible {
   }
 }
 
-@keyframes data-process-rise {
+@keyframes overlay-rise {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.985);
+    transform: translateY(12px) scale(0.985);
   }
   to {
     opacity: 1;
@@ -3177,7 +3380,7 @@ a.table-row:focus-visible {
   box-shadow:
     0 24px 48px rgb(0 0 0 / 0.22),
     0 0 0 1px rgb(255 255 255 / 0.04) inset;
-  animation: data-process-rise 340ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: overlay-rise 340ms var(--overlay-ease) both;
 }
 
 .data-process-head {
@@ -3321,8 +3524,20 @@ a.table-row:focus-visible {
     max(0.5rem, env(safe-area-inset-right))
     max(0.5rem, env(safe-area-inset-bottom))
     max(0.5rem, env(safe-area-inset-left));
-  background: rgb(4 8 14 / 0.94);
+  background: rgb(2 6 12 / 0.78);
+  backdrop-filter: blur(18px) saturate(1.05);
+  -webkit-backdrop-filter: blur(18px) saturate(1.05);
   cursor: zoom-out;
+  animation: overlay-fade-in var(--overlay-dur) var(--overlay-ease) both;
+  touch-action: none;
+}
+
+.image-lightbox.is-zoomed {
+  cursor: grab;
+}
+
+.image-lightbox.is-zoomed:active {
+  cursor: grabbing;
 }
 
 .image-lightbox-top {
@@ -3330,7 +3545,7 @@ a.table-row:focus-visible {
   top: 0;
   left: 0;
   right: 0;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -3340,7 +3555,7 @@ a.table-row:focus-visible {
     max(0.45rem, env(safe-area-inset-right))
     0.35rem
     max(0.65rem, env(safe-area-inset-left));
-  background: linear-gradient(to bottom, rgb(4 8 14 / 0.88), rgb(4 8 14 / 0));
+  background: linear-gradient(to bottom, rgb(2 6 12 / 0.82), rgb(2 6 12 / 0));
   cursor: default;
 }
 
@@ -3370,7 +3585,8 @@ a.table-row:focus-visible {
 }
 
 .image-lightbox-close,
-.image-lightbox-share.icon-btn {
+.image-lightbox-share.icon-btn,
+.image-lightbox-zoom {
   width: 2.5rem;
   height: 2.5rem;
   display: grid;
@@ -3382,15 +3598,40 @@ a.table-row:focus-visible {
   cursor: pointer;
 }
 
+.image-lightbox-zoom:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .image-lightbox-close:hover,
-.image-lightbox-share.icon-btn:hover {
+.image-lightbox-share.icon-btn:hover,
+.image-lightbox-zoom:hover:not(:disabled) {
   background: rgb(255 255 255 / 0.22);
 }
 
 .image-lightbox-close:focus-visible,
-.image-lightbox-share.icon-btn:focus-visible {
+.image-lightbox-share.icon-btn:focus-visible,
+.image-lightbox-zoom:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
+}
+
+.image-lightbox-stage {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+  cursor: zoom-in;
+  overflow: hidden;
+  animation: overlay-rise var(--overlay-dur) var(--overlay-ease) both;
+}
+
+.image-lightbox.is-zoomed .image-lightbox-stage {
+  cursor: grab;
 }
 
 .image-lightbox-img {
@@ -3401,12 +3642,20 @@ a.table-row:focus-visible {
   height: auto;
   object-fit: contain;
   border-radius: 4px;
-  cursor: default;
+  transform-origin: center center;
+  will-change: transform;
   user-select: none;
   -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+.image-lightbox-img.is-smooth {
+  transition: transform 220ms var(--overlay-ease);
 }
 
 .image-lightbox-caption {
+  position: relative;
+  z-index: 2;
   margin: 0;
   max-width: min(36rem, 100%);
   padding: 0 0.75rem;
@@ -3456,16 +3705,6 @@ a.table-row:focus-visible {
   margin: 0;
   font-size: 0.72rem;
   line-height: 1.2;
-}
-
-.modal {
-  width: min(520px, 100%);
-  max-height: 92dvh;
-  overflow: auto;
-  background: var(--bg-elev);
-  border-radius: 18px 18px 0 0;
-  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
-  box-shadow: var(--shadow);
 }
 
 .thumbs {
@@ -4102,6 +4341,11 @@ a.table-row:focus-visible {
   .modal {
     border-radius: 18px;
     padding: 1.15rem;
+    transform: translateY(10px) scale(0.985);
+  }
+
+  .modal-backdrop.is-open .modal {
+    transform: none;
   }
 
   .split-2 {
@@ -4987,7 +5231,7 @@ a.table-row:focus-visible {
 .data-process-panel-outcome {
   text-align: center;
   padding: 1.5rem 1.25rem 1.25rem;
-  animation: data-process-rise 340ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: overlay-rise 340ms var(--overlay-ease) both;
 }
 
 .data-process-outcome-icon {
@@ -5167,7 +5411,16 @@ a.table-row:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
+    animation: none !important;
     transform: none !important;
     filter: none !important;
+  }
+
+  .nuevo-fab-backdrop,
+  .modal-backdrop,
+  .filter-drawer-backdrop,
+  .data-process-overlay {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 }

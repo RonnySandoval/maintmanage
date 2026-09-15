@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { FileText, Image, Plus, Trash2, X } from 'lucide-react'
-import type { Adjunto } from '../db/types'
+import type { Adjunto, Ficha } from '../db/types'
 import { db } from '../db'
 import {
   adjuntoShareFiles,
@@ -9,7 +9,8 @@ import {
   resolveAdjuntoMetas,
   type AdjuntoViewMeta,
 } from '../lib/adjuntoContext'
-import { fileKind, openBlob } from '../lib/files'
+import { fileKind, openBlob, setAdjuntoFicha } from '../lib/files'
+import { fichaTitulo } from '../lib/fichas'
 import {
   ensureEtiquetaInCatalog,
   etiquetasOf,
@@ -30,6 +31,8 @@ function AdjuntoCard({
   url,
   meta,
   onOpenImage,
+  fichas,
+  requireFicha,
 }: {
   adjunto: Adjunto
   catalog: string[]
@@ -38,6 +41,8 @@ function AdjuntoCard({
   url?: string
   meta: AdjuntoViewMeta
   onOpenImage?: (adjunto: Adjunto, url: string) => void
+  fichas?: Ficha[]
+  requireFicha?: boolean
 }) {
   const tags = etiquetasOf(adjunto.etiquetas)
   const [adding, setAdding] = useState(false)
@@ -47,6 +52,7 @@ function AdjuntoCard({
   const shareFiles = useMemo(() => adjuntoShareFiles([adjunto]), [adjunto])
   const shareText = adjuntoShareText(meta, adjunto.nombre)
   const shareTitle = meta.parentLabel || adjunto.nombre
+  const showFichaSelect = Boolean(fichas)
 
   const available = useMemo(() => {
     const assigned = new Set(tags.map((t) => t.toLowerCase()))
@@ -80,7 +86,9 @@ function AdjuntoCard({
   }
 
   return (
-    <article className={`adjunto-card${adding ? ' is-editing' : ''}`}>
+    <article
+      className={`adjunto-card${adding ? ' is-editing' : ''}${showFichaSelect ? ' has-ficha-select' : ''}`}
+    >
       <header className="adjunto-card-head">
         <button
           type="button"
@@ -101,6 +109,23 @@ function AdjuntoCard({
             {adjunto.nombre}
           </button>
           {meta.header ? <p className="muted adjunto-card-meta">{meta.header}</p> : null}
+          {showFichaSelect && fichas ? (
+            <label className="adjunto-ficha-field">
+              <span className="sr-only">Ficha de {adjunto.nombre}</span>
+              <select
+                className="select adjunto-ficha-select"
+                value={adjunto.fichaId ?? ''}
+                onChange={(e) => void setAdjuntoFicha(adjunto.id, e.target.value || undefined)}
+              >
+                <option value="">{requireFicha ? 'Elige una ficha' : 'Sin ficha'}</option>
+                {fichas.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {fichaTitulo(f)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           {tags.length || editableTags ? (
             <div className="adjunto-tags">
               {tags.map((tag) =>
@@ -209,6 +234,8 @@ export function AttachmentList({
   onDelete,
   editableTags = true,
   parentLabel,
+  fichas,
+  requireFicha = false,
 }: {
   adjuntos: Adjunto[]
   onDelete?: (id: string) => void
@@ -216,6 +243,9 @@ export function AttachmentList({
   editableTags?: boolean
   /** Nombre de ficha/actividad cuando ya se conoce (detalle). */
   parentLabel?: string
+  /** Si se pasa, cada card muestra un selector de ficha. */
+  fichas?: Ficha[]
+  requireFicha?: boolean
 }) {
   const [urls, setUrls] = useState<Record<string, string>>({})
   const [lightbox, setLightbox] = useState<{ adjunto: Adjunto; src: string } | null>(null)
@@ -278,6 +308,8 @@ export function AttachmentList({
             url={urls[a.id]}
             meta={metas[a.id] ?? EMPTY_META}
             onOpenImage={(adjunto, src) => setLightbox({ adjunto, src })}
+            fichas={fichas}
+            requireFicha={requireFicha}
           />
         ))}
       </div>

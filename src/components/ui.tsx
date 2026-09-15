@@ -3,6 +3,7 @@ import { CalendarClock, CalendarOff, Captions, CaptionsOff } from 'lucide-react'
 import { ESTADOS, tipoActividadLabel, type EstadoOcurrencia } from '../db/types'
 import { useTiposActividad } from '../hooks/useTiposActividad'
 import { useAccionFechas } from '../hooks/useAccionFechas'
+import { useOverlayPresence } from '../hooks/useOverlayPresence'
 import { accionesTitulo, accionLabel, label, useAliases } from '../lib/labels'
 import { useStatusLabels } from '../hooks/useStatusLabels'
 import { formatDate } from '../lib/dates'
@@ -167,10 +168,16 @@ export function Modal({
   children: ReactNode
   footer?: ReactNode
 }) {
-  if (!open) return null
+  const { mounted, shown, onTransitionEnd } = useOverlayPresence(open)
+  if (!mounted) return null
   const ariaLabel = typeof title === 'string' ? title : 'Diálogo'
   return (
-    <div className="modal-backdrop" onClick={onClose} role="presentation">
+    <div
+      className={`modal-backdrop${shown ? ' is-open' : ''}`}
+      onClick={onClose}
+      onTransitionEnd={onTransitionEnd}
+      role="presentation"
+    >
       <div
         className="modal"
         role="dialog"

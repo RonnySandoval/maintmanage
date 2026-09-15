@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ClipboardCheck, ClipboardList, Plus, Users, Wrench } from 'lucide-react'
+import { ClipboardCheck, ClipboardList, FileText, Plus, Users, Wrench } from 'lucide-react'
+import { useOverlayPresence } from '../hooks/useOverlayPresence'
 
-type FabMenu = 'root' | 'inspeccion'
+type FabMenu = 'root' | 'inspeccion' | 'documento'
 
 const IDLE_MS = 10_000
+
+function menuLabel(menu: FabMenu): string {
+  if (menu === 'inspeccion') return 'Nueva inspección'
+  if (menu === 'documento') return 'Nuevo documento'
+  return 'Crear'
+}
 
 export function NuevoFab() {
   const location = useLocation()
@@ -14,6 +21,7 @@ export function NuevoFab() {
   const openRef = useRef(false)
   const timerRef = useRef<number>(0)
   const rootRef = useRef<HTMLDivElement>(null)
+  const { mounted: menuMounted, shown: menuShown, onTransitionEnd } = useOverlayPresence(open)
   openRef.current = open
 
   const onFormPage = /\/(nueva|editar)(\/|$)/.test(location.pathname)
@@ -60,8 +68,8 @@ export function NuevoFab() {
   }, [location.pathname, location.search])
 
   useEffect(() => {
-    if (!open) setMenu('root')
-  }, [open])
+    if (!menuMounted) setMenu('root')
+  }, [menuMounted])
 
   useEffect(() => {
     if (!open) return
@@ -77,95 +85,137 @@ export function NuevoFab() {
   if (onFormPage) return null
 
   return (
-    <div
-      ref={rootRef}
-      className={`nuevo-fab${visible || open ? '' : ' is-hidden'}`}
-      aria-hidden={!visible && !open}
-    >
-      {open ? (
-        <div
-          className="nuevo-fab-menu"
-          role="menu"
-          aria-label={menu === 'inspeccion' ? 'Nueva inspección' : 'Crear'}
-        >
-          {menu === 'inspeccion' ? (
-            <>
-              <p className="nuevo-fab-caption">Inspección</p>
-              <Link
-                className="nuevo-fab-item"
-                role="menuitem"
-                to="/inspecciones/nueva"
-                onClick={() => setOpen(false)}
-              >
-                <ClipboardList size={16} />
-                De una ficha
-              </Link>
-              <Link
-                className="nuevo-fab-item"
-                role="menuitem"
-                to="/actividades/nueva?tipo=inspeccion"
-                onClick={() => setOpen(false)}
-              >
-                <ClipboardCheck size={16} />
-                Sin ficha
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link
-                className="nuevo-fab-item"
-                role="menuitem"
-                to="/actividades/nueva"
-                onClick={() => setOpen(false)}
-              >
-                <Wrench size={16} />
-                Actividad
-              </Link>
-              <Link
-                className="nuevo-fab-item"
-                role="menuitem"
-                to="/fichas/nueva"
-                onClick={() => setOpen(false)}
-              >
-                <ClipboardList size={16} />
-                Ficha
-              </Link>
-              <button
-                type="button"
-                className="nuevo-fab-item"
-                role="menuitem"
-                onClick={() => setMenu('inspeccion')}
-              >
-                <ClipboardCheck size={16} />
-                Inspección
-              </button>
-              <Link
-                className="nuevo-fab-item"
-                role="menuitem"
-                to="/fichas?tab=encargados&nuevo=1"
-                onClick={() => setOpen(false)}
-              >
-                <Users size={16} />
-                Encargado
-              </Link>
-            </>
-          )}
-        </div>
+    <>
+      {menuMounted ? (
+        <button
+          type="button"
+          className={`nuevo-fab-backdrop${menuShown ? ' is-open' : ''}`}
+          aria-label="Cerrar menú"
+          onClick={() => setOpen(false)}
+        />
       ) : null}
-      <button
-        type="button"
-        className={`nuevo-fab-btn${open ? ' is-open' : ''}`}
-        aria-label="Nuevo"
-        title="Nuevo"
-        aria-expanded={open}
-        aria-haspopup="menu"
-        onClick={() => {
-          setOpen((was) => !was)
-          reveal()
-        }}
+      <div
+        ref={rootRef}
+        className={`nuevo-fab${visible || open || menuMounted ? '' : ' is-hidden'}`}
+        aria-hidden={!visible && !open && !menuMounted}
       >
-        <Plus size={22} />
-      </button>
-    </div>
+        {menuMounted ? (
+          <div
+            className={`nuevo-fab-menu${menuShown ? ' is-open' : ''}`}
+            role="menu"
+            aria-label={menuLabel(menu)}
+            onTransitionEnd={onTransitionEnd}
+          >
+            {menu === 'inspeccion' ? (
+              <>
+                <p className="nuevo-fab-caption">Inspección</p>
+                <Link
+                  className="nuevo-fab-item"
+                  role="menuitem"
+                  to="/inspecciones/nueva"
+                  onClick={() => setOpen(false)}
+                >
+                  <ClipboardList size={14} />
+                  De una ficha
+                </Link>
+                <Link
+                  className="nuevo-fab-item"
+                  role="menuitem"
+                  to="/actividades/nueva?tipo=inspeccion"
+                  onClick={() => setOpen(false)}
+                >
+                  <ClipboardCheck size={14} />
+                  Sin ficha
+                </Link>
+              </>
+            ) : menu === 'documento' ? (
+              <>
+                <p className="nuevo-fab-caption">Documento</p>
+                <Link
+                  className="nuevo-fab-item"
+                  role="menuitem"
+                  to="/fichas?tab=documentos&nuevo=1&conFicha=1"
+                  onClick={() => setOpen(false)}
+                >
+                  <ClipboardList size={14} />
+                  De una ficha
+                </Link>
+                <Link
+                  className="nuevo-fab-item"
+                  role="menuitem"
+                  to="/fichas?tab=documentos&nuevo=1"
+                  onClick={() => setOpen(false)}
+                >
+                  <FileText size={14} />
+                  Sin ficha
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  className="nuevo-fab-item"
+                  role="menuitem"
+                  to="/actividades/nueva"
+                  onClick={() => setOpen(false)}
+                >
+                  <Wrench size={14} />
+                  Actividad
+                </Link>
+                <Link
+                  className="nuevo-fab-item"
+                  role="menuitem"
+                  to="/fichas/nueva"
+                  onClick={() => setOpen(false)}
+                >
+                  <ClipboardList size={14} />
+                  Ficha
+                </Link>
+                <button
+                  type="button"
+                  className="nuevo-fab-item"
+                  role="menuitem"
+                  onClick={() => setMenu('inspeccion')}
+                >
+                  <ClipboardCheck size={14} />
+                  Inspección
+                </button>
+                <button
+                  type="button"
+                  className="nuevo-fab-item"
+                  role="menuitem"
+                  onClick={() => setMenu('documento')}
+                >
+                  <FileText size={14} />
+                  Documento
+                </button>
+                <Link
+                  className="nuevo-fab-item"
+                  role="menuitem"
+                  to="/fichas?tab=encargados&nuevo=1"
+                  onClick={() => setOpen(false)}
+                >
+                  <Users size={14} />
+                  Encargado
+                </Link>
+              </>
+            )}
+          </div>
+        ) : null}
+        <button
+          type="button"
+          className={`nuevo-fab-btn${open ? ' is-open' : ''}`}
+          aria-label="Nuevo"
+          title="Nuevo"
+          aria-expanded={open}
+          aria-haspopup="menu"
+          onClick={() => {
+            setOpen((was) => !was)
+            reveal()
+          }}
+        >
+          <Plus size={22} />
+        </button>
+      </div>
+    </>
   )
 }
