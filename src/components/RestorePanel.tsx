@@ -10,7 +10,10 @@ import {
   restoreFromFolder,
 } from '../db/backup'
 import { ensureHorizon } from '../db/occurrences'
+import { FOLDER_RESTORE_STEPS, IMPORT_STEPS } from '../lib/dataProcess'
 import { clearRestoreSkip } from '../lib/restoreSkip'
+import { useDataProcess } from '../hooks/useDataProcess'
+import { DataProcessOverlay } from './DataProcessOverlay'
 
 type Camino = 'carpeta' | 'zip' | 'json'
 
@@ -27,6 +30,8 @@ export function RestorePanel({
 }) {
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const { state: processState, run: runProcess } = useDataProcess()
+  const working = busy || !!processState
   const folderOk = canUseFolderBackup()
   const [camino, setCamino] = useState<Camino>(() => (canUseFolderBackup() ? 'carpeta' : 'zip'))
   const caminoActivo = camino === 'carpeta' && !folderOk ? 'zip' : camino
@@ -51,8 +56,14 @@ export function RestorePanel({
     setBusy(true)
     setMessage('')
     try {
-      const kind = await importBackup(file, 'replace')
-      await finishRestore()
+      const kind = await runProcess('Restaurando copia', IMPORT_STEPS, async (advance) => {
+        advance('read')
+        advance('validate')
+        const imported = await importBackup(file, 'replace')
+        advance('apply')
+        await finishRestore()
+        return imported
+      })
       const note =
         kind === 'json'
           ? ' JSON no trae fotos ni documentos.'
@@ -70,9 +81,15 @@ export function RestorePanel({
     setBusy(true)
     setMessage('')
     try {
-      const handle = await pickBackupFolder()
-      await restoreFromFolder(handle, 'replace')
-      await finishRestore()
+      await runProcess('Restaurando desde carpeta', FOLDER_RESTORE_STEPS, async (advance) => {
+        advance('read')
+        const handle = await pickBackupFolder()
+        advance('validate')
+        await restoreFromFolder(handle, 'replace')
+        advance('apply')
+        await finishRestore()
+        return handle.name
+      })
       setMessage(`Datos recuperados desde la carpeta (archivo ${BACKUP_FILE_NAME}).`)
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -136,7 +153,7 @@ export function RestorePanel({
           <button
             type="button"
             className="btn btn-primary"
-            disabled={busy}
+            disabled={working}
             onClick={() => void fromFolder()}
           >
             <FolderOpen size={16} />
@@ -151,7 +168,7 @@ export function RestorePanel({
               className="sr-only"
               type="file"
               accept=".zip,application/zip"
-              disabled={busy}
+              disabled={working}
               onChange={(e) => {
                 const file = e.target.files?.[0]
                 e.target.value = ''
@@ -168,7 +185,7 @@ export function RestorePanel({
               className="sr-only"
               type="file"
               accept=".json,application/json"
-              disabled={busy}
+              disabled={working}
               onChange={(e) => {
                 const file = e.target.files?.[0]
                 e.target.value = ''
@@ -178,7 +195,7 @@ export function RestorePanel({
           </label>
         ) : null}
         {onSkip ? (
-          <button type="button" className="btn btn-ghost" disabled={busy} onClick={onSkip}>
+          <button type="button" className="btn btn-ghost" disabled={working} onClick={onSkip}>
             Empezar de cero
           </button>
         ) : null}
@@ -191,11 +208,21 @@ export function RestorePanel({
     </>
   )
 
-  if (embedded) return <div className="restore-embedded">{body}</div>
+  if (embedded) {
+    return (
+      <>
+        <DataProcessOverlay state={processState} />
+        <div className="restore-embedded">{body}</div>
+      </>
+    )
+  }
 
   return (
-    <section className={`card restore-panel${compact ? ' restore-panel-compact' : ''}`}>
-      {body}
-    </section>
+    <>
+      <DataProcessOverlay state={processState} />
+      <section className={`card restore-panel${compact ? ' restore-panel-compact' : ''}`}>
+        {body}
+      </section>
+    </>
   )
 }

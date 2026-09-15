@@ -55,10 +55,19 @@ import {
   useAliases,
 } from '../lib/labels'
 import { requestNotificaciones } from '../lib/notifications'
+import { DataProcessOverlay } from '../components/DataProcessOverlay'
 import { EntityCard } from '../components/EntityCard'
 import { GoogleAccountPanel } from '../components/GoogleAccountPanel'
 import { ThemeModePicker } from '../components/ThemeQuickToggle'
+import { useDataProcess } from '../hooks/useDataProcess'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
+import {
+  EXPORT_STEPS,
+  FOLDER_RESTORE_STEPS,
+  FOLDER_WRITE_STEPS,
+  IMPORT_STEPS,
+  SAVE_BACKUP_STEPS,
+} from '../lib/dataProcess'
 
 type AjustesTab = 'copia' | 'nombres' | 'avisos' | 'estados' | 'acerca'
 
@@ -101,6 +110,8 @@ export function AjustesPage() {
   const shareStampRef = useRef<number>(-1)
   const [sharePrep, setSharePrep] = useState<'idle' | 'preparing' | 'ready' | 'error'>('idle')
   const [shareWarmKey, setShareWarmKey] = useState(0)
+  const { state: processState, run: runProcess } = useDataProcess()
+  const working = busy || !!processState
 
   const aliases = useAliases()
   const intervalHours = backupIntervalHoursOf(ajustes?.backupIntervalHours)
@@ -214,47 +225,52 @@ export function AjustesPage() {
         : 'JSON → archivo .json solo con datos (sin fotos ni documentos).'
 
   async function exportZip() {
-    setBusy(true)
     setMessage('')
     try {
-      const { blob, filename } = await exportBackupZip()
-      downloadBlob(blob, filename)
-      await markBackupDone('zip')
-      shareZipRef.current = null
-      shareStampRef.current = -1
-      setShareWarmKey((k) => k + 1)
-      setMessage(
-        `ZIP listo (${formatBytes(blob.size)}). Guárdalo o pásalo al otro dispositivo e impórtalo como ZIP.`,
-      )
+      await runProcess('Exportando copia ZIP', EXPORT_STEPS, async (advance) => {
+        advance('collect')
+        advance('pack')
+        const { blob, filename } = await exportBackupZip()
+        advance('finish')
+        downloadBlob(blob, filename)
+        await markBackupDone('zip')
+        shareZipRef.current = null
+        shareStampRef.current = -1
+        setShareWarmKey((k) => k + 1)
+        setMessage(
+          `ZIP listo (${formatBytes(blob.size)}). Guárdalo o pásalo al otro dispositivo e impórtalo como ZIP.`,
+        )
+      })
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'No se pudo exportar el ZIP.')
-    } finally {
-      setBusy(false)
     }
   }
 
   async function exportJson() {
-    setBusy(true)
     setMessage('')
     try {
-      const { blob, filename } = await exportBackupJson()
-      downloadBlob(blob, filename)
-      await markBackupDone('json')
-      setMessage(
-        `JSON listo (${formatBytes(blob.size)}). Solo datos (sin fotos). Impórtalo como JSON.`,
-      )
+      await runProcess('Exportando copia JSON', EXPORT_STEPS, async (advance) => {
+        advance('collect')
+        advance('pack')
+        const { blob, filename } = await exportBackupJson()
+        advance('finish')
+        downloadBlob(blob, filename)
+        await markBackupDone('json')
+        setMessage(
+          `JSON listo (${formatBytes(blob.size)}). Solo datos (sin fotos). Impórtalo como JSON.`,
+        )
+      })
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'No se pudo exportar el JSON.')
-    } finally {
-      setBusy(false)
     }
   }
 
   async function saveNow() {
-    setBusy(true)
     setMessage('')
     try {
-      const result = await saveBackupNow()
+      const result = await runProcess('Guardando copia', SAVE_BACKUP_STEPS, async (advance) => {
+        return saveBackupNow((step) => advance(step))
+      })
       setMessage(
         result.kind === 'folder'
           ? `Actualizado en carpeta «${ajustes?.backupFolderName || 'elegida'}» (${formatBytes(result.size)}). Archivo: ${BACKUP_FILE_NAME}.`
@@ -262,30 +278,30 @@ export function AjustesPage() {
       )
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'No se pudo guardar la copia.')
-    } finally {
-      setBusy(false)
     }
   }
 
   async function chooseFolder() {
-    setBusy(true)
     setMessage('')
     try {
-      const handle = await pickBackupFolder()
-      if (await hasUserData()) {
-        const size = await writeBackupToFolder(handle)
-        setMessage(`Carpeta «${handle.name}» lista. Copia escrita (${formatBytes(size)}).`)
-      } else {
-        setMessage(`Carpeta «${handle.name}» lista. Las copias se escribirán aquí automáticamente.`)
-      }
+      await runProcess('Configurando carpeta de copia', FOLDER_WRITE_STEPS, async (advance) => {
+        advance('collect')
+        const handle = await pickBackupFolder()
+        if (await hasUserData()) {
+          advance('pack')
+          advance('write')
+          const size = await writeBackupToFolder(handle)
+          setMessage(`Carpeta «${handle.name}» lista. Copia escrita (${formatBytes(size)}).`)
+        } else {
+          setMessage(`Carpeta «${handle.name}» lista. Las copias se escribirán aquí automáticamente.`)
+        }
+      })
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         setMessage('')
         return
       }
       setMessage(err instanceof Error ? err.message : 'No se pudo elegir la carpeta.')
-    } finally {
-      setBusy(false)
     }
   }
 
@@ -296,24 +312,26 @@ export function AjustesPage() {
         : 'Se fusionarán registros por identificador. ¿Continuar?',
     )
     if (!ok) return
-    setBusy(true)
     setMessage('')
     try {
-      const linked = await getUsableBackupFolder()
-      const handle = linked ?? (await pickBackupFolder())
-      await restoreFromFolder(handle, modeImport)
-      await ensureHorizon()
-      setMessage(
-        `Datos recuperados desde carpeta «${handle.name}» (${BACKUP_FILE_NAME} o ZIP maintmanage-*.zip).`,
-      )
+      await runProcess('Restaurando desde carpeta', FOLDER_RESTORE_STEPS, async (advance) => {
+        advance('read')
+        const linked = await getUsableBackupFolder()
+        const handle = linked ?? (await pickBackupFolder())
+        advance('validate')
+        await restoreFromFolder(handle, modeImport)
+        advance('apply')
+        await ensureHorizon()
+        setMessage(
+          `Datos recuperados desde carpeta «${handle.name}» (${BACKUP_FILE_NAME} o ZIP maintmanage-*.zip).`,
+        )
+      })
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         setMessage('')
         return
       }
       setMessage(err instanceof Error ? err.message : 'No se pudo restaurar desde la carpeta.')
-    } finally {
-      setBusy(false)
     }
   }
 
@@ -370,11 +388,16 @@ export function AjustesPage() {
         : 'Se fusionarán registros por identificador (los del archivo pisan los locales si coinciden). ¿Continuar?',
     )
     if (!ok) return
-    setBusy(true)
     setMessage('')
     try {
-      const kind = await importBackup(file, modeImport)
-      await ensureHorizon()
+      const kind = await runProcess('Importando copia', IMPORT_STEPS, async (advance) => {
+        advance('read')
+        advance('validate')
+        const imported = await importBackup(file, modeImport)
+        advance('apply')
+        await ensureHorizon()
+        return imported
+      })
       const extra =
         kind === 'json'
           ? ' El JSON no incluye fotos ni documentos.'
@@ -384,8 +407,6 @@ export function AjustesPage() {
       )
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'No se pudo importar.')
-    } finally {
-      setBusy(false)
     }
   }
 
@@ -406,6 +427,8 @@ export function AjustesPage() {
   }
 
   return (
+    <>
+    <DataProcessOverlay state={processState} />
     <div className="stack ajustes-page">
       <EntityCard
         className="ajustes-apariencia is-inline"
@@ -583,7 +606,7 @@ export function AjustesPage() {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={busy}
+                  disabled={working}
                   onClick={() => void chooseFolder()}
                 >
                   <FolderOpen size={16} />
@@ -592,7 +615,7 @@ export function AjustesPage() {
                 <button
                   type="button"
                   className="btn"
-                  disabled={busy || !hasFolder}
+                  disabled={working || !hasFolder}
                   onClick={() => void saveNow()}
                 >
                   <Download size={16} />
@@ -602,7 +625,7 @@ export function AjustesPage() {
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    disabled={busy}
+                    disabled={working}
                     onClick={() => void forgetFolder()}
                   >
                     <FolderX size={16} />
@@ -617,7 +640,7 @@ export function AjustesPage() {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={busy}
+                  disabled={working}
                   onClick={() => void exportZip()}
                 >
                   <Download size={16} />
@@ -626,7 +649,7 @@ export function AjustesPage() {
                 <button
                   type="button"
                   className="btn"
-                  disabled={busy || sharePrep === 'preparing'}
+                  disabled={working || sharePrep === 'preparing'}
                   onClick={() => {
                     if (sharePrep === 'ready') {
                       void shareZip()
@@ -665,7 +688,7 @@ export function AjustesPage() {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={busy}
+                  disabled={working}
                   onClick={() => void exportJson()}
                 >
                   <FileJson size={16} />
@@ -682,7 +705,7 @@ export function AjustesPage() {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={busy}
+                  disabled={working}
                   onClick={() => void restoreFolder('replace')}
                 >
                   <Upload size={16} />
@@ -691,7 +714,7 @@ export function AjustesPage() {
                 <button
                   type="button"
                   className="btn"
-                  disabled={busy}
+                  disabled={working}
                   onClick={() => void restoreFolder('merge')}
                 >
                   <Upload size={16} />
@@ -713,7 +736,7 @@ export function AjustesPage() {
                     className="sr-only"
                     type="file"
                     accept=".zip,application/zip"
-                    disabled={busy}
+                    disabled={working}
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       e.target.value = ''
@@ -728,7 +751,7 @@ export function AjustesPage() {
                     className="sr-only"
                     type="file"
                     accept=".zip,application/zip"
-                    disabled={busy}
+                    disabled={working}
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       e.target.value = ''
@@ -748,7 +771,7 @@ export function AjustesPage() {
                     className="sr-only"
                     type="file"
                     accept=".json,application/json"
-                    disabled={busy}
+                    disabled={working}
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       e.target.value = ''
@@ -763,7 +786,7 @@ export function AjustesPage() {
                     className="sr-only"
                     type="file"
                     accept=".json,application/json"
-                    disabled={busy}
+                    disabled={working}
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       e.target.value = ''
@@ -934,6 +957,7 @@ export function AjustesPage() {
         </EntityCard>
       ) : null}
     </div>
+    </>
   )
 }
 

@@ -21,6 +21,7 @@ import { AppLogo } from './AppLogo'
 import { FilterDrawerProvider } from '../hooks/useFilterDrawer'
 import { useAppHistory } from '../hooks/useAppHistory'
 import { useAutoBackup } from '../hooks/useAutoBackup'
+import { DataProcessOverlay } from './DataProcessOverlay'
 
 const LINKS = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, end: true },
@@ -136,10 +137,11 @@ export function Layout() {
 function LayoutShell() {
   const location = useLocation()
   const { canBack, canForward, back, forward } = useAppHistory()
-  const { banner, busy, saveNow, dismiss } = useAutoBackup()
+  const { banner, busy, saveNow, dismiss, process } = useAutoBackup()
 
   return (
     <div className="shell">
+      <DataProcessOverlay state={process} />
       <aside className="sidebar">
         <Link className="brand" to="/" replace>
           <AppLogo className="brand-mark" />

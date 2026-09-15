@@ -18,7 +18,9 @@ import {
   type RemoteBackupRef,
 } from '../backup'
 import { formatDateTime } from '../lib/dates'
+import { gmailRestoreProcess, gmailUploadProcess } from '../lib/dataProcess'
 import { useGoogleAuth } from '../hooks/useGoogleAuth'
+import { DataProcessOverlay } from './DataProcessOverlay'
 import { EntityCard } from './EntityCard'
 import { Modal } from './ui'
 
@@ -41,40 +43,6 @@ function statusLabel(status: string, email: string | null): string {
   }
 }
 
-function uploadProgressLabel(step: CloudBackupProgress | null): string {
-  switch (step) {
-    case 'preparing':
-      return 'Preparando copia…'
-    case 'compressing':
-      return 'Comprimiendo…'
-    case 'uploading':
-      return 'Subiendo a Gmail…'
-    case 'done':
-      return 'Copia creada correctamente.'
-    case 'error':
-      return 'No se pudo crear la copia.'
-    default:
-      return ''
-  }
-}
-
-function restoreProgressLabel(step: CloudRestoreProgress | null): string {
-  switch (step) {
-    case 'downloading':
-      return 'Descargando copia…'
-    case 'validating':
-      return 'Comprobando integridad…'
-    case 'restoring':
-      return 'Restaurando datos…'
-    case 'done':
-      return 'Datos restaurados.'
-    case 'error':
-      return 'No se pudo restaurar.'
-    default:
-      return ''
-  }
-}
-
 function formatBackupWhen(createdAt: string): string {
   const ts = Date.parse(createdAt)
   return formatDateTime(Number.isFinite(ts) ? ts : Date.now())
@@ -89,6 +57,9 @@ export function GoogleAccountPanel() {
   const [restoreProgress, setRestoreProgress] = useState<CloudRestoreProgress | null>(null)
   const [backups, setBackups] = useState<RemoteBackupRef[] | null>(null)
   const [pendingRestore, setPendingRestore] = useState<RemoteBackupRef | null>(null)
+
+  const dataProcess =
+    gmailUploadProcess(uploadProgress) ?? gmailRestoreProcess(restoreProgress)
 
   const connected = auth.status === 'connected'
   const canConnect =
@@ -185,6 +156,8 @@ export function GoogleAccountPanel() {
   }
 
   return (
+    <>
+    <DataProcessOverlay state={dataProcess} />
     <EntityCard
       title={
         <h2 className="title-sm">
@@ -255,21 +228,17 @@ export function GoogleAccountPanel() {
             </button>
           </div>
 
-          {uploadProgress && uploadProgress !== 'done' && uploadProgress !== 'error' ? (
-            <p className="muted" style={{ marginTop: 8 }}>
-              {uploadProgressLabel(uploadProgress)}
-            </p>
-          ) : null}
-          {restoreProgress && restoreProgress !== 'done' && restoreProgress !== 'error' ? (
-            <p className="muted" style={{ marginTop: 8 }}>
-              {restoreProgressLabel(restoreProgress)}
-            </p>
-          ) : null}
-
           {pendingRestore ? (
             <Modal
               open
-              title="¿Restaurar esta copia?"
+              title={
+                <span className="restore-confirm-title">
+                  <span className="restore-confirm-warn" aria-hidden>
+                    !
+                  </span>
+                  ¿Restaurar esta copia?
+                </span>
+              }
               onClose={() => {
                 if (!busy) setPendingRestore(null)
               }}
@@ -285,7 +254,7 @@ export function GoogleAccountPanel() {
                   </button>
                   <button
                     type="button"
-                    className="btn"
+                    className="btn btn-primary"
                     disabled={busy}
                     onClick={() => void onConfirmRestore()}
                   >
@@ -295,57 +264,56 @@ export function GoogleAccountPanel() {
                 </>
               }
             >
-              <div className="inbox-alert" role="status" style={{ marginBottom: '0.75rem' }}>
-                <span className="inbox-alert-pulse" aria-hidden />
-                <span className="inbox-alert-text">
-                  Se reemplazarán los datos actuales de este dispositivo.
-                </span>
+              <div className="restore-confirm-body">
+                <div className="restore-confirm-info">
+                  <p className="restore-confirm-datetime">
+                    {formatBackupWhen(pendingRestore.createdAt)}
+                  </p>
+                  <p className="restore-confirm-meta muted">
+                    {formatBackupSize(pendingRestore.size)}
+                    {pendingRestore.deviceName ? ` · ${pendingRestore.deviceName}` : ''}
+                  </p>
+                </div>
+                <div className="inbox-alert restore-confirm-alert" role="status">
+                  <span className="inbox-alert-pulse" aria-hidden />
+                  <span className="inbox-alert-text">
+                    Se reemplazarán los datos actuales de este dispositivo.
+                  </span>
+                </div>
               </div>
-              <p className="muted" style={{ margin: 0 }}>
-                Copia del <strong>{formatBackupWhen(pendingRestore.createdAt)}</strong>
-                {pendingRestore.deviceName ? ` · ${pendingRestore.deviceName}` : ''}
-                {pendingRestore.size
-                  ? ` · ${formatBackupSize(pendingRestore.size)}`
-                  : ''}
-                .
-              </p>
             </Modal>
           ) : null}
 
           {backups && backups.length > 0 ? (
-            <div style={{ marginTop: 12 }}>
+            <div className="gmail-backup-list-wrap">
               <p className="backup-step-label">Copias disponibles</p>
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+              <ul className="gmail-backup-list">
                 {backups.slice(0, 10).map((b) => (
-                  <li
-                    key={b.remoteId}
-                    className="muted"
-                    style={{
-                      marginBottom: 10,
-                      paddingBottom: 8,
-                      borderBottom: '1px solid var(--border, #e2e8f0)',
-                    }}
-                  >
-                    <div>
-                      <strong>{formatBackupWhen(b.createdAt)}</strong>
-                      {' · '}
-                      {formatBackupSize(b.size)}
-                      {b.deviceName ? ` · ${b.deviceName}` : ''}
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      style={{ marginTop: 6 }}
-                      disabled={busy}
-                      onClick={() => {
-                        setLocalError('')
-                        setLocalOk('')
-                        setPendingRestore(b)
-                      }}
-                    >
-                      <RotateCcw size={16} />
-                      Restaurar esta copia
-                    </button>
+                  <li key={b.remoteId}>
+                    <article className="gmail-backup-card card">
+                      <div className="gmail-backup-card-body">
+                        <time className="gmail-backup-card-date" dateTime={b.createdAt}>
+                          {formatBackupWhen(b.createdAt)}
+                        </time>
+                        <p className="gmail-backup-card-meta muted">
+                          {formatBackupSize(b.size)}
+                          {b.deviceName ? ` · ${b.deviceName}` : ''}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-primary gmail-backup-restore-btn"
+                        disabled={busy}
+                        onClick={() => {
+                          setLocalError('')
+                          setLocalOk('')
+                          setPendingRestore(b)
+                        }}
+                      >
+                        <RotateCcw size={16} aria-hidden />
+                        Restaurar
+                      </button>
+                    </article>
                   </li>
                 ))}
               </ul>
@@ -365,5 +333,6 @@ export function GoogleAccountPanel() {
         </div>
       ) : null}
     </EntityCard>
+    </>
   )
 }

@@ -162,19 +162,20 @@ export function Modal({
   footer,
 }: {
   open: boolean
-  title: string
+  title: ReactNode
   onClose: () => void
   children: ReactNode
   footer?: ReactNode
 }) {
   if (!open) return null
+  const ariaLabel = typeof title === 'string' ? title : 'Diálogo'
   return (
     <div className="modal-backdrop" onClick={onClose} role="presentation">
       <div
         className="modal"
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-label={ariaLabel}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="row-spread" style={{ marginBottom: '0.75rem' }}>

@@ -77,12 +77,20 @@ export function runAutoBackupIfDue(): Promise<AutoBackupResult> {
   return inFlight
 }
 
-export async function saveBackupNow(): Promise<{ kind: 'folder' | 'zip'; size: number }> {
+export type SaveBackupProgress = 'collect' | 'pack' | 'save'
+
+export async function saveBackupNow(
+  onProgress?: (step: SaveBackupProgress) => void,
+): Promise<{ kind: 'folder' | 'zip'; size: number }> {
+  onProgress?.('collect')
+  onProgress?.('pack')
   const folder = await getUsableBackupFolder()
   if (folder) {
+    onProgress?.('save')
     const size = await writeBackupToFolder(folder)
     return { kind: 'folder', size }
   }
+  onProgress?.('save')
   const { blob, filename } = await exportBackupZip()
   downloadBlob(blob, filename)
   await markBackupDone('zip')
