@@ -8,6 +8,7 @@ import {
   importBackup,
   pickBackupFolder,
   restoreFromFolder,
+  type BackupFileKind,
 } from '../db/backup'
 import { ensureHorizon } from '../db/occurrences'
 import { FOLDER_RESTORE_STEPS, IMPORT_STEPS } from '../lib/dataProcess'
@@ -30,8 +31,8 @@ export function RestorePanel({
 }) {
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
-  const { state: processState, run: runProcess } = useDataProcess()
-  const working = busy || !!processState
+  const { session: processSession, run: runProcess, dismiss: dismissProcess } = useDataProcess()
+  const working = busy || !!processSession
   const folderOk = canUseFolderBackup()
   const [camino, setCamino] = useState<Camino>(() => (canUseFolderBackup() ? 'carpeta' : 'zip'))
   const caminoActivo = camino === 'carpeta' && !folderOk ? 'zip' : camino
@@ -56,13 +57,21 @@ export function RestorePanel({
     setBusy(true)
     setMessage('')
     try {
-      const kind = await runProcess('Restaurando copia', IMPORT_STEPS, async (advance) => {
-        advance('read')
-        advance('validate')
-        const imported = await importBackup(file, 'replace')
-        advance('apply')
-        await finishRestore()
-        return imported
+      const kind = await runProcess<BackupFileKind>({
+        title: 'Restaurando copia',
+        steps: IMPORT_STEPS,
+        successTitle: 'Datos restaurados',
+        successMessage: (imported) =>
+          `Copia ${backupKindLabel(imported)} aplicada en este dispositivo.`,
+        errorTitle: 'No se pudo restaurar',
+        work: async (advance) => {
+          advance('read')
+          advance('validate')
+          const imported = await importBackup(file, 'replace')
+          advance('apply')
+          await finishRestore()
+          return imported
+        },
       })
       const note =
         kind === 'json'
@@ -81,14 +90,20 @@ export function RestorePanel({
     setBusy(true)
     setMessage('')
     try {
-      await runProcess('Restaurando desde carpeta', FOLDER_RESTORE_STEPS, async (advance) => {
-        advance('read')
-        const handle = await pickBackupFolder()
-        advance('validate')
-        await restoreFromFolder(handle, 'replace')
-        advance('apply')
-        await finishRestore()
-        return handle.name
+      await runProcess({
+        title: 'Restaurando desde carpeta',
+        steps: FOLDER_RESTORE_STEPS,
+        successTitle: 'Datos restaurados',
+        successMessage: 'La copia de la carpeta se aplicó en este dispositivo.',
+        errorTitle: 'No se pudo restaurar',
+        work: async (advance) => {
+          advance('read')
+          const handle = await pickBackupFolder()
+          advance('validate')
+          await restoreFromFolder(handle, 'replace')
+          advance('apply')
+          await finishRestore()
+        },
       })
       setMessage(`Datos recuperados desde la carpeta (archivo ${BACKUP_FILE_NAME}).`)
     } catch (err) {
@@ -211,7 +226,7 @@ export function RestorePanel({
   if (embedded) {
     return (
       <>
-        <DataProcessOverlay state={processState} />
+        <DataProcessOverlay session={processSession} onDismiss={dismissProcess} />
         <div className="restore-embedded">{body}</div>
       </>
     )
@@ -219,7 +234,7 @@ export function RestorePanel({
 
   return (
     <>
-      <DataProcessOverlay state={processState} />
+      <DataProcessOverlay session={processSession} onDismiss={dismissProcess} />
       <section className={`card restore-panel${compact ? ' restore-panel-compact' : ''}`}>
         {body}
       </section>

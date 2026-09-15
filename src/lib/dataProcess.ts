@@ -1,16 +1,28 @@
-import type { CloudBackupProgress, CloudRestoreProgress } from '../backup'
-
 export type DataProcessStep = {
   id: string
   label: string
   detail: string
 }
 
-export type DataProcessState = {
+export type DataProcessRunning = {
+  phase: 'running'
   title: string
   steps: DataProcessStep[]
   activeStepId: string
+  completing?: boolean
 }
+
+export type DataProcessOutcome = {
+  phase: 'outcome'
+  outcome: 'success' | 'error'
+  title: string
+  message: string
+}
+
+export type DataProcessSession = DataProcessRunning | DataProcessOutcome
+
+/** @deprecated Usar DataProcessSession */
+export type DataProcessState = DataProcessRunning
 
 export const GMAIL_UPLOAD_STEPS: DataProcessStep[] = [
   {
@@ -138,27 +150,23 @@ export const SAVE_BACKUP_STEPS: DataProcessStep[] = [
   },
 ]
 
-export function gmailUploadProcess(step: CloudBackupProgress | null): DataProcessState | null {
-  if (!step || step === 'done' || step === 'error') return null
-  return {
-    title: 'Creando copia en Gmail',
-    steps: GMAIL_UPLOAD_STEPS,
-    activeStepId: step,
-  }
-}
-
-export function gmailRestoreProcess(step: CloudRestoreProgress | null): DataProcessState | null {
-  if (!step || step === 'done' || step === 'error') return null
-  return {
-    title: 'Restaurando desde Gmail',
-    steps: GMAIL_RESTORE_STEPS,
-    activeStepId: step,
-  }
-}
-
-export function processProgressPercent(steps: DataProcessStep[], activeStepId: string): number {
+/** Tramo [floor, ceiling) del paso activo para animación de progreso indeterminado. */
+export function stepProgressBounds(
+  steps: DataProcessStep[],
+  activeStepId: string,
+): { floor: number; ceiling: number } {
   const index = steps.findIndex((s) => s.id === activeStepId)
-  if (index < 0) return 8
-  const slot = (index + 0.62) / steps.length
-  return Math.min(96, Math.max(8, Math.round(slot * 100)))
+  const count = steps.length
+  if (index < 0 || count === 0) return { floor: 0, ceiling: 92 }
+
+  const floor = Math.round((index / count) * 100)
+  if (index >= count - 1) {
+    return { floor, ceiling: 96 }
+  }
+
+  const nextStart = Math.round(((index + 1) / count) * 100)
+  return {
+    floor,
+    ceiling: Math.max(floor + 6, nextStart - 2),
+  }
 }

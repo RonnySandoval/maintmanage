@@ -110,8 +110,8 @@ export function AjustesPage() {
   const shareStampRef = useRef<number>(-1)
   const [sharePrep, setSharePrep] = useState<'idle' | 'preparing' | 'ready' | 'error'>('idle')
   const [shareWarmKey, setShareWarmKey] = useState(0)
-  const { state: processState, run: runProcess } = useDataProcess()
-  const working = busy || !!processState
+  const { session: processSession, run: runProcess, dismiss: dismissProcess } = useDataProcess()
+  const working = busy || !!processSession
 
   const aliases = useAliases()
   const intervalHours = backupIntervalHoursOf(ajustes?.backupIntervalHours)
@@ -227,20 +227,29 @@ export function AjustesPage() {
   async function exportZip() {
     setMessage('')
     try {
-      await runProcess('Exportando copia ZIP', EXPORT_STEPS, async (advance) => {
-        advance('collect')
-        advance('pack')
-        const { blob, filename } = await exportBackupZip()
-        advance('finish')
-        downloadBlob(blob, filename)
-        await markBackupDone('zip')
-        shareZipRef.current = null
-        shareStampRef.current = -1
-        setShareWarmKey((k) => k + 1)
-        setMessage(
-          `ZIP listo (${formatBytes(blob.size)}). Guárdalo o pásalo al otro dispositivo e impórtalo como ZIP.`,
-        )
+      const { blob } = await runProcess<{ blob: Blob; filename: string }>({
+        title: 'Exportando copia ZIP',
+        steps: EXPORT_STEPS,
+        successTitle: 'ZIP exportado',
+        successMessage: (result) =>
+          `Archivo listo (${formatBytes(result.blob.size)}). Guárdalo o compártelo con otro dispositivo.`,
+        errorTitle: 'No se pudo exportar el ZIP',
+        work: async (advance) => {
+          advance('collect')
+          advance('pack')
+          const result = await exportBackupZip()
+          advance('finish')
+          downloadBlob(result.blob, result.filename)
+          await markBackupDone('zip')
+          shareZipRef.current = null
+          shareStampRef.current = -1
+          setShareWarmKey((k) => k + 1)
+          return result
+        },
       })
+      setMessage(
+        `ZIP listo (${formatBytes(blob.size)}). Guárdalo o pásalo al otro dispositivo e impórtalo como ZIP.`,
+      )
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'No se pudo exportar el ZIP.')
     }
@@ -249,17 +258,26 @@ export function AjustesPage() {
   async function exportJson() {
     setMessage('')
     try {
-      await runProcess('Exportando copia JSON', EXPORT_STEPS, async (advance) => {
-        advance('collect')
-        advance('pack')
-        const { blob, filename } = await exportBackupJson()
-        advance('finish')
-        downloadBlob(blob, filename)
-        await markBackupDone('json')
-        setMessage(
-          `JSON listo (${formatBytes(blob.size)}). Solo datos (sin fotos). Impórtalo como JSON.`,
-        )
+      const { blob } = await runProcess<{ blob: Blob; filename: string }>({
+        title: 'Exportando copia JSON',
+        steps: EXPORT_STEPS,
+        successTitle: 'JSON exportado',
+        successMessage: (result) =>
+          `Archivo listo (${formatBytes(result.blob.size)}). Solo datos, sin fotos.`,
+        errorTitle: 'No se pudo exportar el JSON',
+        work: async (advance) => {
+          advance('collect')
+          advance('pack')
+          const result = await exportBackupJson()
+          advance('finish')
+          downloadBlob(result.blob, result.filename)
+          await markBackupDone('json')
+          return result
+        },
       })
+      setMessage(
+        `JSON listo (${formatBytes(blob.size)}). Solo datos (sin fotos). Impórtalo como JSON.`,
+      )
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'No se pudo exportar el JSON.')
     }
@@ -268,8 +286,16 @@ export function AjustesPage() {
   async function saveNow() {
     setMessage('')
     try {
-      const result = await runProcess('Guardando copia', SAVE_BACKUP_STEPS, async (advance) => {
-        return saveBackupNow((step) => advance(step))
+      const result = await runProcess<{ kind: 'folder' | 'zip'; size: number }>({
+        title: 'Guardando copia',
+        steps: SAVE_BACKUP_STEPS,
+        successTitle: 'Copia guardada',
+        successMessage: (saved) =>
+          saved.kind === 'folder'
+            ? `Actualizado en la carpeta (${formatBytes(saved.size)}).`
+            : `ZIP descargado (${formatBytes(saved.size)}).`,
+        errorTitle: 'No se pudo guardar la copia',
+        work: async (advance) => saveBackupNow((step) => advance(step)),
       })
       setMessage(
         result.kind === 'folder'
@@ -284,17 +310,24 @@ export function AjustesPage() {
   async function chooseFolder() {
     setMessage('')
     try {
-      await runProcess('Configurando carpeta de copia', FOLDER_WRITE_STEPS, async (advance) => {
-        advance('collect')
-        const handle = await pickBackupFolder()
-        if (await hasUserData()) {
-          advance('pack')
-          advance('write')
-          const size = await writeBackupToFolder(handle)
-          setMessage(`Carpeta «${handle.name}» lista. Copia escrita (${formatBytes(size)}).`)
-        } else {
-          setMessage(`Carpeta «${handle.name}» lista. Las copias se escribirán aquí automáticamente.`)
-        }
+      await runProcess({
+        title: 'Configurando carpeta de copia',
+        steps: FOLDER_WRITE_STEPS,
+        successTitle: 'Carpeta configurada',
+        successMessage: 'La carpeta de respaldo quedó lista.',
+        errorTitle: 'No se pudo elegir la carpeta',
+        work: async (advance) => {
+          advance('collect')
+          const handle = await pickBackupFolder()
+          if (await hasUserData()) {
+            advance('pack')
+            advance('write')
+            const size = await writeBackupToFolder(handle)
+            setMessage(`Carpeta «${handle.name}» lista. Copia escrita (${formatBytes(size)}).`)
+          } else {
+            setMessage(`Carpeta «${handle.name}» lista. Las copias se escribirán aquí automáticamente.`)
+          }
+        },
       })
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -314,17 +347,27 @@ export function AjustesPage() {
     if (!ok) return
     setMessage('')
     try {
-      await runProcess('Restaurando desde carpeta', FOLDER_RESTORE_STEPS, async (advance) => {
-        advance('read')
-        const linked = await getUsableBackupFolder()
-        const handle = linked ?? (await pickBackupFolder())
-        advance('validate')
-        await restoreFromFolder(handle, modeImport)
-        advance('apply')
-        await ensureHorizon()
-        setMessage(
-          `Datos recuperados desde carpeta «${handle.name}» (${BACKUP_FILE_NAME} o ZIP maintmanage-*.zip).`,
-        )
+      await runProcess({
+        title: 'Restaurando desde carpeta',
+        steps: FOLDER_RESTORE_STEPS,
+        successTitle: 'Datos restaurados',
+        successMessage:
+          modeImport === 'replace'
+            ? 'Los datos locales se reemplazaron por los de la carpeta.'
+            : 'Los datos de la carpeta se fusionaron con los locales.',
+        errorTitle: 'No se pudo restaurar',
+        work: async (advance) => {
+          advance('read')
+          const linked = await getUsableBackupFolder()
+          const handle = linked ?? (await pickBackupFolder())
+          advance('validate')
+          await restoreFromFolder(handle, modeImport)
+          advance('apply')
+          await ensureHorizon()
+          setMessage(
+            `Datos recuperados desde carpeta «${handle.name}» (${BACKUP_FILE_NAME} o ZIP maintmanage-*.zip).`,
+          )
+        },
       })
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -390,13 +433,23 @@ export function AjustesPage() {
     if (!ok) return
     setMessage('')
     try {
-      const kind = await runProcess('Importando copia', IMPORT_STEPS, async (advance) => {
-        advance('read')
-        advance('validate')
-        const imported = await importBackup(file, modeImport)
-        advance('apply')
-        await ensureHorizon()
-        return imported
+      const kind = await runProcess<Awaited<ReturnType<typeof importBackup>>>({
+        title: 'Importando copia',
+        steps: IMPORT_STEPS,
+        successTitle: 'Copia importada',
+        successMessage: () =>
+          modeImport === 'replace'
+            ? 'Los datos del archivo reemplazaron los locales.'
+            : 'Los datos del archivo se fusionaron con los locales.',
+        errorTitle: 'No se pudo importar',
+        work: async (advance) => {
+          advance('read')
+          advance('validate')
+          const imported = await importBackup(file, modeImport)
+          advance('apply')
+          await ensureHorizon()
+          return imported
+        },
       })
       const extra =
         kind === 'json'
@@ -428,7 +481,7 @@ export function AjustesPage() {
 
   return (
     <>
-    <DataProcessOverlay state={processState} />
+    <DataProcessOverlay session={processSession} onDismiss={dismissProcess} />
     <div className="stack ajustes-page">
       <EntityCard
         className="ajustes-apariencia is-inline"

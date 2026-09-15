@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
 import {
   Cloud,
   CloudOff,
@@ -13,13 +14,18 @@ import {
   listGmailBackups,
   restoreFromGmail,
   uploadBackupToGmail,
-  type CloudBackupProgress,
-  type CloudRestoreProgress,
   type RemoteBackupRef,
 } from '../backup'
+import { db } from '../db'
+import { markBackupDone } from '../db/backup'
 import { formatDateTime } from '../lib/dates'
-import { gmailRestoreProcess, gmailUploadProcess } from '../lib/dataProcess'
+import { GMAIL_RESTORE_STEPS, GMAIL_UPLOAD_STEPS } from '../lib/dataProcess'
+import {
+  getCurrentGmailRemoteId,
+  setCurrentGmailRemoteId,
+} from '../lib/gmailCurrentBackup'
 import { useGoogleAuth } from '../hooks/useGoogleAuth'
+import { useDataProcess } from '../hooks/useDataProcess'
 import { DataProcessOverlay } from './DataProcessOverlay'
 import { EntityCard } from './EntityCard'
 import { Modal } from './ui'
@@ -48,18 +54,30 @@ function formatBackupWhen(createdAt: string): string {
   return formatDateTime(Number.isFinite(ts) ? ts : Date.now())
 }
 
+function isCurrentGmailBackup(
+  backup: RemoteBackupRef,
+  currentRemoteId: string | null,
+  lastChangedAt?: number,
+  lastBackupAt?: number,
+): boolean {
+  if (!currentRemoteId || backup.remoteId !== currentRemoteId) return false
+  if (!lastChangedAt) return true
+  if (!lastBackupAt) return false
+  return lastChangedAt <= lastBackupAt
+}
+
 export function GoogleAccountPanel() {
   const auth = useGoogleAuth()
+  const ajustes = useLiveQuery(() => db.ajustes.get('app'))
+  const { session, run, dismiss } = useDataProcess()
   const [busy, setBusy] = useState(false)
   const [localError, setLocalError] = useState('')
   const [localOk, setLocalOk] = useState('')
-  const [uploadProgress, setUploadProgress] = useState<CloudBackupProgress | null>(null)
-  const [restoreProgress, setRestoreProgress] = useState<CloudRestoreProgress | null>(null)
   const [backups, setBackups] = useState<RemoteBackupRef[] | null>(null)
   const [pendingRestore, setPendingRestore] = useState<RemoteBackupRef | null>(null)
 
-  const dataProcess =
-    gmailUploadProcess(uploadProgress) ?? gmailRestoreProcess(restoreProgress)
+  const working = busy || !!session
+  const currentRemoteId = getCurrentGmailRemoteId()
 
   const connected = auth.status === 'connected'
   const canConnect =
@@ -102,15 +120,24 @@ export function GoogleAccountPanel() {
     setLocalError('')
     setLocalOk('')
     setPendingRestore(null)
-    setUploadProgress('preparing')
     try {
-      const ref = await uploadBackupToGmail((step) => setUploadProgress(step))
+      const ref = await run<RemoteBackupRef>({
+        title: 'Creando copia en Gmail',
+        steps: GMAIL_UPLOAD_STEPS,
+        successTitle: 'Copia creada',
+        successMessage: (created) =>
+          `La copia se guardó en tu Gmail (${formatBackupSize(created.size)}).`,
+        errorTitle: 'No se pudo crear la copia',
+        work: async (advance) =>
+          uploadBackupToGmail((step) => {
+            if (step !== 'done' && step !== 'error') advance(step)
+          }),
+      })
+      setCurrentGmailRemoteId(ref.remoteId)
       setLocalOk(`Copia creada (${formatBackupSize(ref.size)}).`)
-      setUploadProgress('done')
       const list = await listGmailBackups()
       setBackups(list)
     } catch (err) {
-      setUploadProgress('error')
       setLocalError(err instanceof Error ? err.message : 'No se pudo crear la copia.')
     } finally {
       setBusy(false)
@@ -136,19 +163,27 @@ export function GoogleAccountPanel() {
   async function onConfirmRestore(): Promise<void> {
     if (!pendingRestore) return
     const target = pendingRestore
+    setPendingRestore(null)
     setBusy(true)
     setLocalError('')
     setLocalOk('')
-    setRestoreProgress('downloading')
     try {
-      await restoreFromGmail(target.remoteId, (step) => setRestoreProgress(step))
-      setPendingRestore(null)
-      setLocalOk(
-        `Datos restaurados desde la copia del ${formatBackupWhen(target.createdAt)}.`,
-      )
-      setRestoreProgress('done')
+      await run({
+        title: 'Restaurando desde Gmail',
+        steps: GMAIL_RESTORE_STEPS,
+        successTitle: 'Restauración completada',
+        successMessage: `Los datos de este dispositivo coinciden con la copia del ${formatBackupWhen(target.createdAt)}.`,
+        errorTitle: 'No se pudo restaurar',
+        work: async (advance) => {
+          await restoreFromGmail(target.remoteId, (step) => {
+            if (step !== 'done' && step !== 'error') advance(step)
+          })
+        },
+      })
+      setCurrentGmailRemoteId(target.remoteId)
+      await markBackupDone('gmail')
+      setLocalOk(`Datos restaurados desde la copia del ${formatBackupWhen(target.createdAt)}.`)
     } catch (err) {
-      setRestoreProgress('error')
       setLocalError(err instanceof Error ? err.message : 'No se pudo restaurar la copia.')
     } finally {
       setBusy(false)
@@ -157,182 +192,195 @@ export function GoogleAccountPanel() {
 
   return (
     <>
-    <DataProcessOverlay state={dataProcess} />
-    <EntityCard
-      title={
-        <h2 className="title-sm">
-          <span className="accordion-label">
-            {connected ? <Cloud size={16} /> : <CloudOff size={16} />}
-            Cuenta Google
-          </span>
-        </h2>
-      }
-    >
-      <p className="backup-status-line muted">{statusLabel(auth.status, auth.email)}</p>
-      {!auth.configured ? (
-        <p className="muted" style={{ marginTop: 0 }}>
-          Falta el Client ID de Google en esta instalación. Actualiza la app o revisa
-          google-oauth.json.
-        </p>
-      ) : (
-        <p className="muted" style={{ marginTop: 0 }}>
-          Las copias se guardan como correos en tu Gmail. No se guarda tu contraseña.
-        </p>
-      )}
+      <DataProcessOverlay session={session} onDismiss={dismiss} />
+      <EntityCard
+        title={
+          <h2 className="title-sm">
+            <span className="accordion-label">
+              {connected ? <Cloud size={16} /> : <CloudOff size={16} />}
+              Cuenta Google
+            </span>
+          </h2>
+        }
+      >
+        <p className="backup-status-line muted">{statusLabel(auth.status, auth.email)}</p>
+        {!auth.configured ? (
+          <p className="muted" style={{ marginTop: 0 }}>
+            Falta el Client ID de Google en esta instalación. Actualiza la app o revisa
+            google-oauth.json.
+          </p>
+        ) : (
+          <p className="muted" style={{ marginTop: 0 }}>
+            Las copias se guardan como correos en tu Gmail. No se guarda tu contraseña.
+          </p>
+        )}
 
-      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-        {canConnect || auth.status === 'connecting' ? (
-          <button
-            type="button"
-            className="btn"
-            disabled={busy || !auth.configured || auth.status === 'connecting'}
-            onClick={() => void onConnect()}
-          >
-            <LogIn size={16} />
-            {auth.status === 'expired' ? 'Volver a conectar' : 'Conectar Google'}
-          </button>
-        ) : null}
-        {connected || auth.status === 'expired' ? (
-          <button
-            type="button"
-            className="btn btn-ghost"
-            disabled={busy}
-            onClick={() => void onDisconnect()}
-          >
-            <LogOut size={16} />
-            Desconectar
-          </button>
-        ) : null}
-      </div>
-
-      {connected ? (
-        <>
-          <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          {canConnect || auth.status === 'connecting' ? (
             <button
               type="button"
               className="btn"
-              disabled={busy}
-              onClick={() => void onCreateBackup()}
+              disabled={working || !auth.configured || auth.status === 'connecting'}
+              onClick={() => void onConnect()}
             >
-              <UploadCloud size={16} />
-              Crear copia ahora
+              <LogIn size={16} />
+              {auth.status === 'expired' ? 'Volver a conectar' : 'Conectar Google'}
             </button>
+          ) : null}
+          {connected || auth.status === 'expired' ? (
             <button
               type="button"
               className="btn btn-ghost"
-              disabled={busy}
-              onClick={() => void onRefreshList()}
+              disabled={working}
+              onClick={() => void onDisconnect()}
             >
-              <RefreshCw size={16} />
-              Ver copias
+              <LogOut size={16} />
+              Desconectar
             </button>
-          </div>
-
-          {pendingRestore ? (
-            <Modal
-              open
-              title={
-                <span className="restore-confirm-title">
-                  <span className="restore-confirm-warn" aria-hidden>
-                    !
-                  </span>
-                  ¿Restaurar esta copia?
-                </span>
-              }
-              onClose={() => {
-                if (!busy) setPendingRestore(null)
-              }}
-              footer={
-                <>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    disabled={busy}
-                    onClick={() => setPendingRestore(null)}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={busy}
-                    onClick={() => void onConfirmRestore()}
-                  >
-                    <RotateCcw size={16} />
-                    Restaurar
-                  </button>
-                </>
-              }
-            >
-              <div className="restore-confirm-body">
-                <div className="restore-confirm-info">
-                  <p className="restore-confirm-datetime">
-                    {formatBackupWhen(pendingRestore.createdAt)}
-                  </p>
-                  <p className="restore-confirm-meta muted">
-                    {formatBackupSize(pendingRestore.size)}
-                    {pendingRestore.deviceName ? ` · ${pendingRestore.deviceName}` : ''}
-                  </p>
-                </div>
-                <div className="inbox-alert restore-confirm-alert" role="status">
-                  <span className="inbox-alert-pulse" aria-hidden />
-                  <span className="inbox-alert-text">
-                    Se reemplazarán los datos actuales de este dispositivo.
-                  </span>
-                </div>
-              </div>
-            </Modal>
           ) : null}
+        </div>
 
-          {backups && backups.length > 0 ? (
-            <div className="gmail-backup-list-wrap">
-              <p className="backup-step-label">Copias disponibles</p>
-              <ul className="gmail-backup-list">
-                {backups.slice(0, 10).map((b) => (
-                  <li key={b.remoteId}>
-                    <article className="gmail-backup-card card">
-                      <div className="gmail-backup-card-body">
-                        <time className="gmail-backup-card-date" dateTime={b.createdAt}>
-                          {formatBackupWhen(b.createdAt)}
-                        </time>
-                        <p className="gmail-backup-card-meta muted">
-                          {formatBackupSize(b.size)}
-                          {b.deviceName ? ` · ${b.deviceName}` : ''}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn btn-primary gmail-backup-restore-btn"
-                        disabled={busy}
-                        onClick={() => {
-                          setLocalError('')
-                          setLocalOk('')
-                          setPendingRestore(b)
-                        }}
-                      >
-                        <RotateCcw size={16} aria-hidden />
-                        Restaurar
-                      </button>
-                    </article>
-                  </li>
-                ))}
-              </ul>
+        {connected ? (
+          <>
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+              <button
+                type="button"
+                className="btn"
+                disabled={working}
+                onClick={() => void onCreateBackup()}
+              >
+                <UploadCloud size={16} />
+                Crear copia ahora
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={working}
+                onClick={() => void onRefreshList()}
+              >
+                <RefreshCw size={16} />
+                Ver copias
+              </button>
             </div>
-          ) : null}
-        </>
-      ) : null}
 
-      {localOk ? (
-        <div className="hint" style={{ marginTop: 8 }}>
-          {localOk}
-        </div>
-      ) : null}
-      {localError || auth.error ? (
-        <div className="hint" role="alert" style={{ marginTop: 8 }}>
-          {localError || auth.error}
-        </div>
-      ) : null}
-    </EntityCard>
+            {pendingRestore ? (
+              <Modal
+                open
+                title={
+                  <span className="restore-confirm-title">
+                    <span className="restore-confirm-warn" aria-hidden>
+                      !
+                    </span>
+                    ¿Restaurar esta copia?
+                  </span>
+                }
+                onClose={() => {
+                  if (!working) setPendingRestore(null)
+                }}
+                footer={
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={working}
+                      onClick={() => setPendingRestore(null)}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={working}
+                      onClick={() => void onConfirmRestore()}
+                    >
+                      <RotateCcw size={16} />
+                      Restaurar
+                    </button>
+                  </>
+                }
+              >
+                <div className="restore-confirm-body">
+                  <div className="restore-confirm-info">
+                    <p className="restore-confirm-datetime">
+                      {formatBackupWhen(pendingRestore.createdAt)}
+                    </p>
+                    <p className="restore-confirm-meta muted">
+                      {formatBackupSize(pendingRestore.size)}
+                      {pendingRestore.deviceName ? ` · ${pendingRestore.deviceName}` : ''}
+                    </p>
+                  </div>
+                  <div className="inbox-alert restore-confirm-alert" role="status">
+                    <span className="inbox-alert-pulse" aria-hidden />
+                    <span className="inbox-alert-text">
+                      Se reemplazarán los datos actuales de este dispositivo.
+                    </span>
+                  </div>
+                </div>
+              </Modal>
+            ) : null}
+
+            {backups && backups.length > 0 ? (
+              <div className="gmail-backup-list-wrap">
+                <p className="backup-step-label">Copias disponibles</p>
+                <ul className="gmail-backup-list">
+                  {backups.slice(0, 10).map((b) => {
+                    const isCurrent = isCurrentGmailBackup(
+                      b,
+                      currentRemoteId,
+                      ajustes?.lastChangedAt,
+                      ajustes?.lastBackupAt,
+                    )
+                    return (
+                      <li key={b.remoteId}>
+                        <article
+                          className={`gmail-backup-card card${isCurrent ? ' is-current' : ''}`}
+                        >
+                          <div className="gmail-backup-card-body">
+                            {isCurrent ? (
+                              <span className="gmail-backup-current-badge">Copia actual</span>
+                            ) : null}
+                            <time className="gmail-backup-card-date" dateTime={b.createdAt}>
+                              {formatBackupWhen(b.createdAt)}
+                            </time>
+                            <p className="gmail-backup-card-meta muted">
+                              {formatBackupSize(b.size)}
+                              {b.deviceName ? ` · ${b.deviceName}` : ''}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-primary gmail-backup-restore-btn"
+                            disabled={working}
+                            onClick={() => {
+                              setLocalError('')
+                              setLocalOk('')
+                              setPendingRestore(b)
+                            }}
+                          >
+                            <RotateCcw size={16} aria-hidden />
+                            Restaurar
+                          </button>
+                        </article>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            ) : null}
+          </>
+        ) : null}
+
+        {localOk ? (
+          <div className="hint" style={{ marginTop: 8 }}>
+            {localOk}
+          </div>
+        ) : null}
+        {localError || auth.error ? (
+          <div className="hint" role="alert" style={{ marginTop: 8 }}>
+            {localError || auth.error}
+          </div>
+        ) : null}
+      </EntityCard>
     </>
   )
 }

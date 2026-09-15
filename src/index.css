@@ -3234,6 +3234,8 @@ a.table-row:focus-visible {
   );
   background-size: 200% 100%;
   animation: data-process-shimmer 1.8s linear infinite;
+  transition: none;
+  will-change: width;
 }
 
 .data-process-pct {
@@ -3244,6 +3246,7 @@ a.table-row:focus-visible {
   font-variant-numeric: tabular-nums;
   color: var(--muted);
   text-align: right;
+  transition: color 180ms ease;
 }
 
 .data-process-detail {
@@ -4928,6 +4931,111 @@ a.table-row:focus-visible {
   min-height: 40px;
   padding-inline: 1rem;
   font-size: 0.88rem;
+}
+
+.gmail-backup-card.is-current {
+  border-color: color-mix(in srgb, var(--accent) 72%, #fff);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 0 10px color-mix(in srgb, var(--accent) 42%, transparent),
+    0 0 22px color-mix(in srgb, var(--accent) 24%, transparent),
+    var(--shadow);
+  animation: gmail-backup-neon-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes gmail-backup-neon-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent),
+      0 0 8px color-mix(in srgb, var(--accent) 34%, transparent),
+      0 0 18px color-mix(in srgb, var(--accent) 18%, transparent),
+      var(--shadow);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--accent) 78%, #fff),
+      0 0 14px color-mix(in srgb, var(--accent) 52%, transparent),
+      0 0 28px color-mix(in srgb, var(--accent) 30%, transparent),
+      var(--shadow);
+  }
+}
+
+.gmail-backup-current-badge {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  width: fit-content;
+  margin: 0 0 0.1rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  color: color-mix(in srgb, var(--accent) 88%, #fff);
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-elev));
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.gmail-backup-card-body:has(.gmail-backup-current-badge) {
+  gap: 0.28rem;
+}
+
+.data-process-panel-outcome {
+  text-align: center;
+  padding: 1.5rem 1.25rem 1.25rem;
+  animation: data-process-rise 340ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.data-process-outcome-icon {
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: 0 auto 0.85rem;
+  border-radius: 999px;
+}
+
+.data-process-panel-outcome.is-success .data-process-outcome-icon {
+  color: #16a34a;
+  background: color-mix(in srgb, #16a34a 14%, var(--bg-muted));
+  border: 1px solid color-mix(in srgb, #16a34a 35%, transparent);
+}
+
+.data-process-panel-outcome.is-error .data-process-outcome-icon {
+  color: #dc2626;
+  background: color-mix(in srgb, #dc2626 12%, var(--bg-muted));
+  border: 1px solid color-mix(in srgb, #dc2626 32%, transparent);
+}
+
+[data-theme='dark'] .data-process-panel-outcome.is-success .data-process-outcome-icon {
+  color: #4ade80;
+}
+
+[data-theme='dark'] .data-process-panel-outcome.is-error .data-process-outcome-icon {
+  color: #f87171;
+}
+
+.data-process-outcome-title {
+  margin: 0 0 0.55rem;
+  font-size: 1.12rem;
+  font-weight: 750;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.data-process-outcome-message {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--text) 88%, var(--muted));
+}
+
+.data-process-outcome-btn {
+  min-width: 8.5rem;
 }
 
 /* Restore confirmation modal */

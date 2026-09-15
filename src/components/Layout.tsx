@@ -137,11 +137,11 @@ export function Layout() {
 function LayoutShell() {
   const location = useLocation()
   const { canBack, canForward, back, forward } = useAppHistory()
-  const { banner, busy, saveNow, dismiss, process } = useAutoBackup()
+  const { banner, busy, saveNow, dismiss, session, dismissProcess } = useAutoBackup()
 
   return (
     <div className="shell">
-      <DataProcessOverlay state={process} />
+      <DataProcessOverlay session={session} onDismiss={dismissProcess} />
       <aside className="sidebar">
         <Link className="brand" to="/" replace>
           <AppLogo className="brand-mark" />
