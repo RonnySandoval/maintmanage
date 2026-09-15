@@ -286,75 +286,95 @@ export async function importBackup(file: Blob, mode: 'replace' | 'merge'): Promi
   return kind
 }
 
-export type ShareBackupResult = 'shared' | 'downloaded' | 'cancelled' | 'failed'
+export type ShareBackupResult = 'shared' | 'cancelled' | 'unsupported' | 'failed'
 
-function backupZipFile(blob: Blob, filename: string, type: string): File {
-  return new File([blob], filename, { type, lastModified: Date.now() })
-}
-
-/**
- * Abre el menú nativo de compartir con el ZIP.
- * Debe llamarse dentro de un gesto de usuario (click).
- * No descarga: si no puede compartir, devuelve 'failed'.
- */
-export async function sharePreparedBackupZip(
-  blob: Blob,
-  filename: string,
-): Promise<'shared' | 'cancelled' | 'failed'> {
+/** ¿El navegador permite compartir un archivo ZIP por el menú nativo? */
+export function canShareZipFiles(): boolean {
   const nav = navigator as Navigator & {
     share?: (data: ShareData) => Promise<void>
     canShare?: (data: ShareData) => boolean
   }
-
-  if (!nav.share) return 'failed'
-
-  const mimeTypes = [
-    'application/zip',
-    'application/x-zip-compressed',
-    'application/octet-stream',
-  ]
-
-  for (const type of mimeTypes) {
-    const file = backupZipFile(blob, filename, type)
-    const data: ShareData = {
-      files: [file],
-      title: 'Copia MaintManage',
-      text: 'Copia completa (ZIP) de MaintManage para restaurar en otro dispositivo.',
+  if (typeof nav.share !== 'function') return false
+  try {
+    const probe = new File([new Uint8Array([0x50, 0x4b])], 'maintmanage-backup.zip', {
+      type: 'application/zip',
+    })
+    if (typeof nav.canShare === 'function') {
+      return nav.canShare({ files: [probe] })
     }
-    try {
-      await nav.share(data)
-      await markBackupDone('zip')
-      return 'shared'
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return 'cancelled'
-      // NotAllowedError / TypeError: probar otro MIME o fallar.
-    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function backupZipAsFile(blob: Blob, filename: string): File {
+  return new File([blob], filename, {
+    type: 'application/zip',
+    lastModified: Date.now(),
+  })
+}
+
+function asShareableZipFile(blob: Blob, filename: string, mime: string): File {
+  return new File([blob], filename, { type: mime, lastModified: Date.now() })
+}
+
+function canShareFile(
+  nav: Navigator & { canShare?: (data: ShareData) => boolean },
+  file: File,
+): boolean {
+  if (typeof nav.canShare !== 'function') return true
+  try {
+    return nav.canShare({ files: [file] })
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Abre el menú nativo con el archivo. Preferir llamarlo justo después de
+ * generar el ZIP en el mismo manejador de click.
+ */
+export async function shareBackupFile(file: File): Promise<ShareBackupResult> {
+  const nav = navigator as Navigator & {
+    share?: (data: ShareData) => Promise<void>
+    canShare?: (data: ShareData) => boolean
+  }
+  if (typeof nav.share !== 'function') return 'unsupported'
+
+  const candidates: File[] = [file]
+  if (file.type !== 'application/octet-stream') {
+    candidates.push(asShareableZipFile(file, file.name, 'application/octet-stream'))
   }
 
-  return 'failed'
-}
+  const shareable = candidates.find((candidate) => canShareFile(nav, candidate))
+  if (!shareable) return 'unsupported'
 
-export async function prepareBackupZipForShare(): Promise<{ blob: Blob; filename: string }> {
-  return exportBackupZip()
-}
-
-export async function shareBackupZip(): Promise<
-  ShareBackupResult | { status: 'ready'; blob: Blob; filename: string }
-> {
-  const prepared = await prepareBackupZipForShare()
-  const nav = navigator as Navigator & { share?: (data: ShareData) => Promise<void> }
-
-  if (!nav.share) {
-    downloadBlob(prepared.blob, prepared.filename)
+  try {
+    // Solo files: title/text a veces rompen el envío a WhatsApp en Android.
+    await nav.share({ files: [shareable] })
     await markBackupDone('zip')
-    return 'downloaded'
+    return 'shared'
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') return 'cancelled'
+    return 'failed'
   }
+}
 
-  const result = await sharePreparedBackupZip(prepared.blob, prepared.filename)
-  if (result === 'shared' || result === 'cancelled') return result
+export async function prepareBackupZipForShare(): Promise<{
+  file: File
+  filename: string
+  size: number
+}> {
+  const { blob, filename } = await exportBackupZip()
+  const file = backupZipAsFile(blob, filename)
+  return { file, filename, size: blob.size }
+}
 
-  // Tras generar el ZIP el gesto puede haber caducado → segundo toque en la UI.
-  return { status: 'ready', blob: prepared.blob, filename: prepared.filename }
+/** Un solo paso: genera el ZIP y abre el menú nativo de compartir. */
+export async function buildAndShareBackupZip(): Promise<ShareBackupResult> {
+  const { file } = await prepareBackupZipForShare()
+  return shareBackupFile(file)
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {
