@@ -286,7 +286,12 @@ export async function importBackup(file: Blob, mode: 'replace' | 'merge'): Promi
   return kind
 }
 
-export type ShareBackupResult = 'shared' | 'cancelled' | 'unsupported' | 'failed'
+export type ShareBackupResult =
+  | 'shared'
+  | 'cancelled'
+  | 'unsupported'
+  | 'failed'
+  | 'needs-gesture'
 
 /** ¿El navegador permite compartir un archivo ZIP por el menú nativo? */
 export function canShareZipFiles(): boolean {
@@ -319,46 +324,48 @@ function asShareableZipFile(blob: Blob, filename: string, mime: string): File {
   return new File([blob], filename, { type: mime, lastModified: Date.now() })
 }
 
-function canShareFile(
-  nav: Navigator & { canShare?: (data: ShareData) => boolean },
-  file: File,
-): boolean {
-  if (typeof nav.canShare !== 'function') return true
-  try {
-    return nav.canShare({ files: [file] })
-  } catch {
-    return false
-  }
-}
-
 /**
- * Abre el menú nativo con el archivo. Preferir llamarlo justo después de
- * generar el ZIP en el mismo manejador de click.
+ * Abre el menú nativo con el archivo.
+ * Debe llamarse en el manejador de click sin awaits previos (el ZIP
+ * tiene que estar ya preparado); si no, Android/Chrome revoca el gesto.
  */
 export async function shareBackupFile(file: File): Promise<ShareBackupResult> {
   const nav = navigator as Navigator & {
     share?: (data: ShareData) => Promise<void>
-    canShare?: (data: ShareData) => boolean
   }
   if (typeof nav.share !== 'function') return 'unsupported'
 
-  const candidates: File[] = [file]
-  if (file.type !== 'application/octet-stream') {
-    candidates.push(asShareableZipFile(file, file.name, 'application/octet-stream'))
+  const candidates: File[] = [
+    file,
+    asShareableZipFile(file, file.name, 'application/octet-stream'),
+    asShareableZipFile(file, file.name, 'application/x-zip-compressed'),
+  ]
+
+  let sawNotAllowed = false
+  let sawTypeError = false
+
+  for (const candidate of candidates) {
+    try {
+      // Solo files: title/text a veces rompen el envío a WhatsApp en Android.
+      await nav.share({ files: [candidate] })
+      await markBackupDone('zip')
+      return 'shared'
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return 'cancelled'
+      if (err instanceof DOMException && err.name === 'NotAllowedError') {
+        sawNotAllowed = true
+        break
+      }
+      if (err instanceof TypeError) {
+        sawTypeError = true
+        continue
+      }
+    }
   }
 
-  const shareable = candidates.find((candidate) => canShareFile(nav, candidate))
-  if (!shareable) return 'unsupported'
-
-  try {
-    // Solo files: title/text a veces rompen el envío a WhatsApp en Android.
-    await nav.share({ files: [shareable] })
-    await markBackupDone('zip')
-    return 'shared'
-  } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') return 'cancelled'
-    return 'failed'
-  }
+  if (sawNotAllowed) return 'needs-gesture'
+  if (sawTypeError) return 'unsupported'
+  return 'failed'
 }
 
 export async function prepareBackupZipForShare(): Promise<{
