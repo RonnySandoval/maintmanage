@@ -78,6 +78,20 @@ export class GoogleAuth {
     return () => this.listeners.delete(listener)
   }
 
+  /** Tras cargar clientId en runtime (p. ej. google-oauth.json en Pages). */
+  refreshConfiguration(): void {
+    if (this.deps.getClientId()) {
+      if (this.status === 'unavailable') {
+        this.setState({ status: 'disconnected', error: null })
+      } else {
+        this.cachedSnapshot = null
+        for (const listener of this.listeners) listener()
+      }
+    } else if (this.status !== 'unavailable') {
+      this.clearToken({ status: 'unavailable', error: null })
+    }
+  }
+
   /**
    * Debe devolver la misma referencia si no hay cambios
    * (useSyncExternalStore hace Object.is y un objeto nuevo congela la UI).
@@ -141,7 +155,7 @@ export class GoogleAuth {
     if (!clientId) {
       this.setState({
         status: 'unavailable',
-        error: 'Falta configurar VITE_GOOGLE_CLIENT_ID para usar la copia en Google.',
+        error: 'Falta configurar el Client ID de Google para usar la copia en la nube.',
       })
       throw new Error(this.error!)
     }

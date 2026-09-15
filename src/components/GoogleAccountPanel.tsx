@@ -198,8 +198,8 @@ export function GoogleAccountPanel() {
       <p className="backup-status-line muted">{statusLabel(auth.status, auth.email)}</p>
       {!auth.configured ? (
         <p className="muted" style={{ marginTop: 0 }}>
-          El administrador debe definir <code>VITE_GOOGLE_CLIENT_ID</code> en el entorno de
-          compilación.
+          El administrador debe publicar <code>public/google-oauth.json</code> o definir{' '}
+          <code>VITE_GOOGLE_CLIENT_ID</code> al compilar.
         </p>
       ) : (
         <p className="muted" style={{ marginTop: 0 }}>

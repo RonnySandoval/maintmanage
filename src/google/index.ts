@@ -1,4 +1,4 @@
-export { getGoogleClientId, isGoogleAuthConfigured } from './config'
+export { getGoogleClientId, isGoogleAuthConfigured, ensureGoogleClientConfig } from './config'
 export { loadGis } from './loadGis'
 export {
   GoogleAuth,

@@ -1,5 +1,9 @@
-import { useCallback, useSyncExternalStore } from 'react'
-import { getGoogleAuth, type GoogleAuthSnapshot } from '../google'
+import { useCallback, useEffect, useSyncExternalStore } from 'react'
+import {
+  ensureGoogleClientConfig,
+  getGoogleAuth,
+  type GoogleAuthSnapshot,
+} from '../google'
 
 export function useGoogleAuth(): GoogleAuthSnapshot & {
   connect: () => Promise<void>
@@ -7,6 +11,16 @@ export function useGoogleAuth(): GoogleAuthSnapshot & {
   ensureAccessToken: () => Promise<string>
 } {
   const auth = getGoogleAuth()
+
+  useEffect(() => {
+    let cancelled = false
+    void ensureGoogleClientConfig().then(() => {
+      if (!cancelled) auth.refreshConfiguration()
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [auth])
 
   const snapshot = useSyncExternalStore(
     (onStoreChange) => auth.subscribe(onStoreChange),

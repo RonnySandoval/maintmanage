@@ -147,7 +147,7 @@ describe('GoogleAuth (Fase 3)', () => {
 
   it('connect sin configuración falla con mensaje claro', async () => {
     const auth = new GoogleAuth({ getClientId: () => '' })
-    await expect(auth.connect()).rejects.toThrow(/VITE_GOOGLE_CLIENT_ID/)
+    await expect(auth.connect()).rejects.toThrow(/Client ID/)
   })
 
   it('getSnapshot estabiliza la referencia (evita freeze en React)', () => {
@@ -155,6 +155,16 @@ describe('GoogleAuth (Fase 3)', () => {
     const a = auth.getSnapshot()
     const b = auth.getSnapshot()
     expect(a).toBe(b)
+  })
+
+  it('refreshConfiguration pasa de unavailable a disconnected', () => {
+    let clientId = ''
+    const auth = new GoogleAuth({ getClientId: () => clientId })
+    expect(auth.getSnapshot().status).toBe('unavailable')
+    clientId = 'client.apps.googleusercontent.com'
+    auth.refreshConfiguration()
+    expect(auth.getSnapshot().status).toBe('disconnected')
+    expect(auth.getSnapshot().configured).toBe(true)
   })
 })
 
