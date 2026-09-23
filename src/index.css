@@ -242,6 +242,28 @@ textarea {
   color: inherit;
 }
 
+.message-preview {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--bg-muted);
+  white-space: pre-wrap;
+}
+
+.message-preview p {
+  margin: 0.35rem 0 0;
+}
+
+.message-preview-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 a {
   color: var(--accent);
   text-decoration: none;
@@ -733,7 +755,7 @@ button.nuevo-fab-item {
   bottom: 0;
   z-index: 30;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   background: var(--bg-elev);
   border-top: 1px solid var(--border);
   padding-bottom: env(safe-area-inset-bottom);
@@ -770,6 +792,15 @@ button.nuevo-fab-item {
 
 .nav-item.active {
   color: var(--accent);
+}
+
+.bottom-nav .nav-item {
+  min-width: 0;
+  padding-inline: 0.1rem;
+  font-size: 0.6rem;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .card {

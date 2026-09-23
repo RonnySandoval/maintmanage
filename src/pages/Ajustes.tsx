@@ -74,9 +74,9 @@ import {
 type AjustesTab = 'gmail' | 'copia' | 'programa' | 'nombres' | 'avisos' | 'estados' | 'acerca'
 
 function tabFromParam(value: string | null): AjustesTab | null {
-  if (value === 'none') return null
   if (
     value === 'gmail' ||
+    value === 'copia' ||
     value === 'programa' ||
     value === 'nombres' ||
     value === 'avisos' ||
@@ -85,7 +85,8 @@ function tabFromParam(value: string | null): AjustesTab | null {
   ) {
     return value
   }
-  return 'copia'
+  // Sin parámetro (o 'none'): todos los acordeones cerrados por defecto.
+  return null
 }
 
 export function AjustesPage() {
@@ -476,12 +477,8 @@ export function AjustesPage() {
 
   function setTab(next: AjustesTab | null) {
     const nextParams = new URLSearchParams(params)
-    if (!next || next === 'copia') {
-      if (!next) nextParams.set('tab', 'none')
-      else nextParams.delete('tab')
-    } else {
-      nextParams.set('tab', next)
-    }
+    if (next) nextParams.set('tab', next)
+    else nextParams.set('tab', 'none')
     setParams(nextParams, { replace: true })
   }
 

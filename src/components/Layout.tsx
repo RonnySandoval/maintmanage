@@ -11,6 +11,7 @@ import {
   ClipboardList,
   History,
   LayoutDashboard,
+  MessageSquare,
   Settings,
 } from 'lucide-react'
 import { FilterDrawer, FilterDrawerToggle } from './FilterDrawer'
@@ -28,6 +29,7 @@ const LINKS = [
   { to: '/cronograma', label: 'Cronograma', icon: CalendarDays, end: false },
   { to: '/fichas', label: 'Fichas', icon: ClipboardList, end: false },
   { to: '/historicos', label: 'Histórico', icon: History, end: false },
+  { to: '/mensajes', label: 'Mensajes', icon: MessageSquare, end: false },
   { to: '/ajustes', label: 'Ajustes', icon: Settings, end: false },
 ]
 
@@ -36,6 +38,7 @@ const TITLES: Record<string, string> = {
   '/cronograma': 'Cronograma',
   '/fichas': 'Fichas',
   '/historicos': 'Histórico',
+  '/mensajes': 'Mensajes',
   '/ajustes': 'Ajustes',
 }
 
@@ -70,12 +73,13 @@ function titleFor(pathname: string, search = ''): string {
   if (pathname === '/ajustes') {
     const tab = new URLSearchParams(search).get('tab')
     if (tab === 'gmail') return 'Copia en Google'
+    if (tab === 'copia') return 'Copia local'
     if (tab === 'programa') return 'Programación'
     if (tab === 'nombres') return 'Nombres'
     if (tab === 'avisos') return 'Avisos'
     if (tab === 'estados') return 'Estados'
     if (tab === 'acerca') return 'Acerca de'
-    return 'Copia local'
+    return 'Ajustes'
   }
   return TITLES[pathname] ?? 'MaintManage'
 }

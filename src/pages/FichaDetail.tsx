@@ -23,6 +23,7 @@ import { FichaTitle } from '../components/FichaTitle'
 import { AccionesPanel } from '../components/AccionesPanel'
 import { CopyText } from '../components/CopyText'
 import { EntityCard } from '../components/EntityCard'
+import { MensajeFichaPanel } from '../components/MensajeFichaPanel'
 
 export function FichaDetailPage() {
   const { id } = useParams()
@@ -228,6 +229,13 @@ export function FichaDetailPage() {
           parentLabel={fichaTitulo(current)}
         />
       </EntityCard>
+
+      <MensajeFichaPanel
+        ficha={ficha}
+        encargado={encargado}
+        bloque={bloque}
+        ocurrencias={ocurrencias}
+      />
 
       <EntityCard
         title={<h3 className="title-sm">Cronograma</h3>}

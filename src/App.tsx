@@ -20,6 +20,7 @@ import { FichaFormPage } from './pages/FichaForm'
 import { FichasPage } from './pages/Fichas'
 import { HistoricosPage } from './pages/Historicos'
 import { InspeccionFichaFormPage } from './pages/InspeccionFichaForm'
+import { MensajesPage } from './pages/Mensajes'
 import { OcurrenciaDetailPage } from './pages/OcurrenciaDetail'
 
 export default function App() {
@@ -63,6 +64,7 @@ export default function App() {
             <Route path="eventos/:id" element={<EventoDetailPage />} />
             <Route path="acciones/:id" element={<AccionDetailPage />} />
             <Route path="historicos" element={<HistoricosPage />} />
+            <Route path="mensajes" element={<MensajesPage />} />
             <Route path="bloques" element={<Navigate to="/fichas?tab=bloques" replace />} />
             <Route path="maestros" element={<Navigate to="/fichas?tab=bloques" replace />} />
             <Route path="ajustes" element={<AjustesPage />} />
