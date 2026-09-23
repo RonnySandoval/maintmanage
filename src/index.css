@@ -4168,6 +4168,7 @@ a.table-row:focus-visible {
 .chip-row.tight {
   margin-bottom: 0.3rem;
   overflow: visible;
+  flex-wrap: wrap;
 }
 
 .textarea.compact {
