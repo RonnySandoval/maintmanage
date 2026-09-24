@@ -89,6 +89,7 @@ async function buildPayload(): Promise<{ payload: BackupPayload; adjuntos: Adjun
     accionesCorrectivas: await db.accionesCorrectivas.toArray(),
     actividades: await db.actividades.toArray(),
     eventos: await db.eventos.toArray(),
+    notas: await db.notas.toArray(),
     ajustes: await db.ajustes.toArray(),
     adjuntosMeta: adjuntos.map((adjunto) => ({
       id: adjunto.id,
@@ -194,6 +195,7 @@ async function applyBackupPayload(
   const accionesCorrectivas = payload.accionesCorrectivas ?? []
   const actividades = payload.actividades ?? []
   const eventos = payload.eventos ?? []
+  const notas = payload.notas ?? []
   const ajustes = payload.ajustes ?? []
 
   await withoutDataTouch(async () => {
@@ -209,6 +211,7 @@ async function applyBackupPayload(
       if (accionesCorrectivas.length) await db.accionesCorrectivas.bulkPut(accionesCorrectivas)
       if (actividades.length) await db.actividades.bulkPut(actividades)
       if (eventos.length) await db.eventos.bulkPut(eventos)
+      if (notas.length) await db.notas.bulkPut(notas)
       if (ajustes.length) await db.ajustes.bulkPut(ajustes)
       if (adjuntos.length) await db.adjuntos.bulkPut(adjuntos)
     })

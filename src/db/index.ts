@@ -10,6 +10,7 @@ import type {
   Evento,
   Bloque,
   Ficha,
+  Nota,
   Ocurrencia,
 } from './types'
 
@@ -24,6 +25,7 @@ export class MaintDB extends Dexie {
   ajustes!: Table<Ajustes, string>
   actividades!: Table<Actividad, string>
   eventos!: Table<Evento, string>
+  notas!: Table<Nota, string>
 
   constructor() {
     super('maintmanage')
@@ -224,6 +226,60 @@ export class MaintDB extends Dexie {
       ajustes: 'id',
       actividades: 'id, tipo, encargadoId, titulo',
       eventos: 'id, actividadId, fechaProgramada, estado, origen, [actividadId+fechaProgramada]',
+    })
+    this.version(11).stores({
+      encargados: 'id, nombre',
+      grupos: 'id, nombre',
+      fichas: 'id, grupoId, encargadoId, nombre, numero',
+      ocurrencias: 'id, fichaId, fechaProgramada, estado, origen, [fichaId+fechaProgramada]',
+      ejecuciones: 'id, ocurrenciaId, eventoId, accionId',
+      accionesCorrectivas:
+        'id, fichaId, ocurrenciaId, actividadId, eventoId, estado, tipo, prioridad',
+      adjuntos: 'id, fichaId, ejecucionId, tipo, actividadId',
+      ajustes: 'id',
+      actividades: 'id, tipo, encargadoId, titulo',
+      eventos: 'id, actividadId, fechaProgramada, estado, origen, [actividadId+fechaProgramada]',
+      notas: 'id, fichaId, ocurrenciaId, updatedAt',
+    })
+    this.version(12)
+      .stores({
+        encargados: 'id, nombre',
+        grupos: 'id, nombre',
+        fichas: 'id, grupoId, encargadoId, nombre, numero',
+        ocurrencias: 'id, fichaId, fechaProgramada, estado, origen, [fichaId+fechaProgramada]',
+        ejecuciones: 'id, ocurrenciaId, eventoId, accionId',
+        accionesCorrectivas:
+          'id, fichaId, ocurrenciaId, actividadId, eventoId, estado, tipo, prioridad',
+        adjuntos: 'id, fichaId, ejecucionId, tipo, actividadId',
+        ajustes: 'id',
+        actividades: 'id, tipo, encargadoId, titulo',
+        eventos: 'id, actividadId, fechaProgramada, estado, origen, [actividadId+fechaProgramada]',
+        notas: 'id, fichaId, ocurrenciaId, updatedAt, fecha',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('notas')
+          .toCollection()
+          .modify((nota: { fecha?: string; createdAt?: number }) => {
+            if (typeof nota.fecha !== 'string' || !nota.fecha) {
+              const base = typeof nota.createdAt === 'number' ? new Date(nota.createdAt) : new Date()
+              nota.fecha = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`
+            }
+          })
+      })
+    this.version(13).stores({
+      encargados: 'id, nombre',
+      grupos: 'id, nombre',
+      fichas: 'id, grupoId, encargadoId, nombre, numero',
+      ocurrencias: 'id, fichaId, fechaProgramada, estado, origen, [fichaId+fechaProgramada]',
+      ejecuciones: 'id, ocurrenciaId, eventoId, accionId',
+      accionesCorrectivas:
+        'id, fichaId, ocurrenciaId, actividadId, eventoId, estado, tipo, prioridad',
+      adjuntos: 'id, fichaId, ejecucionId, tipo, actividadId',
+      ajustes: 'id',
+      actividades: 'id, tipo, encargadoId, titulo',
+      eventos: 'id, actividadId, fechaProgramada, estado, origen, [actividadId+fechaProgramada]',
+      notas: 'id, fichaId, ocurrenciaId, actividadId, eventoId, updatedAt, fecha',
     })
   }
 }

@@ -21,6 +21,7 @@ import { ShareMenu } from '../components/ShareMenu'
 import { ExtraBadge, Modal, StatusBadge } from '../components/ui'
 import { FichaTitle } from '../components/FichaTitle'
 import { AccionesPanel } from '../components/AccionesPanel'
+import { NotasVinculadas } from '../components/NotasVinculadas'
 import { CopyText } from '../components/CopyText'
 import { EntityCard } from '../components/EntityCard'
 import { MensajeFichaPanel } from '../components/MensajeFichaPanel'
@@ -278,6 +279,8 @@ export function FichaDetailPage() {
       </EntityCard>
 
       <AccionesPanel fichaId={ficha.id} />
+
+      <NotasVinculadas fichaId={ficha.id} />
 
       <Modal open={modal === 'extra'} title="Añadir inspección" onClose={() => setModal(null)}>
         <form onSubmit={(e) => void submitExtra(e)}>

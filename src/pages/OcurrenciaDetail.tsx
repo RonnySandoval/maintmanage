@@ -12,6 +12,7 @@ import { ShareMenu } from '../components/ShareMenu'
 import { ExtraBadge, StatusBadge } from '../components/ui'
 import { FichaTitle } from '../components/FichaTitle'
 import { AccionesPanel } from '../components/AccionesPanel'
+import { NotasVinculadas } from '../components/NotasVinculadas'
 import { EjecucionForm } from '../components/EjecucionForm'
 import { EntityCard } from '../components/EntityCard'
 
@@ -176,7 +177,9 @@ export function OcurrenciaDetailPage() {
         ) : null}
       </EntityCard>
 
-      <AccionesPanel fichaId={currentFicha.id} ocurrenciaId={ocurrencia.id} onlyCorrectiva />
+      <AccionesPanel fichaId={currentFicha.id} ocurrenciaId={ocurrencia.id} />
+
+      <NotasVinculadas fichaId={currentFicha.id} ocurrenciaId={ocurrencia.id} />
     </div>
   )
 }

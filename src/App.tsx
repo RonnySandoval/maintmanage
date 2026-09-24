@@ -5,6 +5,7 @@ import { Splash } from './components/Splash'
 import { ThemeProvider } from './hooks/useTheme'
 import { FontScaleProvider } from './hooks/useFontScale'
 import { StatusLabelsProvider } from './hooks/useStatusLabels'
+import { SearchBarProvider } from './hooks/useSearchBar'
 import { AccionFechasProvider } from './hooks/useAccionFechas'
 import { ensureHorizon } from './db/occurrences'
 import { notifyIfNeeded } from './lib/notifications'
@@ -21,6 +22,7 @@ import { FichasPage } from './pages/Fichas'
 import { HistoricosPage } from './pages/Historicos'
 import { InspeccionFichaFormPage } from './pages/InspeccionFichaForm'
 import { MensajesPage } from './pages/Mensajes'
+import { NotasPage } from './pages/Notas'
 import { OcurrenciaDetailPage } from './pages/OcurrenciaDetail'
 
 export default function App() {
@@ -44,6 +46,7 @@ export default function App() {
     <ThemeProvider>
       <FontScaleProvider>
       <StatusLabelsProvider>
+      <SearchBarProvider>
       <AccionFechasProvider>
         <Splash />
         <HashRouter>
@@ -65,6 +68,7 @@ export default function App() {
             <Route path="acciones/:id" element={<AccionDetailPage />} />
             <Route path="historicos" element={<HistoricosPage />} />
             <Route path="mensajes" element={<MensajesPage />} />
+            <Route path="notas" element={<NotasPage />} />
             <Route path="bloques" element={<Navigate to="/fichas?tab=bloques" replace />} />
             <Route path="maestros" element={<Navigate to="/fichas?tab=bloques" replace />} />
             <Route path="ajustes" element={<AjustesPage />} />
@@ -73,6 +77,7 @@ export default function App() {
         </Routes>
         </HashRouter>
       </AccionFechasProvider>
+      </SearchBarProvider>
       </StatusLabelsProvider>
       </FontScaleProvider>
     </ThemeProvider>

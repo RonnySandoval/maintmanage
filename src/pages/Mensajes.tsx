@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
+  Check,
   CheckSquare,
+  ChevronDown,
   Copy,
   Download,
   MessageSquare,
@@ -22,7 +24,9 @@ import { compareFichasByNumero, fichaTitulo } from '../lib/fichas'
 import { formatFechaProgramada, monthLabel, todayISO } from '../lib/dates'
 import { copyText } from '../lib/share'
 import { EntityCard } from '../components/EntityCard'
+import { MultiCheckDropdown } from '../components/MultiCheckDropdown'
 import { ShareMenu } from '../components/ShareMenu'
+import { TagTextarea } from '../components/TagTextarea'
 import { StatusBadge, EmptyState } from '../components/ui'
 
 function initialTemplate(): string {
@@ -38,7 +42,7 @@ interface Criterio {
   q: string
   encargadoId: string
   mes: string
-  estado: EstadoOcurrencia | ''
+  estado: EstadoOcurrencia[]
   limite: string
 }
 
@@ -59,11 +63,11 @@ function filtrarFichas(
       a.fechaProgramada < b.fechaProgramada ? -1 : a.fechaProgramada > b.fechaProgramada ? 1 : 0,
     )
     let ref = occs.find((o) => o.fechaProgramada >= today) ?? occs[0]
-    if (criterio.mes || criterio.estado) {
+    if (criterio.mes || criterio.estado.length > 0) {
       const match = occs.find(
         (o) =>
           (!criterio.mes || o.fechaProgramada.slice(0, 7) === criterio.mes) &&
-          (!criterio.estado || o.estado === criterio.estado),
+          (criterio.estado.length === 0 || criterio.estado.includes(o.estado)),
       )
       if (!match) continue
       ref = match
@@ -81,10 +85,12 @@ export function MensajesPage() {
   const [q, setQ] = useState('')
   const [encargadoId, setEncargadoId] = useState('')
   const [mes, setMes] = useState('')
-  const [estado, setEstado] = useState<EstadoOcurrencia | ''>('')
+  const [estado, setEstado] = useState<EstadoOcurrencia[]>([])
   const [limite, setLimite] = useState('')
   /** Criterio aceptado por el usuario. null = aún no se ha generado nada. */
   const [applied, setApplied] = useState<Criterio | null>(null)
+  /** Cards expandidas. Vacío = todas colapsadas por defecto. */
+  const [openIds, setOpenIds] = useState<string[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [copiedAll, setCopiedAll] = useState(false)
   const [copiedId, setCopiedId] = useState('')
@@ -156,8 +162,15 @@ export function MensajesPage() {
     const rows = filtrarFichas(fichas, occsByFicha, criterio, today)
     setApplied(criterio)
     setSelectedIds(rows.map((r) => r.fichaId))
+    setOpenIds([])
     setCopiedAll(false)
     setCopiedId('')
+  }
+
+  function toggleCard(fichaId: string) {
+    setOpenIds((current) =>
+      current.includes(fichaId) ? current.filter((id) => id !== fichaId) : [...current, fichaId],
+    )
   }
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
@@ -224,13 +237,13 @@ export function MensajesPage() {
     setQ('')
     setEncargadoId('')
     setMes('')
-    setEstado('')
+    setEstado([])
     setLimite('')
     setApplied(null)
     setSelectedIds([])
   }
 
-  const hasFilters = Boolean(q || encargadoId || mes || estado || limite)
+  const hasFilters = Boolean(q || encargadoId || mes || estado.length > 0 || limite)
 
   return (
     <div className="stack">
@@ -253,18 +266,15 @@ export function MensajesPage() {
         }
       >
         <p className="muted" style={{ marginTop: 0 }}>
-          Escribe el texto y toca una etiqueta para insertarla donde esté el cursor. Se comparte
-          con la plantilla de cada ficha.
+          Toca una etiqueta para insertarla donde esté el cursor.
         </p>
         <div className="field">
           <label htmlFor="mensajes-plantilla">Plantilla</label>
-          <textarea
+          <TagTextarea
             ref={textareaRef}
             id="mensajes-plantilla"
-            className="textarea"
-            rows={5}
             value={template}
-            onChange={(event) => setTemplate(event.target.value)}
+            onChange={setTemplate}
             placeholder="Hola {{encargado}}, te escribo por la ficha {{numero_ficha}}…"
           />
         </div>
@@ -330,20 +340,15 @@ export function MensajesPage() {
             />
           </div>
           <div className="field" style={{ margin: 0 }}>
-            <label htmlFor="mensajes-estado">Estado de inspección</label>
-            <select
-              id="mensajes-estado"
-              className="select"
-              value={estado}
-              onChange={(e) => setEstado(e.target.value as EstadoOcurrencia | '')}
-            >
-              <option value="">Todos</option>
-              {ESTADOS.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+            <span className="field-label" id="mensajes-estado-label">
+              Estado de inspección
+            </span>
+            <MultiCheckDropdown
+              label="Estado de inspección"
+              options={ESTADOS.map((s) => ({ value: s.id, label: s.label }))}
+              selected={estado}
+              onChange={setEstado}
+            />
           </div>
           <div className="field" style={{ margin: 0 }}>
             <label htmlFor="mensajes-limite">Cantidad máxima</label>
@@ -357,18 +362,21 @@ export function MensajesPage() {
               onChange={(e) => setLimite(e.target.value)}
             />
           </div>
-          <div className="field" style={{ margin: 0, justifyContent: 'flex-end' }}>
+          <div className="field msg-filter-foot" style={{ margin: 0, justifyContent: 'flex-end' }}>
             <span className="muted" style={{ fontSize: '0.82rem' }}>
               {applied
                 ? `${mensajes.length} mensaje${mensajes.length === 1 ? '' : 's'} · ${seleccionados.length} seleccionado${seleccionados.length === 1 ? '' : 's'}`
                 : 'Sin generar: ajusta y pulsa Generar mensajes.'}
             </span>
-            <div className="row" style={{ flexWrap: 'wrap' }}>
-              {hasFilters ? (
-                <button type="button" className="btn btn-ghost" onClick={clearFilters}>
-                  Limpiar
-                </button>
-              ) : null}
+            <div className="msg-form-actions">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={!hasFilters && !applied}
+                onClick={clearFilters}
+              >
+                Limpiar
+              </button>
               <button type="button" className="btn btn-primary" onClick={generar}>
                 <Sparkles size={16} />{' '}
                 {applied ? 'Generar de nuevo' : 'Generar mensajes'}
@@ -376,49 +384,55 @@ export function MensajesPage() {
             </div>
             {applied && dirty ? (
               <span className="muted" style={{ fontSize: '0.82rem' }}>
-                Cambiaste la plantilla o los filtros: lo generado abajo es lo aceptado antes.
-                Pulsa «Generar de nuevo» para actualizar.
+                Hay cambios sin aplicar. Genera de nuevo para actualizar.
               </span>
             ) : null}
           </div>
         </div>
       </EntityCard>
 
-      <div className="row" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="msg-toolbar">
         <h3 className="title-sm" style={{ margin: 0 }}>
           3 · Mensajes
         </h3>
-        <span style={{ flex: 1 }} />
         {mensajes.length ? (
-          <>
+          <div className="msg-actions">
             <button
               type="button"
               className="btn btn-ghost"
+              title={allChecked ? 'No incluir ninguno' : 'Incluir todos'}
+              aria-label={allChecked ? 'No incluir ninguno' : 'Incluir todos'}
               onClick={() =>
                 setSelectedIds(allChecked ? [] : mensajes.map((m) => m.ficha.id))
               }
             >
-              {allChecked ? <Square size={16} /> : <CheckSquare size={16} />}
-              {allChecked ? 'Ninguno' : 'Todos'}
+              {allChecked ? <Square size={16} aria-hidden /> : <CheckSquare size={16} aria-hidden />}
+              <span className="btn-label">{allChecked ? 'Ninguno' : 'Todos'}</span>
             </button>
             <button
               type="button"
               className="btn btn-primary"
+              title="Copiar seleccionados"
               disabled={!seleccionados.length}
               onClick={() => void copyAll()}
             >
-              <Copy size={16} /> {copiedAll ? 'Copiado' : `Copiar (${seleccionados.length})`}
+              <Copy size={16} aria-hidden />{' '}
+              <span className="btn-label">
+                {copiedAll ? 'Copiado' : `Copiar (${seleccionados.length})`}
+              </span>
             </button>
             <button
               type="button"
               className="btn"
+              title="Descargar TXT"
+              aria-label="Descargar TXT"
               disabled={!seleccionados.length}
               onClick={downloadAll}
             >
-              <Download size={16} /> TXT
+              <Download size={16} aria-hidden /> <span className="btn-label">TXT</span>
             </button>
             <ShareMenu title="Mensajes de inspección" text={textoSeleccionados} />
-          </>
+          </div>
         ) : null}
       </div>
 
@@ -426,7 +440,7 @@ export function MensajesPage() {
         <EmptyState
           icon={<MessageSquare size={36} />}
           title="Aún no hay mensajes"
-          text="Ajusta la plantilla y los criterios arriba y pulsa «Generar mensajes». Nada se genera hasta que lo aceptes."
+          text="Nada se genera hasta que lo aceptes. Pulsa «Generar mensajes»."
           action={
             <button type="button" className="btn btn-primary" onClick={generar}>
               <Sparkles size={16} /> Generar mensajes
@@ -440,7 +454,7 @@ export function MensajesPage() {
           text={
             fichas.length === 0
               ? 'Aún no hay fichas. Crea una ficha para generar mensajes.'
-              : 'No hay fichas con ese criterio. Ajusta los filtros o limpia la búsqueda.'
+              : 'Sin fichas con ese criterio.'
           }
           action={
             hasFilters ? (
@@ -454,27 +468,55 @@ export function MensajesPage() {
         <div className="stack">
           {mensajes.map(({ ficha, ocurrencia, encargado, bloque, texto }) => {
             const checked = selectedSet.has(ficha.id)
+            const isOpen = openIds.includes(ficha.id)
+            const copied = copiedId === ficha.id
             return (
               <EntityCard
                 key={ficha.id}
+                className="mensajes-msg"
                 title={
-                  <label className="row" style={{ gap: '0.6rem', cursor: 'pointer' }}>
+                  <div className="row" style={{ gap: '0.6rem', alignItems: 'center' }}>
                     <input
                       type="checkbox"
                       checked={checked}
                       onChange={() => toggleOne(ficha.id)}
                       aria-label={`Incluir ${fichaTitulo(ficha)}`}
                     />
-                    <Link
-                      to={`/fichas/${ficha.id}`}
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ fontWeight: 650 }}
-                    >
+                    <Link to={`/fichas/${ficha.id}`} style={{ fontWeight: 650 }}>
                       {fichaTitulo(ficha)}
                     </Link>
-                  </label>
+                    <span style={{ flex: 1 }} />
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      aria-expanded={isOpen}
+                      aria-label={isOpen ? 'Contraer mensaje' : 'Ver mensaje'}
+                      title={isOpen ? 'Contraer' : 'Ver mensaje'}
+                      onClick={() => toggleCard(ficha.id)}
+                    >
+                      <ChevronDown
+                        size={16}
+                        aria-hidden
+                        style={{ transform: isOpen ? 'rotate(180deg)' : undefined }}
+                      />
+                    </button>
+                  </div>
                 }
                 badge={ocurrencia ? <StatusBadge estado={ocurrencia.estado} /> : null}
+                footer={
+                  <div className="row" style={{ gap: '0.35rem' }}>
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      title={copied ? 'Copiado' : 'Copiar mensaje'}
+                      aria-label="Copiar mensaje"
+                      onClick={() => void copyOne(ficha.id, texto)}
+                    >
+                      {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
+                    </button>
+                    <ShareMenu title={`Mensaje - ${ficha.nombre}`} text={texto} iconOnly />
+                  </div>
+                }
               >
                 <p className="muted" style={{ marginTop: 0, fontSize: '0.82rem' }}>
                   {[encargado?.nombre ?? 'Sin encargado', bloque?.nombre ?? 'Sin bloque']
@@ -489,19 +531,11 @@ export function MensajesPage() {
                       ? ` · ${monthLabel(ocurrencia.fechaProgramada)}`
                       : ''}
                 </p>
-                <div className="message-preview">
-                  <p style={{ whiteSpace: 'pre-wrap' }}>{texto}</p>
-                </div>
-                <div className="row" style={{ flexWrap: 'wrap', marginTop: '0.6rem' }}>
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => void copyOne(ficha.id, texto)}
-                  >
-                    <Copy size={16} /> {copiedId === ficha.id ? 'Copiado' : 'Copiar'}
-                  </button>
-                  <ShareMenu title={`Mensaje - ${ficha.nombre}`} text={texto} />
-                </div>
+                {isOpen ? (
+                  <div className="message-preview">
+                    <p style={{ whiteSpace: 'pre-wrap' }}>{texto}</p>
+                  </div>
+                ) : null}
               </EntityCard>
             )
           })}

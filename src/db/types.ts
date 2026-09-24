@@ -139,6 +139,10 @@ export interface AccionCorrectiva {
   estado: EstadoCorrectiva
   fechaObjetivo?: string
   prioridad?: PrioridadAccion
+  /** Id de la recomendación que originó esta correctiva (trazabilidad de conversión). */
+  origenId?: string
+  /** Id de la correctiva creada desde esta recomendación (trazabilidad de conversión). */
+  convertidaEnId?: string
   createdAt: number
   updatedAt: number
 }
@@ -155,6 +159,28 @@ export interface Adjunto {
   /** Etiquetas libres creadas por el usuario (formato, instructivo…). */
   etiquetas?: string[]
   createdAt: number
+}
+
+export interface Nota {
+  id: string
+  titulo: string
+  cuerpo: string
+  /** Etiquetas libres para ordenar (p. ej. compras, pendiente…). */
+  etiquetas: string[]
+  /** Fecha de la nota (YYYY-MM-DD), definible a mano. Por defecto el día actual. */
+  fecha: string
+  /** Vínculo opcional a una ficha. */
+  fichaId?: string
+  /** Vínculo opcional a una inspección concreta (requiere fichaId). */
+  ocurrenciaId?: string
+  /** Vínculo opcional a una actividad (excluyente con fichaId). */
+  actividadId?: string
+  /** Vínculo opcional a un evento concreto (requiere actividadId). */
+  eventoId?: string
+  fijada: boolean
+  archivada: boolean
+  createdAt: number
+  updatedAt: number
 }
 
 export interface Ajustes {

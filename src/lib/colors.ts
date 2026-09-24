@@ -71,5 +71,10 @@ export function kindActividadVar(): string {
   return 'var(--kind-actividad)'
 }
 
+/** Color único para títulos y barras de ficha (sin color de bloque). */
+export function kindFichaVar(): string {
+  return 'var(--kind-ficha)'
+}
+
 export const BLOQUE_COLORS = BLOQUE_PALETTE.map((swatch) => swatch.light)
 export const GRUPO_COLORS = BLOQUE_COLORS

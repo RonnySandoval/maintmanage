@@ -7,9 +7,11 @@ import {
   LogOut,
   RefreshCw,
   RotateCcw,
+  Trash2,
   UploadCloud,
 } from 'lucide-react'
 import {
+  deleteGmailBackup,
   formatBackupSize,
   listGmailBackups,
   restoreFromGmail,
@@ -23,6 +25,7 @@ import { GMAIL_RESTORE_STEPS, GMAIL_UPLOAD_STEPS } from '../lib/dataProcess'
 import {
   getCurrentGmailRemoteId,
   setCurrentGmailRemoteId,
+  clearCurrentGmailRemoteId,
 } from '../lib/gmailCurrentBackup'
 import { useGoogleAuth } from '../hooks/useGoogleAuth'
 import { useDataProcess } from '../hooks/useDataProcess'
@@ -75,6 +78,7 @@ export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } 
   const [localOk, setLocalOk] = useState('')
   const [backups, setBackups] = useState<RemoteBackupRef[] | null>(null)
   const [pendingRestore, setPendingRestore] = useState<RemoteBackupRef | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<RemoteBackupRef | null>(null)
 
   const working = busy || !!session
   const currentRemoteId = getCurrentGmailRemoteId()
@@ -106,6 +110,7 @@ export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } 
     setLocalOk('')
     setBackups(null)
     setPendingRestore(null)
+    setPendingDelete(null)
     try {
       await auth.disconnect()
     } catch (err) {
@@ -120,6 +125,7 @@ export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } 
     setLocalError('')
     setLocalOk('')
     setPendingRestore(null)
+    setPendingDelete(null)
     try {
       const ref = await run<RemoteBackupRef>({
         title: 'Creando copia en Gmail',
@@ -148,6 +154,7 @@ export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } 
     setBusy(true)
     setLocalError('')
     setPendingRestore(null)
+    setPendingDelete(null)
     try {
       const list = await listGmailBackups()
       setBackups(list)
@@ -155,6 +162,26 @@ export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } 
       else setLocalOk('')
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'No se pudieron listar las copias.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onConfirmDelete(): Promise<void> {
+    if (!pendingDelete) return
+    const target = pendingDelete
+    setPendingDelete(null)
+    setBusy(true)
+    setLocalError('')
+    setLocalOk('')
+    try {
+      await deleteGmailBackup(target.remoteId)
+      if (getCurrentGmailRemoteId() === target.remoteId) clearCurrentGmailRemoteId()
+      const list = await listGmailBackups()
+      setBackups(list)
+      setLocalOk(`Copia del ${formatBackupWhen(target.createdAt)} borrada para siempre.`)
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'No se pudo borrar la copia.')
     } finally {
       setBusy(false)
     }
@@ -308,6 +335,62 @@ export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } 
               </Modal>
             ) : null}
 
+            {pendingDelete ? (
+              <Modal
+                open
+                title={
+                  <span className="restore-confirm-title">
+                    <span className="restore-confirm-warn" aria-hidden>
+                      !
+                    </span>
+                    ¿Borrar esta copia para siempre?
+                  </span>
+                }
+                onClose={() => {
+                  if (!working) setPendingDelete(null)
+                }}
+                footer={
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={working}
+                      onClick={() => setPendingDelete(null)}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      disabled={working}
+                      onClick={() => void onConfirmDelete()}
+                    >
+                      <Trash2 size={16} />
+                      Borrar para siempre
+                    </button>
+                  </>
+                }
+              >
+                <div className="restore-confirm-body">
+                  <div className="restore-confirm-info">
+                    <p className="restore-confirm-datetime">
+                      {formatBackupWhen(pendingDelete.createdAt)}
+                    </p>
+                    <p className="restore-confirm-meta muted">
+                      {formatBackupSize(pendingDelete.size)}
+                      {pendingDelete.deviceName ? ` · ${pendingDelete.deviceName}` : ''}
+                    </p>
+                  </div>
+                  <div className="inbox-alert restore-confirm-alert" role="status">
+                    <span className="inbox-alert-pulse" aria-hidden />
+                    <span className="inbox-alert-text">
+                      Se eliminará de tu Gmail de forma permanente. No se puede deshacer.
+                    </span>
+                  </div>
+                </div>
+              </Modal>
+            ) : null}
+
             {backups && backups.length > 0 ? (
               <div className="gmail-backup-list-wrap">
                 <p className="backup-step-label">Copias disponibles</p>
@@ -336,19 +419,35 @@ export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } 
                               {b.deviceName ? ` · ${b.deviceName}` : ''}
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            className="btn btn-primary gmail-backup-restore-btn"
-                            disabled={working}
-                            onClick={() => {
-                              setLocalError('')
-                              setLocalOk('')
-                              setPendingRestore(b)
-                            }}
-                          >
-                            <RotateCcw size={16} aria-hidden />
-                            Restaurar
-                          </button>
+                          <div className="gmail-backup-card-actions">
+                            <button
+                              type="button"
+                              className="btn btn-primary gmail-backup-restore-btn"
+                              disabled={working}
+                              onClick={() => {
+                                setLocalError('')
+                                setLocalOk('')
+                                setPendingRestore(b)
+                              }}
+                            >
+                              <RotateCcw size={16} aria-hidden />
+                              Restaurar
+                            </button>
+                            <button
+                              type="button"
+                              className="icon-btn icon-btn-delete"
+                              disabled={working}
+                              aria-label={`Borrar copia del ${formatBackupWhen(b.createdAt)}`}
+                              title="Borrar para siempre"
+                              onClick={() => {
+                                setLocalError('')
+                                setLocalOk('')
+                                setPendingDelete(b)
+                              }}
+                            >
+                              <Trash2 size={16} aria-hidden />
+                            </button>
+                          </div>
                         </article>
                       </li>
                     )

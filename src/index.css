@@ -40,6 +40,7 @@
   --top-h: 56px;
   --sidebar-w: 232px;
   --kind-actividad: #7c4a1e;
+  --kind-ficha: #1d4ed8;
   --font-scale: 1;
   --grid-font-dampen: 1;
   --font: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
@@ -197,6 +198,7 @@
     inset 0 -1px 0 rgb(0 0 0 / 0.22);
   --metal-shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 5px 14px rgb(0 0 0 / 0.22);
   --kind-actividad: #e0a36a;
+  --kind-ficha: #93c5fd;
   --app-texture:
     radial-gradient(980px 520px at 10% -12%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
     radial-gradient(720px 400px at 96% 6%, color-mix(in srgb, #1e3a5f 28%, transparent), transparent 55%),
@@ -1257,6 +1259,12 @@ a.icon-btn:hover {
   color: var(--text-muted);
 }
 
+.field-label {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--text-muted);
+}
+
 .input,
 .select,
 .textarea {
@@ -1304,6 +1312,11 @@ a.icon-btn:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-muted);
+}
+
+/* Toggle global del header: oculta los buscadores de todas las vistas. */
+html[data-busqueda='oculta'] .search-field {
+  display: none;
 }
 
 .row > .search-field,
@@ -1376,14 +1389,14 @@ a.icon-btn:hover {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.3rem 0.4rem;
   margin-bottom: 0.45rem;
   min-width: 0;
 }
 
 .crono-toolbar-toggles {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
   flex-wrap: nowrap;
   gap: 0.3rem;
@@ -1405,6 +1418,10 @@ a.icon-btn:hover {
   grid-template-columns: repeat(3, minmax(2rem, auto));
 }
 
+.seg-toggle.compact.icon-only.tabs-2 {
+  grid-template-columns: repeat(2, minmax(2rem, auto));
+}
+
 .seg-toggle.compact.icon-only button {
   min-width: 2rem;
   padding: 0 0.3rem;
@@ -1413,14 +1430,17 @@ a.icon-btn:hover {
 .year-stepper {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   flex: 0 0 auto;
-  gap: 0;
+  min-width: 0;
+  gap: 0.35rem;
 }
 
 .year-stepper strong {
-  min-width: 2.6rem;
+  min-width: 3.4rem;
   text-align: center;
-  font-size: 0.92rem;
+  font-size: 1.25rem;
+  letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1602,6 +1622,9 @@ a.icon-btn:hover {
   background: var(--accent-soft);
   color: var(--accent);
   border-color: transparent;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent),
+    0 0 10px color-mix(in srgb, var(--accent) 38%, transparent);
 }
 
 .chip.active:hover {
@@ -1708,6 +1731,14 @@ a.icon-btn:hover {
 .ficha-title {
   font-weight: 650;
   font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.ficha-title-icon {
+  flex-shrink: 0;
 }
 
 .actividad-title {
@@ -2735,6 +2766,14 @@ a.icon-btn:hover {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
+  min-width: 0;
+}
+
+/* Las píldoras de estado no se parten ni se recortan en el histórico. */
+.hist-acc-estado .badge,
+.hist-occ-end .badge {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .hist-occ-toggle {
@@ -3079,7 +3118,7 @@ a.table-row:focus-visible {
 }
 
 .table-cols-hist-acc {
-  grid-template-columns: 2rem minmax(0, 1.5fr) minmax(0, 1fr) 7.5rem 3rem;
+  grid-template-columns: 2rem minmax(0, 1.5fr) minmax(0, 1fr) 7.5rem auto;
   justify-items: start;
   text-align: left;
 }
@@ -3189,7 +3228,7 @@ a.table-row:focus-visible {
   }
 
   .table-cols-hist-acc {
-    grid-template-columns: 2rem minmax(0, 1fr) 3rem;
+    grid-template-columns: 2rem minmax(0, 1fr) auto;
   }
 }
 
@@ -3336,12 +3375,12 @@ a.table-row:focus-visible {
   position: fixed;
   inset: 0;
   z-index: 90;
-  background: rgb(8 15 25 / 0.42);
+  background: rgb(8 15 25 / 0.52);
   backdrop-filter: blur(var(--overlay-blur));
   -webkit-backdrop-filter: blur(var(--overlay-blur));
   display: grid;
-  place-items: end center;
-  padding: 0;
+  place-items: center;
+  padding: 1rem;
   opacity: 0;
   transition: opacity var(--overlay-dur) var(--overlay-ease);
 }
@@ -3351,11 +3390,11 @@ a.table-row:focus-visible {
 }
 
 .modal {
-  width: min(520px, 100%);
+  width: min(468px, 100%);
   max-height: 92dvh;
   overflow: auto;
   background: var(--bg-elev);
-  border-radius: 18px 18px 0 0;
+  border-radius: 18px;
   padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
   box-shadow: var(--shadow);
   opacity: 0;
@@ -4142,6 +4181,95 @@ a.table-row:focus-visible {
   overflow-wrap: break-word;
 }
 
+label.bloque-select-option {
+  align-items: center;
+  cursor: pointer;
+}
+
+/* Pie de filtros de Mensajes: ocupa toda la fila y botones lado a lado. */
+.msg-filter-foot {
+  grid-column: 1 / -1;
+}
+
+.msg-form-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.msg-form-actions .btn:only-child {
+  grid-column: 1 / -1;
+}
+
+/* Cards de mensajes: menos aire vertical. */
+.mensajes-msg.entity-card {
+  gap: 0.45rem;
+  padding: 0.7rem 0.85rem;
+}
+
+.mensajes-msg .entity-card-body {
+  gap: 0.25rem;
+}
+
+/* Notas en lista: solo dos líneas con suspensivos; el modal muestra todo. */
+.nota-card {
+  cursor: pointer;
+}
+
+.nota-snippet {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mensajes-msg .message-preview {
+  margin-top: 0.55rem;
+  padding: 0.6rem 0.75rem;
+}
+
+.mensajes-msg .entity-card-foot {
+  padding-top: 0.5rem;
+}
+
+/* Barra de acciones de Mensajes: título + botones agrupados en una línea. */
+.msg-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.msg-toolbar .title-sm {
+  flex-shrink: 0;
+}
+
+.msg-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  justify-content: end;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  min-width: 0;
+}
+
+@media (max-width: 860px) {
+  /* En pantallas medianas/pequeñas solo el símbolo. */
+  .msg-actions .btn-label {
+    display: none;
+  }
+  .msg-actions {
+    gap: 0.25rem;
+  }
+  .msg-actions .btn {
+    padding-inline: 0.6rem;
+  }
+}
+
 .bloque-select-option .color-dot {
   margin-top: 0;
 }
@@ -4169,6 +4297,80 @@ a.table-row:focus-visible {
   margin-bottom: 0.3rem;
   overflow: visible;
   flex-wrap: wrap;
+}
+
+/* Editor de plantilla con etiquetas dibujadas como píldoras. */
+.tag-editor {
+  display: grid;
+}
+
+.tag-editor-backdrop,
+.tag-editor-input {
+  grid-area: 1 / 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  min-height: 96px;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.5;
+  letter-spacing: -0.011em;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.tag-editor-backdrop {
+  overflow: auto;
+  scrollbar-width: none;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: var(--bg);
+  pointer-events: none;
+}
+
+.tag-editor-backdrop::-webkit-scrollbar {
+  display: none;
+}
+
+.tag-editor-backdrop pre {
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: var(--text);
+}
+
+.tag-editor-input {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--accent);
+  resize: vertical;
+}
+
+.tag-editor-input::selection {
+  background: color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+.tag-token {
+  display: inline-block;
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 0 0.4rem;
+  font-size: 0.85em;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.tag-token.unknown {
+  border-style: dashed;
+  background: transparent;
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 65%, transparent);
 }
 
 .textarea.compact {
@@ -4935,6 +5137,41 @@ a.table-row:focus-visible {
   margin-bottom: 1rem;
 }
 
+/* Globo de copia pendiente en el header: flasheo lento. */
+.backup-bell {
+  position: relative;
+  color: var(--warning);
+}
+
+.backup-bell-dot {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 9px;
+  height: 9px;
+  border-radius: 99px;
+  background: var(--warning);
+  animation: backup-bell-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes backup-bell-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.75);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backup-bell-dot {
+    animation: none;
+  }
+}
+
 .inbox-banner {
   display: flex;
   align-items: center;
@@ -5224,6 +5461,20 @@ a.table-row:focus-visible {
   min-height: 40px;
   padding-inline: 1rem;
   font-size: 0.88rem;
+}
+
+.gmail-backup-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  align-self: flex-start;
+  flex-shrink: 0;
+}
+
+@media (min-width: 420px) {
+  .gmail-backup-card-actions {
+    align-self: center;
+  }
 }
 
 .gmail-backup-card.is-current {

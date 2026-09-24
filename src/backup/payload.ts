@@ -8,6 +8,7 @@ import type {
   Evento,
   Bloque,
   Ficha,
+  Nota,
   Ocurrencia,
 } from '../db/types'
 
@@ -26,6 +27,7 @@ export interface BackupPayload {
   accionesCorrectivas: AccionCorrectiva[]
   actividades?: Actividad[]
   eventos?: Evento[]
+  notas?: Nota[]
   ajustes: Ajustes[]
   adjuntosMeta: AdjuntoMeta[]
 }

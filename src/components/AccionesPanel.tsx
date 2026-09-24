@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
+  ArrowRight,
   ChevronDown,
   CircleCheck,
   CalendarClock,
@@ -27,7 +28,9 @@ import {
   accionHref,
   accionTitulo,
   convertirAccionHref,
+  convertirRecomendacionACorrectiva,
   estadoAgendaCorrectiva,
+  limpiarTrazabilidadAlBorrar,
 } from '../lib/acciones'
 import { createId } from '../lib/ids'
 import { accionLabel, accionesTitulo, useAliases } from '../lib/labels'
@@ -79,6 +82,8 @@ export function AccionesPanel({
   const [filtroTipo, setFiltroTipo] = useState<'todas' | TipoAccion>('todas')
   const [filtroFecha, setFiltroFecha] = useState<'todas' | 'con' | 'sin'>('todas')
   const [open, setOpen] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [convertingId, setConvertingId] = useState<string | null>(null)
 
   const visibles = acciones.filter((a) => {
     if (!onlyCorrectiva && filtroTipo !== 'todas' && tipoAccionOf(a) !== filtroTipo) return false
@@ -96,7 +101,9 @@ export function AccionesPanel({
     }
     const nextTipo = onlyCorrectiva ? 'correctiva' : tipo
     const now = Date.now()
-    const nextEstado: EstadoCorrectiva = fecha ? 'programada' : 'pendiente'
+    // La recomendación no lleva fecha: siempre pendiente hasta convertirse.
+    const nextFecha = nextTipo === 'recomendacion' ? '' : fecha
+    const nextEstado: EstadoCorrectiva = nextFecha ? 'programada' : 'pendiente'
     const detalleTrim = detalle.trim()
     await db.accionesCorrectivas.add({
       id: createId(),
@@ -108,7 +115,7 @@ export function AccionesPanel({
       texto: texto.trim(),
       detalle: detalleTrim || undefined,
       estado: nextEstado,
-      fechaObjetivo: fecha || undefined,
+      fechaObjetivo: nextFecha || undefined,
       prioridad: nextTipo === 'correctiva' ? prioridad : undefined,
       createdAt: now,
       updatedAt: now,
@@ -118,10 +125,24 @@ export function AccionesPanel({
     setFecha('')
     setPrioridad('media')
     setTipo('correctiva')
+    setShowForm(false)
+  }
+
+  async function convertir(id: string) {
+    const rec = acciones.find((a) => a.id === id)
+    if (!rec || tipoAccionOf(rec) !== 'recomendacion' || convertingId) return
+    setConvertingId(id)
+    try {
+      await convertirRecomendacionACorrectiva(rec)
+    } finally {
+      setConvertingId(null)
+    }
   }
 
   async function remove(id: string) {
     if (!confirm('¿Borrar este registro?')) return
+    const target = acciones.find((a) => a.id === id)
+    if (target) await limpiarTrazabilidadAlBorrar(target)
     const ejec = await db.ejecuciones.where('accionId').equals(id).first()
     if (ejec) {
       await db.adjuntos.where('ejecucionId').equals(ejec.id).delete()
@@ -158,88 +179,7 @@ export function AccionesPanel({
       </button>
       {open ? (
         <div className="accordion-body">
-          <form onSubmit={(e) => void add(e)}>
-            {onlyCorrectiva ? null : (
-              <div className="chip-row tight" role="tablist" aria-label="Tipo">
-                <button
-                  type="button"
-                  className={`chip compact${tipo === 'correctiva' ? ' active' : ''}`}
-                  onClick={() => setTipo('correctiva')}
-                >
-                  {accionLabel('correctiva', aliases)}
-                </button>
-                <button
-                  type="button"
-                  className={`chip compact${tipo === 'recomendacion' ? ' active' : ''}`}
-                  onClick={() => setTipo('recomendacion')}
-                >
-                  {accionLabel('recomendacion', aliases)}
-                </button>
-              </div>
-            )}
-            <div className="field">
-              <label htmlFor="accion-texto">Título</label>
-              <textarea
-                id="accion-texto"
-                className="textarea compact"
-                rows={2}
-                value={texto}
-                onChange={(e) => setTexto(e.target.value)}
-                placeholder={
-                  tipo === 'recomendacion'
-                    ? 'p. ej. Revisar holgura en la próxima visita'
-                    : 'p. ej. Sustituir junta del tanque'
-                }
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="accion-detalle">Detalle</label>
-              <textarea
-                id="accion-detalle"
-                className="textarea compact"
-                rows={3}
-                value={detalle}
-                onChange={(e) => setDetalle(e.target.value)}
-                placeholder="Opcional: contexto, materiales, ubicación…"
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="accion-fecha">Fecha programada (opcional)</label>
-              <input
-                id="accion-fecha"
-                className="input"
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-              />
-            </div>
-            {onlyCorrectiva || tipo === 'correctiva' ? (
-              <div className="field">
-                <label id="accion-prioridad">Prioridad</label>
-                <div className="chip-row tight" role="radiogroup" aria-labelledby="accion-prioridad">
-                  {PRIORIDADES.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={prioridad === p.id}
-                      className={`chip compact${prioridad === p.id ? ' active' : ''}`}
-                      onClick={() => setPrioridad(p.id)}
-                    >
-                      <PrioridadMark prioridad={p.id} forceLabel />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            {error ? <p className="danger-text">{error}</p> : null}
-            <button className="btn btn-add" type="submit">
-              <Plus size={16} />
-              Añadir
-            </button>
-          </form>
-
-          <div style={{ marginTop: '0.9rem' }}>
+          <div>
             {acciones.length > 0 ? (
               <div className="acciones-filtros">
                 <div className="row-spread" style={{ marginBottom: '0.35rem' }}>
@@ -394,7 +334,27 @@ export function AccionesPanel({
                             >
                               <Wrench size={16} />
                             </Link>
-                          ) : null}
+                          ) : a.convertidaEnId ? (
+                            <Link
+                              className="icon-btn"
+                              to={accionHref({ id: a.convertidaEnId })}
+                              aria-label="Ver acción correctiva"
+                              title="Ver acción correctiva"
+                            >
+                              <ArrowRight size={16} />
+                            </Link>
+                          ) : (
+                            <button
+                              type="button"
+                              className="icon-btn"
+                              aria-label="Convertir en acción correctiva"
+                              title="Convertir en acción correctiva"
+                              disabled={convertingId === a.id}
+                              onClick={() => void convertir(a.id)}
+                            >
+                              <ArrowRight size={16} />
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="icon-btn icon-btn-edit"
@@ -429,14 +389,127 @@ export function AccionesPanel({
                       ) : null}
                       <p className="muted occ-meta">
                         {tipoAccionLabel(tipoAccionOf(a), aliases)}
-                        <AccionFechaLabel fechaObjetivo={a.fechaObjetivo} gated />
+                        {isCorrectiva ? (
+                          <AccionFechaLabel fechaObjetivo={a.fechaObjetivo} gated />
+                        ) : null}
                       </p>
+                      {!isCorrectiva && a.convertidaEnId ? (
+                        <p className="muted occ-meta">
+                          Convertida en correctiva:{' '}
+                          <Link to={accionHref({ id: a.convertidaEnId })}>ver</Link>
+                        </p>
+                      ) : null}
+                      {isCorrectiva && a.origenId ? (
+                        <p className="muted occ-meta">
+                          Proviene de recomendación:{' '}
+                          <Link to={accionHref({ id: a.origenId })}>ver</Link>
+                        </p>
+                      ) : null}
                     </EntityCard>
                   )
                 })}
               </div>
             )}
           </div>
+          <div style={{ marginTop: '0.8rem' }}>
+            <button
+              type="button"
+              className="btn btn-add"
+              aria-expanded={showForm}
+              onClick={() => setShowForm((was) => !was)}
+            >
+              <Plus size={16} />
+              {showForm ? 'Ocultar' : 'Añadir'}
+            </button>
+          </div>
+          {showForm ? (
+            <form onSubmit={(e) => void add(e)} style={{ marginTop: '0.8rem' }}>
+              {onlyCorrectiva ? null : (
+                <div className="chip-row tight" role="tablist" aria-label="Tipo">
+                  <button
+                    type="button"
+                    className={`chip compact${tipo === 'correctiva' ? ' active' : ''}`}
+                    onClick={() => setTipo('correctiva')}
+                  >
+                    {accionLabel('correctiva', aliases)}
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip compact${tipo === 'recomendacion' ? ' active' : ''}`}
+                    onClick={() => setTipo('recomendacion')}
+                  >
+                    {accionLabel('recomendacion', aliases)}
+                  </button>
+                </div>
+              )}
+              <div className="field">
+                <label htmlFor="accion-texto">Título</label>
+                <textarea
+                  id="accion-texto"
+                  className="textarea compact"
+                  rows={2}
+                  value={texto}
+                  onChange={(e) => setTexto(e.target.value)}
+                  placeholder={
+                    tipo === 'recomendacion'
+                      ? 'p. ej. Revisar holgura en la próxima visita'
+                      : 'p. ej. Sustituir junta del tanque'
+                  }
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="accion-detalle">Detalle</label>
+                <textarea
+                  id="accion-detalle"
+                  className="textarea compact"
+                  rows={3}
+                  value={detalle}
+                  onChange={(e) => setDetalle(e.target.value)}
+                  placeholder="Opcional: contexto, materiales, ubicación…"
+                />
+              </div>
+              {onlyCorrectiva || tipo === 'correctiva' ? (
+                <div className="field">
+                  <label htmlFor="accion-fecha">Fecha programada (opcional)</label>
+                  <input
+                    id="accion-fecha"
+                    className="input"
+                    type="date"
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value)}
+                  />
+                </div>
+              ) : (
+                <p className="muted" style={{ marginTop: 0 }}>
+                  La recomendación no lleva fecha. Podrás convertirla en correctiva después.
+                </p>
+              )}
+              {onlyCorrectiva || tipo === 'correctiva' ? (
+                <div className="field">
+                  <label id="accion-prioridad">Prioridad</label>
+                  <div className="chip-row tight" role="radiogroup" aria-labelledby="accion-prioridad">
+                    {PRIORIDADES.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={prioridad === p.id}
+                        className={`chip compact${prioridad === p.id ? ' active' : ''}`}
+                        onClick={() => setPrioridad(p.id)}
+                      >
+                        <PrioridadMark prioridad={p.id} forceLabel />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {error ? <p className="danger-text">{error}</p> : null}
+              <button className="btn btn-add" type="submit">
+                <Plus size={16} />
+                Añadir
+              </button>
+            </form>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -568,7 +641,10 @@ export function AccionEditor({
           <button
             type="button"
             className={`chip compact${tipo === 'recomendacion' ? ' active' : ''}`}
-            onClick={() => setTipo('recomendacion')}
+            onClick={() => {
+              setTipo('recomendacion')
+              setFecha('')
+            }}
           >
             {accionLabel('recomendacion', aliases)}
           </button>
@@ -593,26 +669,34 @@ export function AccionEditor({
           placeholder="Opcional: contexto, materiales, ubicación…"
         />
       </div>
-      <div className="field">
-        <label>Fecha programada (opcional)</label>
-        <input
-          className="input"
-          type="date"
-          value={fecha}
-          onChange={(e) => setFecha(e.target.value)}
-        />
-      </div>
-      <p className="muted" style={{ marginTop: 0 }}>
-        El estado se calcula por esa fecha, no por la inspección o actividad de origen.
-        {fecha ? (
-          <>
-            {' '}
-            <Link to={accionHref(accion)}>
-              {accion.estado === 'ejecutada' ? 'Ver o editar ejecución' : 'Ejecutar'}
-            </Link>
-          </>
-        ) : null}
-      </p>
+      {onlyCorrectiva || tipo === 'correctiva' ? (
+        <div className="field">
+          <label>Fecha programada (opcional)</label>
+          <input
+            className="input"
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
+          />
+        </div>
+      ) : null}
+      {onlyCorrectiva || tipo === 'correctiva' ? (
+        <p className="muted" style={{ marginTop: 0 }}>
+          El estado se calcula por esa fecha, no por la inspección o actividad de origen.
+          {fecha ? (
+            <>
+              {' '}
+              <Link to={accionHref(accion)}>
+                {accion.estado === 'ejecutada' ? 'Ver o editar ejecución' : 'Ejecutar'}
+              </Link>
+            </>
+          ) : null}
+        </p>
+      ) : (
+        <p className="muted" style={{ marginTop: 0 }}>
+          La recomendación no lleva fecha. Podrás convertirla en correctiva después.
+        </p>
+      )}
       {onlyCorrectiva || tipo === 'correctiva' ? (
         <div className="field">
           <label>Prioridad</label>

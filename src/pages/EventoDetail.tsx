@@ -10,6 +10,7 @@ import { blobToFile } from '../lib/share'
 import { deleteEvento } from '../db/activities'
 import { ShareMenu } from '../components/ShareMenu'
 import { AccionesPanel } from '../components/AccionesPanel'
+import { NotasVinculadas } from '../components/NotasVinculadas'
 import { ExtraBadge, StatusBadge, TipoBadge } from '../components/ui'
 import { useTiposActividad } from '../hooks/useTiposActividad'
 import { ActividadTitle } from '../components/ActividadTitle'
@@ -183,8 +184,9 @@ export function EventoDetailPage() {
       <AccionesPanel
         actividadId={currentActividad.id}
         eventoId={current.id}
-        onlyCorrectiva
       />
+
+      <NotasVinculadas actividadId={currentActividad.id} eventoId={current.id} />
     </div>
   )
 }

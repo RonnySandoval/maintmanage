@@ -20,6 +20,11 @@
           (mode !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
         document.documentElement.dataset.theme = dark ? 'dark' : 'light'
         document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        var search = '1'
+        try {
+          search = localStorage.getItem('mm-search-visible') || '1'
+        } catch (e) {}
+        document.documentElement.dataset.busqueda = search === '0' ? 'oculta' : 'visible'
       })()
     </script>
   </head>

@@ -33,7 +33,7 @@ import {
   type Ficha,
   type Ocurrencia,
 } from '../db/types'
-import { bloqueColorVar, kindActividadVar } from '../lib/colors'
+import { kindActividadVar, kindFichaVar } from '../lib/colors'
 import { formatDate, formatFechaProgramada, monthLabel, monthValue } from '../lib/dates'
 import { accionHref, accionSearchText, estadoAgendaCorrectiva } from '../lib/acciones'
 import { actividadTitulo, compareActividadesByTitulo } from '../lib/actividades'
@@ -55,13 +55,21 @@ import { EMPTY_COUNTS, buildAdjuntoCounts } from '../lib/adjuntos'
 import { etiquetasOf } from '../lib/etiquetasAdjuntos'
 
 type AccGroup = 'lista' | 'fecha' | 'prioridad' | 'estado' | 'ficha'
-type AccSort = 'fecha' | 'prioridad' | 'reciente'
+type AccSort = 'fecha' | 'prioridad' | 'reciente' | 'estado'
 type EjecVista = 'ejecuciones' | 'evidencias'
 
 function sortAcciones(rows: AccionCorrectiva[], sort: AccSort): AccionCorrectiva[] {
   return [...rows].sort((a, b) => {
     if (sort === 'prioridad') {
       const d = prioridadRank(prioridadOf(a)) - prioridadRank(prioridadOf(b))
+      if (d) return d
+    }
+    if (sort === 'estado') {
+      const rank = (item: AccionCorrectiva): number => {
+        const idx = ESTADOS.findIndex((s) => s.id === estadoAgendaCorrectiva(item))
+        return idx < 0 ? ESTADOS.length : idx
+      }
+      const d = rank(a) - rank(b)
       if (d) return d
     }
     if (sort === 'fecha') {
@@ -128,7 +136,9 @@ function groupAcciones(
 
 export function HistoricosPage() {
   const [params, setParams] = useSearchParams()
-  const tab = params.get('tab') === 'acciones' ? 'acciones' : 'ocurrencias'
+  const tabParam = params.get('tab')
+  const tab: 'ocurrencias' | 'acciones' | 'recomendaciones' =
+    tabParam === 'acciones' || tabParam === 'recomendaciones' ? tabParam : 'ocurrencias'
   const ejecVista: EjecVista = params.get('vista') === 'evidencias' ? 'evidencias' : 'ejecuciones'
   const q = params.get('q') ?? ''
   const bloqueId = params.get('bloque') ?? ''
@@ -148,7 +158,9 @@ export function HistoricosPage() {
       : 'lista'
   const sortAccRaw = params.get('ordenar')
   const sortAcc: AccSort =
-    sortAccRaw === 'prioridad' || sortAccRaw === 'reciente' ? sortAccRaw : 'fecha'
+    sortAccRaw === 'prioridad' || sortAccRaw === 'reciente' || sortAccRaw === 'estado'
+      ? sortAccRaw
+      : 'fecha'
   const [searchText, setSearchText] = useState(q)
   const [groupBy, setGroupBy] = useState<'ficha' | 'bloque' | 'fecha'>('ficha')
   const [openOcc, setOpenOcc] = useState<string | null>(null)
@@ -165,12 +177,12 @@ export function HistoricosPage() {
     )
   }
 
-  function setTab(next: 'ocurrencias' | 'acciones') {
+  function setTab(next: 'ocurrencias' | 'acciones' | 'recomendaciones') {
     setParams(
       (current) => {
         const nextParams = new URLSearchParams(current)
         if (next === 'ocurrencias') nextParams.delete('tab')
-        else nextParams.set('tab', 'acciones')
+        else nextParams.set('tab', next)
         if (next === 'ocurrencias') {
           nextParams.delete('fecha')
           nextParams.delete('estado')
@@ -180,6 +192,7 @@ export function HistoricosPage() {
           nextParams.delete('bloque')
           nextParams.delete('encargado')
           nextParams.delete('vista')
+          if (next === 'recomendaciones') nextParams.delete('fecha')
         }
         return nextParams
       },
@@ -238,6 +251,13 @@ export function HistoricosPage() {
       const rows = await db.accionesCorrectivas.toArray()
       return rows.filter((a) => tipoAccionOf(a) === 'correctiva')
     }) ?? []
+  const recomendaciones =
+    useLiveQuery(async () => {
+      const rows = await db.accionesCorrectivas.toArray()
+      return rows.filter((a) => tipoAccionOf(a) === 'recomendacion')
+    }) ?? []
+  /** Registros del tab activo (correctivas o recomendaciones). */
+  const accionesTab = tab === 'recomendaciones' ? recomendaciones : acciones
 
   const fichaMap = useMemo(() => Object.fromEntries(fichas.map((f) => [f.id, f])), [fichas])
   const actividadMap = useMemo(
@@ -475,7 +495,7 @@ export function HistoricosPage() {
   )
 
   const accionesFiltradas = sortAcciones(
-    acciones.filter((a) => {
+    accionesTab.filter((a) => {
       if (estadoAcc && estadoAgendaCorrectiva(a) !== estadoAcc) return false
       if (fechaFiltro === 'sin' && a.fechaObjetivo) return false
       if (fechaFiltro === 'con' && !a.fechaObjetivo) return false
@@ -558,7 +578,7 @@ export function HistoricosPage() {
       const rows = (byFicha.get(fichaId) ?? []).sort((a, b) => b.createdAt - a.createdAt)
       groups.push({
         key: `ficha:${fichaId}`,
-        title: <FichaTitle ficha={ficha} color={bloque?.color} />,
+        title: <FichaTitle ficha={ficha} unified icon />,
         shareTitle: fichaTitulo(ficha),
         href: `/fichas/${fichaId}`,
         meta: [
@@ -625,7 +645,6 @@ export function HistoricosPage() {
 
   function renderOccRow(o: Ocurrencia, hideTitle: boolean) {
     const ficha = fichaMap[o.fichaId]
-    const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
     const linked = accionesPorOcc.get(o.id) ?? []
     const sueltas =
       latestOccIdByFicha.get(o.fichaId) === o.id
@@ -636,7 +655,6 @@ export function HistoricosPage() {
         key={o.id}
         occ={o}
         ficha={ficha}
-        color={bloque?.color}
         encargado={ficha?.encargadoId ? encargadoMap[ficha.encargadoId] : undefined}
         ejecucion={ejecucionMap[o.id]}
         adjuntosCount={
@@ -678,7 +696,7 @@ export function HistoricosPage() {
   }
 
   const filterTools = useMemo<FilterTool[]>(() => {
-    if (tab === 'acciones') {
+    if (tab === 'acciones' || tab === 'recomendaciones') {
       return [
         {
           id: 'filtrar',
@@ -687,19 +705,21 @@ export function HistoricosPage() {
           active: Boolean(fechaFiltro || bloqueId || encargadoId),
           content: (
             <div className="stack" style={{ gap: '0.7rem' }}>
-              <div className="field" style={{ margin: 0 }}>
-                <label htmlFor="hist-fecha">Fecha objetivo</label>
-                <select
-                  id="hist-fecha"
-                  className="select"
-                  value={fechaFiltro}
-                  onChange={(e) => setParam('fecha', e.target.value)}
-                >
-                  <option value="">Todas</option>
-                  <option value="sin">Sin programar</option>
-                  <option value="con">Con fecha</option>
-                </select>
-              </div>
+              {tab === 'acciones' ? (
+                <div className="field" style={{ margin: 0 }}>
+                  <label htmlFor="hist-fecha">Fecha objetivo</label>
+                  <select
+                    id="hist-fecha"
+                    className="select"
+                    value={fechaFiltro}
+                    onChange={(e) => setParam('fecha', e.target.value)}
+                  >
+                    <option value="">Todas</option>
+                    <option value="sin">Sin programar</option>
+                    <option value="con">Con fecha</option>
+                  </select>
+                </div>
+              ) : null}
               <div className="field" style={{ margin: 0 }}>
                 <label htmlFor="hist-acc-bloque">Bloque (origen ficha)</label>
                 <select
@@ -801,6 +821,7 @@ export function HistoricosPage() {
                 [
                   ['fecha', 'Fecha'],
                   ['prioridad', 'Prioridad'],
+                  ['estado', 'Estado'],
                   ['reciente', 'Recientes'],
                 ] as const
               ).map(([id, label]) => (
@@ -915,12 +936,12 @@ export function HistoricosPage() {
     ejecVista,
   ])
 
-  if (!ocurrencias.length && !eventos.length && !acciones.length) {
+  if (!ocurrencias.length && !eventos.length && !acciones.length && !recomendaciones.length) {
     return (
       <EmptyState
         icon={<History size={36} />}
         title="Sin histórico"
-        text="Cuando ejecutes fichas, actividades o registres acciones correctivas, aparecerán aquí."
+        text="Cuando ejecutes fichas, actividades o registres acciones y recomendaciones, aparecerán aquí."
       />
     )
   }
@@ -928,7 +949,13 @@ export function HistoricosPage() {
   return (
     <div>
       <FilterDrawerSlot
-        title={tab === 'acciones' ? 'Correctivas' : 'Ejecutadas'}
+        title={
+          tab === 'acciones'
+            ? 'Correctivas'
+            : tab === 'recomendaciones'
+              ? 'Recomendaciones'
+              : 'Ejecutadas'
+        }
         tools={filterTools}
         canClear={
           Boolean(q || bloqueId || encargadoId || fechaFiltro || estadoAcc || ejecVista === 'evidencias') ||
@@ -939,7 +966,7 @@ export function HistoricosPage() {
         onClear={clearFilters}
       />
       <div className="hist-toolbar">
-        <div className="seg-toggle" role="tablist" aria-label="Histórico">
+        <div className="seg-toggle tabs-3" role="tablist" aria-label="Histórico">
           <button
             type="button"
             role="tab"
@@ -963,6 +990,15 @@ export function HistoricosPage() {
               </span>
             ) : null}
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'recomendaciones'}
+            className={tab === 'recomendaciones' ? 'active' : ''}
+            onClick={() => setTab('recomendaciones')}
+          >
+            Recomendaciones
+          </button>
         </div>
       </div>
 
@@ -981,9 +1017,11 @@ export function HistoricosPage() {
           placeholder={
             tab === 'acciones'
               ? 'Buscar correctiva, origen o etiqueta'
-              : ejecVista === 'evidencias'
-                ? 'Buscar evidencia, ficha, actividad o etiqueta'
-                : 'Buscar ficha, actividad, encargado o etiqueta'
+              : tab === 'recomendaciones'
+                ? 'Buscar recomendación, origen o etiqueta'
+                : ejecVista === 'evidencias'
+                  ? 'Buscar evidencia, ficha, actividad o etiqueta'
+                  : 'Buscar ficha, actividad, encargado o etiqueta'
           }
           value={searchText}
           onChange={(e) => onSearchChange(e.target.value)}
@@ -1037,14 +1075,13 @@ export function HistoricosPage() {
                 <>
                   {fichasOrdenadas.map((fichaId) => {
                     const ficha = fichaMap[fichaId]
-                    const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
                     const rows = (byFicha.get(fichaId) ?? []).sort((a, b) =>
                       b.fechaProgramada.localeCompare(a.fechaProgramada),
                     )
                     return (
                       <section key={fichaId}>
                         <div className="table-section">
-                          <FichaTitle ficha={ficha} color={bloque?.color} />
+                          <FichaTitle ficha={ficha} unified icon />
                         </div>
                         {rows.map((o) => renderOccRow(o, true))}
                       </section>
@@ -1077,10 +1114,7 @@ export function HistoricosPage() {
                     )
                     return (
                       <section key={bloqueId}>
-                        <div
-                          className="table-section"
-                          style={bloque ? { color: bloqueColorVar(bloque.color) } : undefined}
-                        >
+                        <div className="table-section">
                           {bloque?.nombre ?? 'Sin bloque'}
                         </div>
                         {rows.map((o) => renderOccRow(o, false))}
@@ -1138,14 +1172,17 @@ export function HistoricosPage() {
                   {grupo.items.map((a) => {
                     const ficha = a.fichaId ? fichaMap[a.fichaId] : undefined
                     const act = a.actividadId ? actividadMap[a.actividadId] : undefined
-                    const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
                     const origen = act ? actividadTitulo(act) : ficha ? fichaTitulo(ficha) : ''
                     const ejec = a.estado === 'ejecutada' ? ejecucionAccionMap[a.id] : undefined
                     const adjCount = ejec ? (adjuntoCounts.ejecucion[ejec.id] ?? 0) : 0
                     return (
                       <Link key={a.id} className="table-row table-cols-hist-acc" to={accionHref(a)}>
                         <span className="hist-acc-prio">
-                          <PrioridadMark prioridad={prioridadOf(a)} iconOnly />
+                          {tab === 'recomendaciones' ? (
+                            '—'
+                          ) : (
+                            <PrioridadMark prioridad={prioridadOf(a)} iconOnly />
+                          )}
                         </span>
                         <span className="table-cell">
                           <span className="row" style={{ flexWrap: 'wrap', gap: '0.35rem', alignItems: 'flex-start' }}>
@@ -1162,19 +1199,25 @@ export function HistoricosPage() {
                           ) : null}
                           <span className="muted col-sm-only">
                             {origen}
-                            {origen ? ' · ' : ''}
-                            <AccionFechaLabel fechaObjetivo={a.fechaObjetivo} />
+                            {origen && tab !== 'recomendaciones' ? ' · ' : ''}
+                            {tab === 'recomendaciones' ? null : (
+                              <AccionFechaLabel fechaObjetivo={a.fechaObjetivo} />
+                            )}
                           </span>
                         </span>
                         <span className="col-md hist-acc-origen">
                           {act ? (
                             <ActividadTitle actividad={act} />
                           ) : (
-                            <FichaTitle ficha={ficha} color={bloque?.color} />
+                            <FichaTitle ficha={ficha} unified icon />
                           )}
                         </span>
                         <span className="col-md muted table-nowrap hist-acc-fecha">
-                          <AccionFechaLabel fechaObjetivo={a.fechaObjetivo} />
+                          {tab === 'recomendaciones' ? (
+                            '—'
+                          ) : (
+                            <AccionFechaLabel fechaObjetivo={a.fechaObjetivo} />
+                          )}
                         </span>
                         <span className="hist-acc-estado">
                           <StatusBadge estado={estadoAgendaCorrectiva(a)} />
@@ -1197,7 +1240,6 @@ function EjecutadaRow({
   evento,
   ficha,
   actividad,
-  color,
   encargado,
   ejecucion,
   adjuntosCount = 0,
@@ -1210,7 +1252,6 @@ function EjecutadaRow({
   evento?: Evento
   ficha?: Ficha
   actividad?: Actividad
-  color?: string
   encargado?: Encargado
   ejecucion?: Ejecucion
   adjuntosCount?: number
@@ -1225,7 +1266,7 @@ function EjecutadaRow({
   const href = occ ? `/ocurrencias/${occ.id}` : `/eventos/${evento?.id}`
   const precision =
     (ficha?.fechaPrecision ?? actividad?.fechaPrecision) === 'dia' ? 'dia' : 'mes'
-  const barColor = actividad ? kindActividadVar() : bloqueColorVar(color)
+  const barColor = actividad ? kindActividadVar() : kindFichaVar()
   const fecha = formatFechaProgramada(item.fechaProgramada, precision)
   const shareTitle = ficha ? fichaTitulo(ficha) : actividad ? actividadTitulo(actividad) : 'Ejecución'
   const shareText = [
@@ -1245,7 +1286,7 @@ function EjecutadaRow({
       <div className="table-row table-cols-hist-occ">
         <span className="table-bar" style={{ background: barColor }} />
         <Link className="table-cell hist-occ-main" to={href}>
-          {!hideTitle && ficha ? <FichaTitle ficha={ficha} color={color} /> : null}
+          {!hideTitle && ficha ? <FichaTitle ficha={ficha} unified icon /> : null}
           {!hideTitle && actividad ? (
             <span className="occ-meta">
               <ActividadTitle actividad={actividad} />

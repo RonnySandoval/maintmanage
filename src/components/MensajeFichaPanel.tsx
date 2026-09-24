@@ -11,6 +11,7 @@ import {
 } from '../lib/messageTemplates'
 import { ShareMenu } from './ShareMenu'
 import { EntityCard } from './EntityCard'
+import { TagTextarea } from './TagTextarea'
 
 const STORAGE_KEY = FICHA_MESSAGE_STORAGE_KEY
 
@@ -98,17 +99,16 @@ export function MensajeFichaPanel({
       }
     >
       <p className="muted" style={{ marginTop: 0 }}>
-        Escribe una plantilla y añade etiquetas. Se guarda para reutilizarla en las demás fichas.
+        Toca una etiqueta para insertarla donde esté el cursor.
       </p>
       <div className="field">
         <label htmlFor="mensaje-plantilla">Plantilla</label>
-        <textarea
+        <TagTextarea
           ref={textareaRef}
           id="mensaje-plantilla"
-          className="textarea"
-          rows={7}
           value={template}
-          onChange={(event) => setTemplate(event.target.value)}
+          onChange={setTemplate}
+          rows={7}
         />
       </div>
       <div className="chip-row tight" aria-label="Etiquetas disponibles">

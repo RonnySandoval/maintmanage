@@ -10,6 +10,7 @@ const TRACKED = [
   'adjuntos',
   'actividades',
   'eventos',
+  'notas',
 ] as const
 
 let suppressDataTouch = false

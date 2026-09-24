@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ClipboardCheck, ClipboardList, FileText, Plus, Users, Wrench } from 'lucide-react'
+import { ClipboardCheck, ClipboardList, FileText, NotebookPen, Plus, Users, Wrench } from 'lucide-react'
 import { useOverlayPresence } from '../hooks/useOverlayPresence'
 
 type FabMenu = 'root' | 'inspeccion' | 'documento'
@@ -196,6 +196,15 @@ export function NuevoFab() {
                 >
                   <Users size={14} />
                   Encargado
+                </Link>
+                <Link
+                  className="nuevo-fab-item"
+                  role="menuitem"
+                  to="/notas?nueva=1"
+                  onClick={() => setOpen(false)}
+                >
+                  <NotebookPen size={14} />
+                  Nota
                 </Link>
               </>
             )}

@@ -247,11 +247,11 @@ describe('GmailBackupProvider API (Fase 4)', () => {
     expect(new Uint8Array(await blob.arrayBuffer())).toEqual(zipBytes)
   })
 
-  it('deleteBackup llama a trash', async () => {
+  it('deleteBackup borra permanente (DELETE, sin papelera)', async () => {
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      expect(String(url)).toContain('/trash')
-      expect(init?.method).toBe('POST')
-      return new Response('{}', { status: 200 })
+      expect(String(url)).toBe('https://gmail.googleapis.com/gmail/v1/users/me/messages/m1')
+      expect(init?.method).toBe('DELETE')
+      return new Response(null, { status: 204 })
     })
     const provider = new GmailBackupProvider(mockAuth(), fetchMock as unknown as typeof fetch)
     await provider.deleteBackup('m1')

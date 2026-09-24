@@ -7,6 +7,7 @@ import {
   CircleCheck,
   ClipboardList,
   Clock,
+  NotebookPen,
   ShieldAlert,
   TriangleAlert,
   Wrench,
@@ -26,6 +27,7 @@ import { ActividadTitle } from '../components/ActividadTitle'
 import { PrioridadMark } from '../components/PrioridadMark'
 import { ExpandableText } from '../components/ExpandableText'
 import { FichaTitle } from '../components/FichaTitle'
+import { NotasWidget } from '../components/NotasWidget'
 import { RestorePanel } from '../components/RestorePanel'
 import { InboxAlert } from '../components/InboxAlert'
 import { isRestoreSkipped, skipRestore } from '../lib/restoreSkip'
@@ -186,7 +188,7 @@ export function DashboardPage() {
         <Link key={`occ-${o.id}`} className="card card-click dash-item" to={`/ocurrencias/${o.id}`}>
           <div className="row-spread">
             <strong>
-              <FichaTitle ficha={ficha} color={bloque?.color} />
+              <FichaTitle ficha={ficha} unified icon />
             </strong>
             <StatusBadge estado={o.estado} />
           </div>
@@ -264,7 +266,17 @@ export function DashboardPage() {
   return (
     <div className="dash">
       <header className="dash-hero">
-        <p className="dash-kicker">{label('trimestre', aliases)} en curso</p>
+        <div className="row-spread" style={{ alignItems: 'center', gap: '0.6rem' }}>
+          <p className="dash-kicker">{label('trimestre', aliases)} en curso</p>
+          <Link
+            to="/notas"
+            className="row"
+            style={{ gap: '0.35rem', alignItems: 'center', fontSize: '0.82rem', flexShrink: 0 }}
+          >
+            <NotebookPen size={15} aria-hidden />
+            Ver notas
+          </Link>
+        </div>
         <h2 className="dash-title">{trimestre}</h2>
         <p className="dash-sub">
           {ready ? (
@@ -410,7 +422,6 @@ export function DashboardPage() {
             {accionesAbiertas.slice(0, 5).map((a) => {
               const ficha = a.fichaId ? fichaMap[a.fichaId] : undefined
               const act = a.actividadId ? actividadMap[a.actividadId] : undefined
-              const bloque = ficha ? bloqueMap[ficha.grupoId] : undefined
               return (
                 <Link
                   key={a.id}
@@ -439,7 +450,7 @@ export function DashboardPage() {
                     {act ? (
                       <ActividadTitle actividad={act} />
                     ) : (
-                      <FichaTitle ficha={ficha} color={bloque?.color} />
+                      <FichaTitle ficha={ficha} unified icon />
                     )}
                   </div>
                 </Link>
@@ -448,6 +459,8 @@ export function DashboardPage() {
           </div>
         </div>
       ) : null}
+
+      <NotasWidget />
 
       <p className="muted dash-foot">
         <CalendarDays size={14} /> Datos solo en este navegador. Sincroniza con una copia en Ajustes.

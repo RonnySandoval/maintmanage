@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
@@ -5,6 +6,7 @@ import { actividadTitulo } from '../lib/actividades'
 import { fichaTitulo } from '../lib/fichas'
 import { monthLabel } from '../lib/dates'
 import {
+  Bell,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -17,7 +19,7 @@ import {
 import { FilterDrawer, FilterDrawerToggle } from './FilterDrawer'
 import { NuevoFab } from './NuevoFab'
 import { FontScaleToggle } from './FontScaleToggle'
-import { StatusWordsToggle } from './ui'
+import { SearchToggle, StatusWordsToggle } from './ui'
 import { AppLogo } from './AppLogo'
 import { FilterDrawerProvider } from '../hooks/useFilterDrawer'
 import { useAppHistory } from '../hooks/useAppHistory'
@@ -39,6 +41,7 @@ const TITLES: Record<string, string> = {
   '/fichas': 'Fichas',
   '/historicos': 'Histórico',
   '/mensajes': 'Mensajes',
+  '/notas': 'Notas',
   '/ajustes': 'Ajustes',
 }
 
@@ -65,6 +68,9 @@ function titleFor(pathname: string, search = ''): string {
   }
   if (pathname === '/historicos') {
     const hist = new URLSearchParams(search)
+    if (hist.get('tab') === 'recomendaciones') {
+      return 'Recomendaciones'
+    }
     if (hist.get('tab') === 'acciones') {
       return hist.get('fecha') === 'sin' ? 'Sin programar' : 'Correctivas'
     }
@@ -145,6 +151,12 @@ function LayoutShell() {
   const location = useLocation()
   const { canBack, canForward, back, forward } = useAppHistory()
   const { banner, busy, saveNow, dismiss, session, dismissProcess } = useAutoBackup()
+  /** La card de guardar copia queda oculta hasta pulsar el globo del header. */
+  const [backupOpen, setBackupOpen] = useState(false)
+
+  useEffect(() => {
+    if (!banner) setBackupOpen(false)
+  }, [banner])
 
   return (
     <div className="shell">
@@ -192,13 +204,27 @@ function LayoutShell() {
             </h1>
           </div>
           <div className="topbar-actions">
+            {banner ? (
+              <button
+                type="button"
+                className="icon-btn backup-bell"
+                aria-label="Guardar copia pendiente"
+                title={banner}
+                aria-expanded={backupOpen}
+                onClick={() => setBackupOpen((was) => !was)}
+              >
+                <Bell size={18} aria-hidden />
+                <span className="backup-bell-dot" aria-hidden />
+              </button>
+            ) : null}
             <StatusWordsToggle />
+            <SearchToggle />
             <FilterDrawerToggle />
             <FontScaleToggle />
           </div>
         </header>
         <main className="page">
-          {banner ? (
+          {banner && backupOpen ? (
             <div className="backup-banner" role="status">
               <p>{banner}</p>
               <div className="row" style={{ flexWrap: 'wrap' }}>

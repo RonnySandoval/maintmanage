@@ -48,7 +48,7 @@ export function ShareMenu({
         }}
       >
         <Share2 size={16} />
-        {iconOnly ? null : 'Compartir'}
+        {iconOnly ? null : <span className="btn-label">Compartir</span>}
       </button>
       <Modal open={open} title="Compartir" onClose={() => setOpen(false)}>
         <div className="stack">

@@ -395,7 +395,7 @@ export function CronogramaPage() {
               Actividad
             </button>
           </div>
-          <div className="seg-toggle compact icon-only" role="tablist" aria-label="Vista del cronograma">
+          <div className="seg-toggle compact icon-only tabs-2" role="tablist" aria-label="Vista del cronograma">
             <button
               type="button"
               role="tab"

@@ -125,6 +125,15 @@ export class GmailClient {
     )
   }
 
+  /** Borrado permanente e inmediato (no pasa por la papelera). */
+  async deleteMessage(id: string): Promise<void> {
+    await this.request(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+      'No se pudo borrar la copia en Gmail.',
+    )
+  }
+
   private async request<T>(
     url: string,
     init: RequestInit,

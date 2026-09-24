@@ -52,6 +52,7 @@ export async function uploadBackupToGmail(
     accionesCorrectivas: await db.accionesCorrectivas.toArray(),
     actividades: await db.actividades.toArray(),
     eventos: await db.eventos.toArray(),
+    notas: await db.notas.toArray(),
     ajustes: await db.ajustes.toArray(),
     adjuntosMeta: adjuntos.map((adjunto) => ({
       id: adjunto.id,
@@ -89,6 +90,13 @@ export async function downloadGmailBackup(remoteId: string): Promise<Blob> {
   const provider = getGmailBackupProvider()
   if (!provider.isAuthenticated()) await provider.authenticate()
   return provider.downloadBackup(remoteId)
+}
+
+/** Borra una copia de Gmail de forma permanente (sin papelera). */
+export async function deleteGmailBackup(remoteId: string): Promise<void> {
+  const provider = getGmailBackupProvider()
+  if (!provider.isAuthenticated()) await provider.authenticate()
+  return provider.deleteBackup(remoteId)
 }
 
 /**

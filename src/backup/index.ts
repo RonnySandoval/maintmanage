@@ -51,6 +51,7 @@ export {
   uploadBackupToGmail,
   listGmailBackups,
   downloadGmailBackup,
+  deleteGmailBackup,
   restoreFromGmail,
 } from './cloudBackup'
 export type { CloudBackupProgress, CloudRestoreProgress, RestoreFromGmailDeps } from './cloudBackup'

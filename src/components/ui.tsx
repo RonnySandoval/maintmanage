@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
-import { CalendarClock, CalendarOff, Captions, CaptionsOff } from 'lucide-react'
+import { CalendarClock, CalendarOff, Captions, CaptionsOff, Search, SearchX } from 'lucide-react'
 import { ESTADOS, tipoActividadLabel, type EstadoOcurrencia } from '../db/types'
 import { useTiposActividad } from '../hooks/useTiposActividad'
 import { useAccionFechas } from '../hooks/useAccionFechas'
+import { useSearchBar } from '../hooks/useSearchBar'
 import { useOverlayPresence } from '../hooks/useOverlayPresence'
 import { accionesTitulo, accionLabel, label, useAliases } from '../lib/labels'
 import { useStatusLabels } from '../hooks/useStatusLabels'
@@ -51,6 +52,22 @@ export function StatusBadge({
       </span>
       {hideWords ? <span className="sr-only">{meta.label}</span> : meta.label}
     </span>
+  )
+}
+
+export function SearchToggle({ className }: { className?: string }) {
+  const { showSearch, toggleSearch } = useSearchBar()
+  return (
+    <button
+      type="button"
+      className={`estado-words-btn${className ? ` ${className}` : ''}${showSearch ? '' : ' is-off'}`}
+      onClick={toggleSearch}
+      aria-pressed={showSearch}
+      aria-label={showSearch ? 'Ocultar buscador' : 'Mostrar buscador'}
+      title={showSearch ? 'Ocultar buscador' : 'Mostrar buscador'}
+    >
+      {showSearch ? <Search size={18} /> : <SearchX size={18} />}
+    </button>
   )
 }
 

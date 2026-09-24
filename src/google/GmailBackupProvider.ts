@@ -268,7 +268,8 @@ export class GmailBackupProvider implements BackupProvider {
   }
 
   async deleteBackup(remoteId: string): Promise<void> {
-    await this.client.trashMessage(remoteId)
+    // Borrado permanente: no pasa por la papelera de Gmail.
+    await this.client.deleteMessage(remoteId)
   }
 }
 

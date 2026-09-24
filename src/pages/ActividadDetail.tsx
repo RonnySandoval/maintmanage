@@ -24,6 +24,7 @@ import { AttachmentList, removeAdjunto } from '../components/AttachmentList'
 import { FilePicker } from '../components/FilePicker'
 import { ShareMenu } from '../components/ShareMenu'
 import { AccionesPanel } from '../components/AccionesPanel'
+import { NotasVinculadas } from '../components/NotasVinculadas'
 import { ExtraBadge, Modal, StatusBadge, TipoBadge } from '../components/ui'
 import { useTiposActividad } from '../hooks/useTiposActividad'
 import { ActividadTitle } from '../components/ActividadTitle'
@@ -274,6 +275,8 @@ export function ActividadDetailPage() {
       </EntityCard>
 
       <AccionesPanel actividadId={actividad.id} />
+
+      <NotasVinculadas actividadId={actividad.id} />
 
       <Modal open={modal === 'extra'} title="Añadir evento" onClose={() => setModal(null)}>
         <form onSubmit={(e) => void submitExtra(e)}>

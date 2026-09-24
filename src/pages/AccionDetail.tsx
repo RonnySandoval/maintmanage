@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CalendarClock, CircleCheck, Pencil, Trash2, Wrench } from 'lucide-react'
+import { ArrowRight, CalendarClock, CircleCheck, Pencil, Trash2, Wrench } from 'lucide-react'
 import { db } from '../db'
 import { prioridadOf, tipoAccionLabel, tipoAccionOf } from '../db/types'
 import {
   accionDetalle,
+  accionHref,
   accionTitulo,
   convertirAccionHref,
+  convertirRecomendacionACorrectiva,
   estadoAgendaCorrectiva,
+  limpiarTrazabilidadAlBorrar,
 } from '../lib/acciones'
 import { formatDate } from '../lib/dates'
 import { accionLabel, useAliases } from '../lib/labels'
@@ -47,6 +50,7 @@ export function AccionDetailPage() {
   )
   const [ejecOpen, setEjecOpen] = useState(false)
   const [removing, setRemoving] = useState(false)
+  const [converting, setConverting] = useState(false)
   const [panel, setPanel] = useState<'none' | 'edit' | 'schedule'>('none')
 
   if (!id) return null
@@ -78,6 +82,7 @@ export function AccionDetailPage() {
     if (!confirm('¿Eliminar esta acción? No se modifica la inspección ni la actividad de origen.')) return
     setRemoving(true)
     try {
+      await limpiarTrazabilidadAlBorrar(current)
       const ejec = await db.ejecuciones.where('accionId').equals(current.id).first()
       if (ejec) {
         await db.adjuntos.where('ejecucionId').equals(ejec.id).delete()
@@ -137,7 +142,32 @@ export function AccionDetailPage() {
               >
                 <Wrench size={16} />
               </Link>
-            ) : null}
+            ) : current.convertidaEnId ? (
+              <Link
+                className="icon-btn"
+                to={accionHref({ id: current.convertidaEnId })}
+                aria-label="Ver acción correctiva"
+                title="Ver acción correctiva"
+              >
+                <ArrowRight size={16} />
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="Convertir en acción correctiva"
+                title="Convertir en acción correctiva"
+                disabled={converting}
+                onClick={() => {
+                  setConverting(true)
+                  convertirRecomendacionACorrectiva(current).finally(() =>
+                    setConverting(false),
+                  )
+                }}
+              >
+                <ArrowRight size={16} />
+              </button>
+            )}
             <button
               type="button"
               className="icon-btn icon-btn-edit"
@@ -165,8 +195,22 @@ export function AccionDetailPage() {
         ) : null}
         <p className="muted occ-meta">
           <span>{tipoAccionLabel(tipo, aliases)}</span>
-          <AccionFechaLabel fechaObjetivo={current.fechaObjetivo} />
+          {tipo === 'correctiva' ? (
+            <AccionFechaLabel fechaObjetivo={current.fechaObjetivo} />
+          ) : null}
         </p>
+        {tipo === 'recomendacion' && current.convertidaEnId ? (
+          <p className="muted">
+            Convertida en correctiva:{' '}
+            <Link to={accionHref({ id: current.convertidaEnId })}>ver</Link>
+          </p>
+        ) : null}
+        {tipo === 'correctiva' && current.origenId ? (
+          <p className="muted">
+            Proviene de recomendación:{' '}
+            <Link to={accionHref({ id: current.origenId })}>ver</Link>
+          </p>
+        ) : null}
         <p className="muted">
           Origen:{' '}
           <Link to={origenHref}>
@@ -205,7 +249,7 @@ export function AccionDetailPage() {
             </p>
           ) : null
         ) : null}
-        {panel === 'none' && !canExecute && !needsSchedule ? (
+        {panel === 'none' && !canExecute && !needsSchedule && tipo === 'correctiva' ? (
           <p className="muted">
             Añade una fecha programada para poder ejecutar esta {accionLabel(tipo, aliases).toLowerCase()}.
           </p>
