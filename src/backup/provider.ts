@@ -24,5 +24,10 @@ export interface BackupProvider {
   createBackup(blob: Blob, meta: BackupManifest): Promise<RemoteBackupRef>
   listBackups(): Promise<RemoteBackupRef[]>
   downloadBackup(remoteId: string): Promise<Blob>
-  deleteBackup(remoteId: string): Promise<void>
+  /**
+   * Borra una copia remota.
+   * True si se eliminó de forma permanente; false si solo se pudo mover a la
+   * papelera (p. ej. Gmail sin permiso de borrado definitivo).
+   */
+  deleteBackup(remoteId: string): Promise<boolean>
 }

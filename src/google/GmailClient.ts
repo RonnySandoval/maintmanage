@@ -13,7 +13,12 @@ export class GmailApiError extends Error {
 function friendlyGmailError(status: number, body: string, fallback: string): string {
   const lower = body.toLowerCase()
   if (status === 401) return 'La sesión de Google caducó. Vuelve a conectar.'
-  if (status === 403) return 'Google denegó el acceso a Gmail. Revisa los permisos de la app.'
+  if (status === 403) {
+    if (lower.includes('insufficient') || lower.includes('permission')) {
+      return 'Faltan permisos de Google para esta acción. Desconéstate y vuelve a conectar para renovar los permisos.'
+    }
+    return 'Google denegó el acceso a Gmail. Revisa los permisos de la app.'
+  }
   if (status === 404) return 'No se encontró esa copia en Gmail.'
   if (status === 413 || lower.includes('too large') || lower.includes('limit')) {
     return 'La copia es demasiado grande para Gmail.'
@@ -66,13 +71,37 @@ export class GmailClient {
     this.fetchImpl = fetchImpl
   }
 
-  async insertRawMessage(rawBase64Url: string): Promise<{ id: string }> {
+  /**
+   * Inserta el mensaje por el endpoint de subida multipart
+   * (`/upload/...?uploadType=multipart`), que es el que respeta el límite
+   * documentado de 150 MiB de `users.messages.insert`. El endpoint JSON simple
+   * (`raw`) tiene topes menores no documentados y falla con copias grandes.
+   */
+  async insertRawMessageMultipart(
+    rawBase64Url: string,
+    rawMimeBytes: Uint8Array,
+  ): Promise<{ id: string }> {
+    const boundary = `maintmanage_boundary_${Date.now().toString(36)}_${Math.random()
+      .toString(36)
+      .slice(2)}`
+    // `Uint8Array` por defecto es `Uint8Array<ArrayBufferLike>` (puede ser un
+    // SharedArrayBuffer, que `BlobPart` no acepta). `TextEncoder` siempre
+    // produce un `ArrayBuffer` real, así que el cast es seguro.
+    const rawMimePart = rawMimeBytes as BlobPart
+    const parts: BlobPart[] = [
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
+      JSON.stringify({ raw: rawBase64Url, labelIds: ['INBOX'] }),
+      `\r\n--${boundary}\r\nContent-Type: message/rfc822\r\n\r\n`,
+      rawMimePart,
+      `\r\n--${boundary}--\r\n`,
+    ]
+    const body = new Blob(parts, { type: `multipart/related; boundary=${boundary}` })
     const data = await this.request<{ id: string }>(
-      'https://gmail.googleapis.com/gmail/v1/users/me/messages',
+      'https://www.googleapis.com/upload/gmail/v1/users/me/messages?uploadType=multipart',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ raw: rawBase64Url, labelIds: ['INBOX'] }),
+        headers: { 'Content-Type': body.type },
+        body,
       },
       'No se pudo guardar la copia en Gmail.',
     )

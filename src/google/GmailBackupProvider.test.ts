@@ -103,12 +103,23 @@ describe('GmailBackupProvider helpers', () => {
 })
 
 describe('GmailBackupProvider API (Fase 4)', () => {
-  it('createBackup inserta mensaje raw', async () => {
+  it('createBackup inserta mensaje por upload multipart', async () => {
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      expect(String(url)).toContain('/users/me/messages')
+      expect(String(url)).toContain('/upload/gmail/v1/users/me/messages?uploadType=multipart')
       expect(init?.method).toBe('POST')
-      const body = JSON.parse(String(init?.body)) as { raw: string }
-      expect(body.raw.length).toBeGreaterThan(10)
+      const contentType = new Headers(init?.headers).get('Content-Type') ?? ''
+      expect(contentType).toContain('multipart/related; boundary=')
+      const bodyText = await (init?.body as Blob).text()
+      // Parte JSON: raw base64url del mensaje RFC 822 completo + etiqueta INBOX.
+      const rawMatch = /"raw":"([^"]+)"/.exec(bodyText)
+      expect(rawMatch).not.toBeNull()
+      const decoded = new TextDecoder().decode(base64UrlToBytes(rawMatch![1]))
+      expect(decoded).toContain('[MAINTMANAGE_BACKUP]')
+      // El ZIP [1,2,3,4] dentro del MIME va en base64 clásico AQIDBA==.
+      expect(decoded).toContain('AQIDBA==')
+      expect(bodyText).toContain('"labelIds":["INBOX"]')
+      // Parte media con el mensaje message/rfc822.
+      expect(bodyText).toContain('message/rfc822')
       return new Response(JSON.stringify({ id: 'msgid-1' }), { status: 200 })
     })
 
@@ -122,7 +133,7 @@ describe('GmailBackupProvider API (Fase 4)', () => {
 
   it('Caso 12: rechaza backup demasiado grande', async () => {
     const provider = new GmailBackupProvider(mockAuth(), vi.fn() as unknown as typeof fetch)
-    const big = new Blob([new Uint8Array(25 * 1024 * 1024)])
+    const big = new Blob([new Uint8Array(100 * 1024 * 1024 + 1)])
     await expect(provider.createBackup(big, sampleMeta({ size: big.size }))).rejects.toThrow(
       /grande|Gmail/i,
     )
@@ -254,7 +265,23 @@ describe('GmailBackupProvider API (Fase 4)', () => {
       return new Response(null, { status: 204 })
     })
     const provider = new GmailBackupProvider(mockAuth(), fetchMock as unknown as typeof fetch)
-    await provider.deleteBackup('m1')
+    await expect(provider.deleteBackup('m1')).resolves.toBe(true)
     expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('deleteBackup cae a la papelera cuando Gmail niega el borrado permanente (403)', async () => {
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      const u = String(url)
+      if (u.endsWith('/messages/m1')) {
+        expect(init?.method).toBe('DELETE')
+        return new Response('{"error":{"message":"Insufficient Permission"}}', { status: 403 })
+      }
+      expect(init?.method).toBe('POST')
+      expect(u).toContain('/trash')
+      return new Response(null, { status: 204 })
+    })
+    const provider = new GmailBackupProvider(mockAuth(), fetchMock as unknown as typeof fetch)
+    await expect(provider.deleteBackup('m1')).resolves.toBe(false)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })

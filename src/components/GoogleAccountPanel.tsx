@@ -175,11 +175,15 @@ export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } 
     setLocalError('')
     setLocalOk('')
     try {
-      await deleteGmailBackup(target.remoteId)
+      const permanent = await deleteGmailBackup(target.remoteId)
       if (getCurrentGmailRemoteId() === target.remoteId) clearCurrentGmailRemoteId()
       const list = await listGmailBackups()
       setBackups(list)
-      setLocalOk(`Copia del ${formatBackupWhen(target.createdAt)} borrada para siempre.`)
+      setLocalOk(
+        permanent
+          ? `Copia del ${formatBackupWhen(target.createdAt)} borrada para siempre.`
+          : `Copia del ${formatBackupWhen(target.createdAt)} movida a la papelera de Gmail.`,
+      )
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'No se pudo borrar la copia.')
     } finally {
@@ -343,7 +347,7 @@ export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } 
                     <span className="restore-confirm-warn" aria-hidden>
                       !
                     </span>
-                    ¿Borrar esta copia para siempre?
+                    ¿Borrar esta copia?
                   </span>
                 }
                 onClose={() => {
@@ -366,7 +370,7 @@ export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } 
                       onClick={() => void onConfirmDelete()}
                     >
                       <Trash2 size={16} />
-                      Borrar para siempre
+                      Borrar copia
                     </button>
                   </>
                 }
@@ -384,7 +388,9 @@ export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } 
                   <div className="inbox-alert restore-confirm-alert" role="status">
                     <span className="inbox-alert-pulse" aria-hidden />
                     <span className="inbox-alert-text">
-                      Se eliminará de tu Gmail de forma permanente. No se puede deshacer.
+                      Se intentará borrar de forma permanente. Si tu sesión no tiene permiso de
+                      borrado definitivo, la copia irá a la papelera de Gmail (se vacía sola en
+                      ~30 días).
                     </span>
                   </div>
                 </div>
@@ -438,7 +444,7 @@ export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } 
                               className="icon-btn icon-btn-delete"
                               disabled={working}
                               aria-label={`Borrar copia del ${formatBackupWhen(b.createdAt)}`}
-                              title="Borrar para siempre"
+                              title="Borrar copia"
                               onClick={() => {
                                 setLocalError('')
                                 setLocalOk('')

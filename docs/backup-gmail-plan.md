@@ -46,7 +46,7 @@ Producción: [https://ronnysandoval.github.io/maintmanage](https://ronnysandoval
 │  GoogleAuth · GmailClient · GmailBackupProvider               │
 └───────────────────────────┬─────────────────────────────────┘
                             │
-                     Gmail API (messages.insert / list / attachments.get)
+                     Gmail API (messages.insert multipart / list / attachments.get / delete·trash)
 ```
 
 ### Regla de dependencias
@@ -182,12 +182,13 @@ sequenceDiagram
   Cloud->>Auth: authenticate() si hace falta
   Cloud->>Cloud: leer Dexie → payload
   Cloud->>Cloud: packAndVerify + assessBackupSize
-  alt size > 24 MB
+  alt size > 100 MB
     Cloud-->>UI: Error claro
   end
   Cloud->>Gmail: createBackup(blob, manifest)
   Gmail->>Gmail: buildBackupMimeMessage (multipart + base64url)
-  Gmail->>API: users.messages.insert (INBOX, sin enviar a terceros)
+  Gmail->>Gmail: assessEncodedMessageSize (mensaje ≤ ~135 MB)
+  Gmail->>API: users.messages.insert /upload?uploadType=multipart (INBOX, sin enviar a terceros)
   Gmail-->>Cloud: RemoteBackupRef
   Cloud->>Cloud: markBackupDone('gmail')
   Cloud-->>UI: ref
@@ -200,7 +201,7 @@ sequenceDiagram
 |------|-------------|
 | `preparing` | OAuth + lectura IndexedDB |
 | `compressing` | `packAndVerify` |
-| `uploading` | `messages.insert` |
+| `uploading` | `messages.insert` (multipart `/upload`) |
 | `done` / `error` | Fin (overlay muestra resultado) |
 
 ### Mensaje en Gmail
@@ -283,6 +284,42 @@ Criterio «toca copia»: `lastChangedAt > lastBackupAt` y `now >= nextBackupAt`.
 
 ---
 
+## Flujo 7 — Eliminar copia en Gmail
+
+**Entrada UI:** «Eliminar» en una card → modal de confirmación  
+**Código:** `deleteGmailBackup(remoteId)` → `GmailBackupProvider.deleteBackup()`
+
+```mermaid
+sequenceDiagram
+  participant UI as GoogleAccountPanel
+  participant Cloud as deleteGmailBackup
+  participant Gmail as GmailBackupProvider
+  participant API as Gmail API
+
+  UI->>UI: Modal confirmación eliminar
+  UI->>Cloud: deleteGmailBackup(remoteId)
+  Cloud->>Gmail: deleteBackup(remoteId)
+  Gmail->>API: DELETE users/messages/{id} (borrado permanente)
+  alt 403 (token sin scope mail.google.com)
+    Gmail->>API: POST users/messages/{id}/trash (papelera)
+    Gmail-->>Cloud: false (solo papelera)
+    Cloud-->>UI: Aviso «se movió a la papelera»
+  else Ok
+    Gmail-->>Cloud: true (eliminado)
+    Cloud-->>UI: «Copia eliminada»
+  end
+```
+
+**Comportamiento:**
+
+- **Borrado permanente** (`users.messages.delete`) exige el scope **restringido** `https://mail.google.com/`; `gmail.modify` no lo permite y Google responde 403.
+- Si el token en uso no tiene `mail.google.com` (sesión iniciada antes del cambio de scopes), la app **cae a la papelera** (`gmail.modify` sí permite `trash`) y avisa en la UI.
+- La papelera de Gmail se vacía sola en **~30 días**, y la búsqueda por defecto (`subject:"..."`) **no** incluye mensajes en papelera, así que la copia desaparece de la lista de inmediato.
+- Al reconectar (nuevo gesto OAuth) el token incorpora `mail.google.com` y se recupera el borrado permanente.
+- `deleteBackup` devuelve `true` (eliminado totalmente) o `false` (movido a papelera), y `deleteGmailBackup` lo pasa tal cual.
+
+---
+
 ## Capa UI — overlay de procesos
 
 Todos los flujos de datos largos usan el mismo patrón:
@@ -315,12 +352,12 @@ Ciclo de `run()`:
 | `package.ts` | `packBackupZip` / `unpackBackupZip` (JSZip) |
 | `validator.ts` | Validación estructural + checksum |
 | `verify.ts` | `packAndVerify`, `verifyRoundTrip` |
-| `limits.ts` | Umbrales Gmail (18 MB warn, 24 MB hard) |
+| `limits.ts` | Umbrales Gmail (80 MB warn, 100 MB hard; API 150 MB via multipart) |
 | `snapshot.ts` | Store IDB `maintmanage-restore` para rollback |
 | `restorer.ts` | `replaceWithRollback` |
 | `device.ts` | `deviceId` persistente, nombre legible |
-| `provider.ts` | Interfaz `BackupProvider` + `RemoteBackupRef` |
-| `cloudBackup.ts` | Orquestación Gmail (upload/list/restore) |
+| `provider.ts` | Interfaz `BackupProvider` + `RemoteBackupRef` (delete → boolean) |
+| `cloudBackup.ts` | Orquestación Gmail (upload/list/download/delete/restore) |
 
 ### `src/google/`
 
@@ -329,8 +366,8 @@ Ciclo de `run()`:
 | `config.ts` | Resolución Client ID (env → json → bundled) |
 | `bundledClientId.ts` | ID embebido para PWA cacheada en Pages |
 | `GoogleAuth.ts` | GIS Token model; access token en localStorage hasta caducar |
-| `GmailClient.ts` | Fetch wrapper Gmail REST v1 |
-| `mime.ts` | Construcción MIME multipart para insert |
+| `GmailClient.ts` | Fetch wrapper Gmail REST v1 (insert multipart, list, attachments, delete/trash) |
+| `mime.ts` | Construcción MIME multipart (base64url `raw` + adjunto) para `/upload` |
 | `GmailBackupProvider.ts` | Implementación `BackupProvider` |
 
 ### `src/db/backup.ts`
@@ -363,7 +400,8 @@ npm test
 ### 2. Pantalla de consentimiento OAuth
 
 - Tipo: **Externa** (o Interna si Workspace).
-- Scopes: `openid`, `email`, `https://www.googleapis.com/auth/gmail.modify`.
+- Scopes: `openid`, `email`, `https://www.googleapis.com/auth/gmail.modify`, `https://mail.google.com/`.
+- ⚠️ `https://mail.google.com/` es un scope **restringido** (acceso total al buzón): Google exige verificación del proyecto para publicación, pero **funciona en modo Testing** con los Gmail añadidos como **usuarios de prueba**. Sin él, el borrado de copias cae a la papelera (ver Flujo 7).
 - En **Testing**: añadir cada Gmail que vaya a probar como **usuario de prueba**.
 
 ### 3. Credencial OAuth «Aplicación web»
@@ -398,6 +436,7 @@ CI: secret `VITE_GOOGLE_CLIENT_ID` en `.github/workflows/deploy.yml`.
 | `access_denied` 403 | Usuario no tester | Añadir en OAuth consent screen |
 | «Copia en Google no configurada» en móvil | PWA con JS viejo | Forzar actualización / reinstalar PWA |
 | Token caducado (~1 h) | Sin refresh token (by design) | «Volver a conectar» (la recarga no desconecta si el token sigue válido) |
+| Borrar copia da «Faltan permisos» (403) | Token sin `mail.google.com` (sesión anterior) | Volver a conectar (re-consent). Con `gmail.modify` la app mueve la copia a la papelera y avisa |
 
 ---
 
@@ -406,7 +445,8 @@ CI: secret `VITE_GOOGLE_CLIENT_ID` en `.github/workflows/deploy.yml`.
 | Tema | Decisión |
 |------|----------|
 | OAuth | GIS Token model — **sin** refresh token, **sin** backend; sesión persistida en `localStorage` (~1 h) |
-| Tamaño Gmail | Hard max ~24 MB; warn ~18 MB |
+| Tamaño Gmail | Hard 100 MB; warn 80 MB (la API admite 150 MB vía `/upload` multipart, ya verificado tras codificar el MIME) |
+| Borrado Gmail | Permanente solo con `mail.google.com`; si el token no lo tiene, la copia se mueve a la papelera (~30 días) |
 | Cifrado | No (Fase 8 opcional: AES-GCM) |
 | Retención Gmail | No se borran copias antiguas automáticamente (futuro: últimos N) |
 | PWA cerrada | No hay backup en background; al reabrir se evalúa pendiente |

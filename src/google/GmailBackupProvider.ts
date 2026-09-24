@@ -3,9 +3,19 @@ import {
   type BackupManifest,
 } from '../backup'
 import type { BackupProvider, RemoteBackupRef } from '../backup/provider'
-import { assessBackupSize } from '../backup/limits'
+import {
+  assessBackupSize,
+  assessEncodedMessageSize,
+  formatBackupSize,
+  GMAIL_API_UPLOAD_MAX_BYTES,
+} from '../backup/limits'
 import { getGoogleAuth } from './GoogleAuth'
-import { GmailClient, type GmailMessage, type GmailMessagePart } from './GmailClient'
+import {
+  GmailApiError,
+  GmailClient,
+  type GmailMessage,
+  type GmailMessagePart,
+} from './GmailClient'
 import { buildBackupMimeMessage, bytesToBase64Url } from './mime'
 
 const META_MARKER = 'MAINTMANAGE_BACKUP_META'
@@ -221,8 +231,20 @@ export class GmailBackupProvider implements BackupProvider {
       filename: `maintmanage-${meta.backupId}.zip`,
       attachmentBytes: bytes,
     })
-    const raw = bytesToBase64Url(new TextEncoder().encode(mime))
-    const inserted = await this.client.insertRawMessage(raw)
+    const mimeBytes = new TextEncoder().encode(mime)
+
+    // El límite real de la API se aplica al mensaje RFC 822 ya codificado
+    // (base64 + CRLF). El `raw` no puede excederlo, así que lo verificamos aquí.
+    const encodedCheck = assessEncodedMessageSize(mimeBytes.byteLength)
+    if (encodedCheck.status === 'too_large') {
+      throw new Error(
+        encodedCheck.message ??
+          `La copia codificada (${formatBackupSize(mimeBytes.byteLength)}) supera el máximo de Gmail (${formatBackupSize(GMAIL_API_UPLOAD_MAX_BYTES)}).`,
+      )
+    }
+
+    const raw = bytesToBase64Url(mimeBytes)
+    const inserted = await this.client.insertRawMessageMultipart(raw, mimeBytes)
 
     return {
       remoteId: inserted.id,
@@ -267,9 +289,26 @@ export class GmailBackupProvider implements BackupProvider {
     return new Blob([copy.buffer], { type: 'application/zip' })
   }
 
-  async deleteBackup(remoteId: string): Promise<void> {
-    // Borrado permanente: no pasa por la papelera de Gmail.
-    await this.client.deleteMessage(remoteId)
+  /**
+   * Borra una copia de Gmail.
+   * Devuelve `true` si se eliminó definitivamente, o `false` si el permiso
+   * actual (`gmail.modify`) no permite el borrado permanente y la copia se
+   * movió a la papelera de Gmail (Gmail la vacía sola en ~30 días).
+   */
+  async deleteBackup(remoteId: string): Promise<boolean> {
+    try {
+      // Borrado permanente: no pasa por la papelera de Gmail.
+      await this.client.deleteMessage(remoteId)
+      return true
+    } catch (err) {
+      if (err instanceof GmailApiError && err.status === 403) {
+        // El token no tiene `mail.google.com`; usar como respaldo la papelera
+        // (permite `gmail.modify`) para que la copia salga de la bandeja.
+        await this.client.trashMessage(remoteId)
+        return false
+      }
+      throw err
+    }
   }
 }
 

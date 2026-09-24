@@ -92,8 +92,12 @@ export async function downloadGmailBackup(remoteId: string): Promise<Blob> {
   return provider.downloadBackup(remoteId)
 }
 
-/** Borra una copia de Gmail de forma permanente (sin papelera). */
-export async function deleteGmailBackup(remoteId: string): Promise<void> {
+/**
+ * Borra una copia de Gmail.
+ * Devuelve true si se eliminó permanentemente; false si solo se pudo mover a
+ * la papelera (permiso sin borrado definitivo).
+ */
+export async function deleteGmailBackup(remoteId: string): Promise<boolean> {
   const provider = getGmailBackupProvider()
   if (!provider.isAuthenticated()) await provider.authenticate()
   return provider.deleteBackup(remoteId)
