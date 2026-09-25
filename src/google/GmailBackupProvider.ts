@@ -247,20 +247,30 @@ export class GmailBackupProvider implements BackupProvider {
 
     const raw = bytesToBase64Url(mimeBytes)
 
-    // Subida reanudable primero (fragmentos de 8 MiB, más robusta en redes
-    // inestables). Cualquier problema del flujo resumable cae al multipart
+    // Subida reanudable primero (fragmentos de 8 MiB; Google la recomienda
+    // para subidas desde móvil y ante caídas de red). Si no está disponible
+    // (cabecera Location no expuesta por CORS) o falla, se cae al multipart
     // clásico para no empeorar el comportamiento anterior.
     let inserted: { id: string }
+    let resumableAttempted = false
     try {
       const resumable = await this.client.insertRawMessageResumable(raw, mimeBytes).catch(
-        () => null,
+        () => {
+          resumableAttempted = true
+          return null
+        },
       )
       inserted = resumable ?? (await this.client.insertRawMessageMultipart(raw, mimeBytes))
     } catch (err) {
-      if (err instanceof GmailNetworkError && blob.size >= GMAIL_WARN_BYTES) {
-        throw new GmailNetworkError(
-          `${err.message} La copia pesa ${formatBackupSize(blob.size)}: si el problema continúa, prueba con WiFi o guarda una copia local en carpeta o ZIP.`,
-        )
+      if (err instanceof GmailNetworkError) {
+        const sizeHint =
+          blob.size >= GMAIL_WARN_BYTES
+            ? ` La copia pesa ${formatBackupSize(blob.size)}: si el problema continúa, prueba con WiFi o guarda una copia local en carpeta o ZIP.`
+            : ''
+        const modeNote = resumableAttempted
+          ? 'La subida reanudable por fragmentos se intentó y falló.'
+          : 'La subida reanudable por fragmentos no está disponible en este dispositivo.'
+        throw new GmailNetworkError(`${err.message}${sizeHint} ${modeNote}`)
       }
       throw err
     }

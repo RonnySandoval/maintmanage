@@ -210,6 +210,39 @@ describe('GmailBackupProvider API (Fase 4)', () => {
     ).rejects.toThrow(/conectar con el servidor de Gmail/i)
   })
 
+  it('avisa cuando la subida reanudable no está disponible (sin Location)', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+      .mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const provider = new GmailBackupProvider(mockAuth(), fetchMock as unknown as typeof fetch)
+    await expect(
+      provider.createBackup(new Blob([new Uint8Array([1])]), sampleMeta()),
+    ).rejects.toThrow(/no está disponible en este dispositivo/)
+  })
+
+  it('indica cuándo la subida reanudable se intentó y falló', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('{}', {
+          status: 200,
+          headers: {
+            Location:
+              'https://www.googleapis.com/upload/gmail/v1/users/me/messages?upload_id=SESION-3',
+          },
+        }),
+      )
+      .mockResolvedValueOnce(new Response('{"error":{}}', { status: 500 }))
+      .mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const provider = new GmailBackupProvider(mockAuth(), fetchMock as unknown as typeof fetch)
+    await expect(
+      provider.createBackup(new Blob([new Uint8Array([1])]), sampleMeta()),
+    ).rejects.toThrow(/se intentó y falló/)
+  })
+
   it('Caso 11: error de Gmail API se traduce', async () => {
     const fetchMock = vi.fn(
       async () => new Response('{"error":{"message":"Backend Error"}}', { status: 500 }),
