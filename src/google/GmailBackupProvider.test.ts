@@ -103,9 +103,14 @@ describe('GmailBackupProvider helpers', () => {
 })
 
 describe('GmailBackupProvider API (Fase 4)', () => {
-  it('createBackup inserta mensaje por upload multipart', async () => {
+  it('createBackup cae a multipart cuando resumable no está disponible', async () => {
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      expect(String(url)).toContain('/upload/gmail/v1/users/me/messages?uploadType=multipart')
+      const u = String(url)
+      if (u.includes('uploadType=resumable')) {
+        // Sin cabecera Location → el navegador no puede usar resumable.
+        return new Response('{}', { status: 200 })
+      }
+      expect(u).toContain('/upload/gmail/v1/users/me/messages?uploadType=multipart')
       expect(init?.method).toBe('POST')
       const contentType = new Headers(init?.headers).get('Content-Type') ?? ''
       expect(contentType).toContain('multipart/related; boundary=')
@@ -128,7 +133,7 @@ describe('GmailBackupProvider API (Fase 4)', () => {
     const ref = await provider.createBackup(blob, sampleMeta({ size: 4 }))
     expect(ref.remoteId).toBe('msgid-1')
     expect(ref.backupId).toContain('BACKUP-')
-    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('Caso 12: rechaza backup demasiado grande', async () => {
@@ -139,17 +144,61 @@ describe('GmailBackupProvider API (Fase 4)', () => {
     )
   })
 
-  it('reintenta la subida multipart si el fetch falla por red (paso 3)', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'msgid-1' }), { status: 200 }))
+  it('createBackup usa la subida reanudable cuando está disponible', async () => {
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      const u = String(url)
+      if (u.includes('uploadType=resumable')) {
+        expect(init?.method).toBe('POST')
+        expect(new Headers(init?.headers).get('X-Upload-Content-Type')).toBe('message/rfc822')
+        expect(String(init?.body)).toContain('"labelIds":["INBOX"]')
+        return new Response('{}', {
+          status: 200,
+          headers: {
+            Location:
+              'https://www.googleapis.com/upload/gmail/v1/users/me/messages?upload_id=SESION-1',
+          },
+        })
+      }
+      expect(init?.method).toBe('PUT')
+      expect(new Headers(init?.headers).get('Content-Range')).toMatch(/^bytes 0-\d+\/\d+$/)
+      return new Response(JSON.stringify({ id: 'msgid-1' }), { status: 201 })
+    })
 
     const provider = new GmailBackupProvider(mockAuth(), fetchMock as unknown as typeof fetch)
-    const blob = new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'application/zip' })
-    const ref = await provider.createBackup(blob, sampleMeta({ size: 4 }))
+    const ref = await provider.createBackup(
+      new Blob([new Uint8Array([1])]),
+      sampleMeta({ size: 1 }),
+    )
     expect(ref.remoteId).toBe('msgid-1')
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('reintenta un fragmento de subida que falla por red y la completa (paso 3)', async () => {
+    let calls = 0
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      calls += 1
+      const u = String(url)
+      if (u.includes('uploadType=resumable')) {
+        return new Response('{}', {
+          status: 200,
+          headers: {
+            Location:
+              'https://www.googleapis.com/upload/gmail/v1/users/me/messages?upload_id=SESION-2',
+          },
+        })
+      }
+      if (calls === 2) throw new TypeError('Failed to fetch')
+      expect(init?.method).toBe('PUT')
+      return new Response(JSON.stringify({ id: 'msgid-1' }), { status: 201 })
+    })
+
+    const provider = new GmailBackupProvider(mockAuth(), fetchMock as unknown as typeof fetch)
+    const ref = await provider.createBackup(
+      new Blob([new Uint8Array([1, 2, 3])]),
+      sampleMeta({ size: 3 }),
+    )
+    expect(ref.remoteId).toBe('msgid-1')
+    expect(calls).toBe(3)
   })
 
   it('traduce un fallo de red persistente a GmailNetworkError', async () => {

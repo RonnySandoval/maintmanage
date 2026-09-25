@@ -26,6 +26,11 @@ export class GmailNetworkError extends Error {
 const NETWORK_RETRY_ATTEMPTS = 2
 const NETWORK_RETRY_DELAY_MS = 1200
 
+/** Tamaño de cada fragmento en la subida reanudable (8 MiB). */
+const RESUMABLE_CHUNK_SIZE = 8 * 1024 * 1024
+/** Reintentos extra por fragmento (los PUT por rango son idempotentes). */
+const RESUMABLE_CHUNK_ATTEMPTS = 3
+
 function isNetworkError(err: unknown): boolean {
   return err instanceof TypeError || (err instanceof Error && err.name === 'TypeError')
 }
@@ -34,6 +39,18 @@ const NETWORK_ERROR_MESSAGE =
   'No se pudo conectar con el servidor de Gmail. Comprueba tu conexión a internet, ' +
   'espera unos segundos y vuelve a intentarlo. Si tienes una VPN o un bloqueador de ' +
   'anuncios activos, desactívalos.'
+
+/**
+ * Siguiente byte a subir según la cabecera `Range` de un `308 Resume
+ * Incomplete`. Si no viene expuesta (CORS), se continúa desde nuestro propio
+ * final del fragmento confirmado.
+ */
+function parseResumeOffset(range: string | null, fallbackEnd: number): number {
+  if (!range) return fallbackEnd
+  const match = /bytes=0-(\d+)/.exec(range.trim())
+  if (!match) return fallbackEnd
+  return Number(match[1]) + 1
+}
 
 function friendlyGmailError(status: number, body: string, fallback: string): string {
   const lower = body.toLowerCase()
@@ -188,15 +205,105 @@ export class GmailClient {
     )
   }
 
+  /**
+   * Subida reanudable por fragmentos (protocolo oficial de Google para
+   * archivos grandes desde navegador): inicia una sesión de subida y envía el
+   * mensaje en `PUT` de 8 MiB. Si un fragmento se corta por red, se reenvía
+   * solo ese fragmento, sin volver a empezar.
+   *
+   * Devuelve `null` si el flujo resumable no es usable (p. ej. el navegador no
+   * puede leer la cabecera `Location` por CORS); el llamador cae entonces al
+   * endpoint multipart clásico.
+   */
+  async insertRawMessageResumable(
+    rawBase64Url: string,
+    rawMimeBytes: Uint8Array,
+  ): Promise<{ id: string } | null> {
+    const initUrl =
+      'https://www.googleapis.com/upload/gmail/v1/users/me/messages?uploadType=resumable'
+    const init = await this.authorizedFetch(initUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'X-Upload-Content-Type': 'message/rfc822',
+        'X-Upload-Content-Length': String(rawMimeBytes.length),
+      },
+      body: JSON.stringify({ raw: rawBase64Url, labelIds: ['INBOX'] }),
+    })
+    const initText = await init.text()
+    if (!init.ok) {
+      throw new GmailApiError(init.status, initText, 'No se pudo iniciar la subida a Gmail.')
+    }
+    const location = init.headers.get('location')
+    if (!location) return null
+
+    const media = new Blob([rawMimeBytes as BlobPart], { type: 'message/rfc822' })
+    const total = rawMimeBytes.length
+    let offset = 0
+    while (offset < total) {
+      const end = Math.min(offset + RESUMABLE_CHUNK_SIZE, total)
+      const chunk = media.slice(offset, end)
+      const contentRange = `bytes ${offset}-${end - 1}/${total}`
+      const res = await this.putChunkWithRetry(location, chunk, contentRange, 1)
+
+      if (res.status === 200 || res.status === 201) {
+        const text = await res.text()
+        if (!text) return null
+        let data: { id?: string }
+        try {
+          data = JSON.parse(text) as { id?: string }
+        } catch {
+          return null
+        }
+        if (!data.id) return null
+        return { id: data.id }
+      }
+
+      if (res.status === 308) {
+        // El servidor recibió el fragmento pero falta más; continuar desde donde
+        // indica `Range` (o desde nuestro propio final si no está expuesto).
+        offset = parseResumeOffset(res.headers.get('range'), end)
+        continue
+      }
+
+      const text = await res.text()
+      throw new GmailApiError(res.status, text, 'No se pudo guardar la copia en Gmail.')
+    }
+    return null
+  }
+
+  /** `PUT` de un fragmento con reintento por fallos de red transitorios. */
+  private async putChunkWithRetry(
+    location: string,
+    chunk: Blob,
+    contentRange: string,
+    attempt: number,
+  ): Promise<Response> {
+    try {
+      return await this.fetchWithRetry(
+        location,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'message/rfc822', 'Content-Range': contentRange },
+          body: chunk,
+        },
+        1,
+      )
+    } catch (err) {
+      if (err instanceof GmailNetworkError && attempt < RESUMABLE_CHUNK_ATTEMPTS) {
+        await new Promise((resolve) => setTimeout(resolve, NETWORK_RETRY_DELAY_MS * attempt))
+        return this.putChunkWithRetry(location, chunk, contentRange, attempt + 1)
+      }
+      throw err
+    }
+  }
+
   private async request<T>(
     url: string,
     init: RequestInit,
     fallbackMessage: string,
   ): Promise<T> {
-    const token = await this.getAccessToken()
-    const headers = new Headers(init.headers)
-    headers.set('Authorization', `Bearer ${token}`)
-    const res = await this.fetchWithRetry(url, { ...init, headers }, 1)
+    const res = await this.authorizedFetch(url, init)
     const text = await res.text()
     if (!res.ok) throw new GmailApiError(res.status, text, fallbackMessage)
     if (!text) return {} as T
@@ -205,6 +312,14 @@ export class GmailClient {
     } catch {
       throw new Error('Respuesta inválida de Gmail.')
     }
+  }
+
+  /** `fetch` autorizado (Bearer token) con reintento ante fallos de red. */
+  private async authorizedFetch(url: string, init: RequestInit): Promise<Response> {
+    const token = await this.getAccessToken()
+    const headers = new Headers(init.headers)
+    headers.set('Authorization', `Bearer ${token}`)
+    return this.fetchWithRetry(url, { ...init, headers }, 1)
   }
 
   /**

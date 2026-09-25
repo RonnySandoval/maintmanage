@@ -8,11 +8,13 @@ import {
   assessEncodedMessageSize,
   formatBackupSize,
   GMAIL_API_UPLOAD_MAX_BYTES,
+  GMAIL_WARN_BYTES,
 } from '../backup/limits'
 import { getGoogleAuth } from './GoogleAuth'
 import {
   GmailApiError,
   GmailClient,
+  GmailNetworkError,
   type GmailMessage,
   type GmailMessagePart,
 } from './GmailClient'
@@ -244,7 +246,24 @@ export class GmailBackupProvider implements BackupProvider {
     }
 
     const raw = bytesToBase64Url(mimeBytes)
-    const inserted = await this.client.insertRawMessageMultipart(raw, mimeBytes)
+
+    // Subida reanudable primero (fragmentos de 8 MiB, más robusta en redes
+    // inestables). Cualquier problema del flujo resumable cae al multipart
+    // clásico para no empeorar el comportamiento anterior.
+    let inserted: { id: string }
+    try {
+      const resumable = await this.client.insertRawMessageResumable(raw, mimeBytes).catch(
+        () => null,
+      )
+      inserted = resumable ?? (await this.client.insertRawMessageMultipart(raw, mimeBytes))
+    } catch (err) {
+      if (err instanceof GmailNetworkError && blob.size >= GMAIL_WARN_BYTES) {
+        throw new GmailNetworkError(
+          `${err.message} La copia pesa ${formatBackupSize(blob.size)}: si el problema continúa, prueba con WiFi o guarda una copia local en carpeta o ZIP.`,
+        )
+      }
+      throw err
+    }
 
     return {
       remoteId: inserted.id,
