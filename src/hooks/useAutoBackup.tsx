@@ -77,7 +77,11 @@ export function AutoBackupProvider({ children }: { children: ReactNode }) {
         if (!interrupted.current) setBar({ kind: 'running', stage: step })
       })
       if (interrupted.current) return
-      if (result.status === 'saved-folder' || result.status === 'saved-download') {
+      if (
+        result.status === 'saved-gmail' ||
+        result.status === 'saved-folder' ||
+        result.status === 'saved-download'
+      ) {
         setBar({ kind: 'done', message: result.message ?? 'Copia de seguridad actualizada.' })
       } else {
         setBar({ kind: 'error', message: result.message ?? 'No se pudo completar la copia automática.' })

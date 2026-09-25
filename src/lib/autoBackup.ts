@@ -9,10 +9,12 @@ import {
 } from '../db/backup'
 import { formatBytes } from './dates'
 import { db } from '../db'
+import { uploadBackupToGmail } from '../backup'
+import { getGoogleAuth } from '../google/GoogleAuth'
 
 export type SaveBackupProgress = 'collect' | 'pack' | 'save'
 
-export type AutoBackupRunStatus = 'saved-folder' | 'saved-download' | 'error'
+export type AutoBackupRunStatus = 'saved-gmail' | 'saved-folder' | 'saved-download' | 'error'
 
 export interface AutoBackupResult {
   status: AutoBackupRunStatus
@@ -59,20 +61,43 @@ export async function checkAutoBackup(now = Date.now()): Promise<AutoBackupCheck
 }
 
 /**
- * Ejecuta la copia automática en segundo plano, sin preguntar al usuario:
- * si hay una carpeta vinculada escribe ahí; si no, descarga el ZIP completo
- * (datos + fotos) a Descargas. Usa los datos tal cual están en el momento en
- * que arranca («a partir del último cambio antes de empezar»).
+ * Ejecuta la copia automática en segundo plano, sin preguntar al usuario.
+ * Prioridad de destinos: Gmail (si hay sesión de Google con token válido),
+ * carpeta vinculada y, si no, descarga del ZIP completo (datos + fotos) a
+ * Descargas. Usa los datos tal cual están en el momento en que arranca
+ * («a partir del último cambio antes de empezar»). Si un destino falla, se cae
+ * al siguiente: la copia nunca se pierde por un destino concreto.
  */
 export async function runAutoBackupNow(
   onProgress?: (step: SaveBackupProgress) => void,
 ): Promise<AutoBackupResult> {
   onProgress?.('collect')
 
-  // En segundo plano no hay gesto de usuario: si la carpeta vinculada necesita
-  // renovar permisos, el navegador rechaza `requestPermission` ("User
-  // activation is required") en lugar de mostrarla. Para no tumbar la copia
-  // entera se cae al ZIP descargado y se avisa en el mensaje de cierre.
+  // 1) Gmail primero. En segundo plano no hay gesto de usuario (Google no
+  //    permite pedir consentimiento sin él), así que solo se intenta cuando ya
+  //    hay token válido restaurado de la sesión. Si la subida falla por red o
+  //    por token caducado, se sigue con carpeta y luego ZIP.
+  const googleConnected = getGoogleAuth().isAuthenticated()
+  let gmailFailed = false
+  if (googleConnected) {
+    onProgress?.('pack')
+    onProgress?.('save')
+    try {
+      const ref = await uploadBackupToGmail()
+      return {
+        status: 'saved-gmail',
+        message: `Copia subida a tu cuenta de Gmail (${formatBytes(ref.size)}).`,
+      }
+    } catch {
+      gmailFailed = true
+    }
+  }
+
+  // 2) Carpeta vinculada. En segundo plano no hay gesto de usuario: si la
+  //    carpeta necesita renovar permisos, el navegador rechaza
+  //    `requestPermission` ("User activation is required") en lugar de
+  //    mostrarla. Para no tumbar la copia entera se cae al ZIP descargado y se
+  //    avisa en el mensaje de cierre.
   let folder: Awaited<ReturnType<typeof getUsableBackupFolder>> = undefined
   let folderNeedsPermission = false
   try {
@@ -101,14 +126,25 @@ export async function runAutoBackupNow(
     }
   }
 
+  // 3) Último recurso: ZIP descargado, siempre disponible.
   onProgress?.('pack')
   const { blob, filename } = await exportBackupZip()
   onProgress?.('save')
   downloadBlob(blob, filename)
   await markBackupDone('download')
-  const note = folderNeedsPermission
-    ? ' La carpeta vinculada necesita permisos: ábrela en Ajustes → Copia local → Carpeta para renovarlos.'
-    : ''
+
+  const notes: string[] = []
+  if (gmailFailed) {
+    notes.push('Gmail rechazó la subida (¿red inestable?); se descargó el ZIP como respaldo.')
+  } else if (!googleConnected) {
+    notes.push('Gmail no está conectado en esta sesión; la copia se descargó como ZIP.')
+  }
+  if (folderNeedsPermission) {
+    notes.push(
+      'La carpeta vinculada necesita permisos: ábrela en Ajustes → Copia local → Carpeta para renovarlos.',
+    )
+  }
+  const note = notes.length ? ` ${notes.join(' ')}` : ''
   return {
     status: 'saved-download',
     message: `Copia descargada como ZIP (${formatBytes(blob.size)}). Guárdala en un lugar seguro.${note}`,

@@ -291,12 +291,14 @@ sequenceDiagram
 3. Si no hay cambios desde la última copia → `fresh` → nada.
 4. Si no toca todavía (`now < nextBackupAt`) → `not-due` → nada.
 5. Si toca → `runAutoBackupNow()` en segundo plano, **sin preguntar**, usando los datos
-   tal como están al arrancar («a partir del último cambio antes de empezar»):
-   - Con carpeta vinculada y permiso vigente → `writeBackupToFolder` (silencioso).
-   - Sin carpeta, o con carpeta que exige renovar permisos (en segundo plano no hay
-     gesto de usuario y `requestPermission` lo rechaza) → descarga automática del ZIP
-     (`downloadBlob`) y `markBackupDone('download')`, con nota si la carpeta necesita
-     que la reabra el usuario en Ajustes.
+   tal como están al arrancar («a partir del último cambio antes de empezar»).
+   Prioridad de destinos (si uno falla se cae al siguiente; la copia nunca se pierde):
+   - **Gmail**, si hay sesión de Google con token válido (sin gesto de usuario) →
+     `uploadBackupToGmail` silencioso y `markBackupDone('gmail')`.
+   - **Carpeta vinculada**, con permiso vigente → `writeBackupToFolder` (silencioso).
+   - **ZIP descargado** (`downloadBlob`) y `markBackupDone('download')`, con nota del
+     motivo (Gmail no conectado/rechazó, o carpeta que necesita renovar permisos:
+     en segundo plano no hay gesto de usuario y `requestPermission` lo rechaza).
 
 Criterio «toca copia»: `lastChangedAt > lastBackupAt` y `now >= nextBackupAt`.
 
@@ -498,9 +500,12 @@ CI: secret `VITE_GOOGLE_CLIENT_ID` en `.github/workflows/deploy.yml`.
 
 ### Añadir backup automático Gmail (Fase 6)
 
-1. En `runAutoBackupNow` (o un segundo proveedor), si conectado a Google y hay cambios → `uploadBackupToGmail`.
-2. Comparar `dataVersion` / checksum con última copia para skip si idéntica.
-3. Respetar token OAuth (gesto si expirado).
+**Estado: ✅ implementado** — `runAutoBackupNow` ya intenta Gmail primero:
+
+1. ✅ Si `getGoogleAuth().isAuthenticated()` (token válido, sin gesto) → `uploadBackupToGmail()`; éxito → `saved-gmail` y `markBackupDone('gmail')`.
+2. Si no hay token válido o la subida falla → carpeta vinculada, y de último recurso ZIP (`saved-download` con nota del motivo).
+3. Pendiente: dedup por `dataVersion` / checksum para saltarse la subida si la copia es idéntica.
+4. Nota: token OAuth expirado no puede renovarse en segundo plano (GIS exige gesto); se cae a carpeta/ZIP.
 
 ### Añadir indicador de sync (Fase 7)
 
