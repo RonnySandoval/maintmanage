@@ -4308,6 +4308,32 @@ label.bloque-select-option {
   margin-top: 0;
 }
 
+/* Mensaje dentro de una corrida: filas separadas con borde suave. */
+.corrida-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.corrida-msg:last-child {
+  border-bottom: none;
+}
+
+.corrida-msg .message-preview {
+  margin-top: 0.2rem;
+}
+
+.corrida-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.92rem;
+}
+
 .bloque-select-option .color-dot.is-empty {
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--border);

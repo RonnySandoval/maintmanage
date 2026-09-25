@@ -11,7 +11,7 @@ import {
   ClipboardList,
   History,
   LayoutDashboard,
-  MessageSquare,
+  NotebookPen,
   Settings,
 } from 'lucide-react'
 import { FilterDrawer, FilterDrawerToggle } from './FilterDrawer'
@@ -29,7 +29,7 @@ const LINKS = [
   { to: '/cronograma', label: 'Cronograma', icon: CalendarDays, end: false },
   { to: '/fichas', label: 'Fichas', icon: ClipboardList, end: false },
   { to: '/historicos', label: 'Histórico', icon: History, end: false },
-  { to: '/mensajes', label: 'Mensajes', icon: MessageSquare, end: false },
+  { to: '/notas', label: 'Notas', icon: NotebookPen, end: false },
   { to: '/ajustes', label: 'Ajustes', icon: Settings, end: false },
 ]
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   Archive,
@@ -25,6 +25,7 @@ import { ActividadTitle } from '../components/ActividadTitle'
 import { FichaTitle } from '../components/FichaTitle'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
 import { EmptyState, Modal } from '../components/ui'
+import { MensajesSeccion } from './Mensajes'
 
 function parseEtiquetas(text: string): string[] {
   const seen = new Set<string>()
@@ -41,11 +42,16 @@ function notaHay(nota: Nota, qLower: string): boolean {
 }
 
 export function NotasPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const vista = params.get('vista') === 'archivadas' ? 'archivadas' : 'activas'
+  /** /mensajes abre la pestaña Mensajes; el resto, Notas. */
+  const tab = location.pathname.startsWith('/mensajes') ? 'mensajes' : 'notas'
   const q = params.get('q') ?? ''
   const etiqueta = params.get('etiqueta') ?? ''
   const [searchText, setSearchText] = useState(q)
+  /** Notas archivadas ocultas por defecto; se muestran solo si se activa el filtro. */
+  const [incluirArchivadas, setIncluirArchivadas] = useState(false)
 
   const notas = useLiveQuery(() => db.notas.orderBy('updatedAt').reverse().toArray()) ?? []
   const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
@@ -243,7 +249,7 @@ export function NotasPage() {
         actividadId: saveActividadId,
         eventoId: saveEventoId,
         fijada,
-        archivada: vista === 'archivadas',
+        archivada: false,
         createdAt: now,
         updatedAt: now,
       })
@@ -265,26 +271,43 @@ export function NotasPage() {
   }
 
   const qLower = q.trim().toLowerCase()
-  const hayFiltros = Boolean(qLower || etiqueta || fechaFiltro || mesFiltro)
+  const hayFiltros = Boolean(qLower || etiqueta || fechaFiltro || mesFiltro || incluirArchivadas)
   const visibles = useMemo(() => {
     const rows = notas.filter((n) => {
-      if (vista === 'archivadas' ? !n.archivada : n.archivada) return false
+      if (n.archivada && !incluirArchivadas) return false
       if (etiqueta && !n.etiquetas.includes(etiqueta)) return false
       if (fechaFiltro && fechaDeNota(n) !== fechaFiltro) return false
       if (mesFiltro && fechaDeNota(n).slice(0, 7) !== mesFiltro) return false
       return notaHay(n, qLower)
     })
     return rows.sort(compararNotas)
-  }, [notas, vista, etiqueta, fechaFiltro, mesFiltro, qLower])
+  }, [notas, incluirArchivadas, etiqueta, fechaFiltro, mesFiltro, qLower])
 
   function limpiarFiltros() {
     setFechaFiltro('')
     setMesFiltro('')
+    setIncluirArchivadas(false)
     patch({ q: undefined, etiqueta: undefined })
   }
 
   const filterTools = useMemo<FilterTool[]>(
     () => [
+      {
+        id: 'archivadas',
+        label: 'Archivadas',
+        icon: Archive,
+        active: incluirArchivadas,
+        content: (
+          <label className="row" style={{ gap: '0.5rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={incluirArchivadas}
+              onChange={(e) => setIncluirArchivadas(e.target.checked)}
+            />
+            Incluir notas archivadas
+          </label>
+        ),
+      },
       {
         id: 'fecha',
         label: 'Fecha',
@@ -316,7 +339,7 @@ export function NotasPage() {
         ),
       },
     ],
-    [fechaFiltro, mesFiltro],
+    [incluirArchivadas, fechaFiltro, mesFiltro],
   )
 
   const formEtiquetas = parseEtiquetas(etiquetasText)
@@ -328,12 +351,15 @@ export function NotasPage() {
 
   return (
     <div className="stack">
+      {tab === 'notas' ? (
       <FilterDrawerSlot
         title="Notas"
         tools={filterTools}
         canClear={hayFiltros}
         onClear={limpiarFiltros}
       />
+      ) : null}
+      {tab === 'notas' ? (
       <Modal
         open={!!viewNota}
         title={viewNota?.titulo ?? 'Nota'}
@@ -384,6 +410,29 @@ export function NotasPage() {
           </div>
         ) : null}
       </Modal>
+      ) : null}
+      <div className="seg-toggle tabs-2" role="tablist" aria-label="Notas o mensajes">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'notas'}
+          className={tab === 'notas' ? 'active' : ''}
+          onClick={() => navigate('/notas')}
+        >
+          Notas
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'mensajes'}
+          className={tab === 'mensajes' ? 'active' : ''}
+          onClick={() => navigate('/mensajes')}
+        >
+          Mensajes
+        </button>
+      </div>
+      {tab === 'notas' ? (
+      <>
       <div className="page-head">
         <p className="muted" style={{ margin: 0 }}>
           {notas.filter((n) => !n.archivada).length} activa
@@ -395,27 +444,6 @@ export function NotasPage() {
             Nueva
           </button>
         </div>
-      </div>
-
-      <div className="seg-toggle tabs-2" role="tablist" aria-label="Notas activas o archivadas">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={vista === 'activas'}
-          className={vista === 'activas' ? 'active' : ''}
-          onClick={() => patch({ vista: '' })}
-        >
-          Activas
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={vista === 'archivadas'}
-          className={vista === 'archivadas' ? 'active' : ''}
-          onClick={() => patch({ vista: 'archivadas' })}
-        >
-          Archivadas
-        </button>
       </div>
 
       <label className="search-field" htmlFor="notas-q">
@@ -773,6 +801,10 @@ export function NotasPage() {
             )
           })}
         </div>
+      )}
+      </>
+      ) : (
+        <MensajesSeccion />
       )}
     </div>
   )
