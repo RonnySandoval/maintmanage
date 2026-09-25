@@ -139,6 +139,28 @@ describe('GmailBackupProvider API (Fase 4)', () => {
     )
   })
 
+  it('reintenta la subida multipart si el fetch falla por red (paso 3)', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'msgid-1' }), { status: 200 }))
+
+    const provider = new GmailBackupProvider(mockAuth(), fetchMock as unknown as typeof fetch)
+    const blob = new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'application/zip' })
+    const ref = await provider.createBackup(blob, sampleMeta({ size: 4 }))
+    expect(ref.remoteId).toBe('msgid-1')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('traduce un fallo de red persistente a GmailNetworkError', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const provider = new GmailBackupProvider(mockAuth(), fetchMock as unknown as typeof fetch)
+    await expect(
+      provider.createBackup(new Blob([new Uint8Array([1])]), sampleMeta()),
+    ).rejects.toThrow(/conectar con el servidor de Gmail/i)
+  })
+
   it('Caso 11: error de Gmail API se traduce', async () => {
     const fetchMock = vi.fn(
       async () => new Response('{"error":{"message":"Backend Error"}}', { status: 500 }),

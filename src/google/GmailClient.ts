@@ -10,6 +10,31 @@ export class GmailApiError extends Error {
   }
 }
 
+/**
+ * Fallo de red al hablar con Gmail: el `fetch` lanzó `TypeError` (sin
+ * respuesta HTTP), típicamente por pérdida de conexión, corte a mitad de una
+ * subida grande, o bloqueo de CORS/VPN/antipublicidad. Se distingue de
+ * `GmailApiError`, que es una respuesta HTTP de error ya recibida.
+ */
+export class GmailNetworkError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'GmailNetworkError'
+  }
+}
+
+const NETWORK_RETRY_ATTEMPTS = 2
+const NETWORK_RETRY_DELAY_MS = 1200
+
+function isNetworkError(err: unknown): boolean {
+  return err instanceof TypeError || (err instanceof Error && err.name === 'TypeError')
+}
+
+const NETWORK_ERROR_MESSAGE =
+  'No se pudo conectar con el servidor de Gmail. Comprueba tu conexión a internet, ' +
+  'espera unos segundos y vuelve a intentarlo. Si tienes una VPN o un bloqueador de ' +
+  'anuncios activos, desactívalos.'
+
 function friendlyGmailError(status: number, body: string, fallback: string): string {
   const lower = body.toLowerCase()
   if (status === 401) return 'La sesión de Google caducó. Vuelve a conectar.'
@@ -171,7 +196,7 @@ export class GmailClient {
     const token = await this.getAccessToken()
     const headers = new Headers(init.headers)
     headers.set('Authorization', `Bearer ${token}`)
-    const res = await this.fetchImpl(url, { ...init, headers })
+    const res = await this.fetchWithRetry(url, { ...init, headers }, 1)
     const text = await res.text()
     if (!res.ok) throw new GmailApiError(res.status, text, fallbackMessage)
     if (!text) return {} as T
@@ -179,6 +204,25 @@ export class GmailClient {
       return JSON.parse(text) as T
     } catch {
       throw new Error('Respuesta inválida de Gmail.')
+    }
+  }
+
+  /**
+   * Ejecuta `fetch` reintentando ante fallos de red transitorios (`TypeError`,
+   * el "Failed to fetch" del navegador). Un único reintento con backoff suele
+   * bastar cuando cae una subida grande por datos móviles. Los errores HTTP
+   * (respuesta ya recibida) no se reintentan.
+   */
+  private async fetchWithRetry(url: string, init: RequestInit, attempt: number): Promise<Response> {
+    try {
+      return await this.fetchImpl(url, init)
+    } catch (err) {
+      if (!isNetworkError(err) || attempt >= NETWORK_RETRY_ATTEMPTS) {
+        if (isNetworkError(err)) throw new GmailNetworkError(NETWORK_ERROR_MESSAGE)
+        throw err
+      }
+      await new Promise((resolve) => setTimeout(resolve, NETWORK_RETRY_DELAY_MS * attempt))
+      return this.fetchWithRetry(url, init, attempt + 1)
     }
   }
 }

@@ -436,6 +436,7 @@ CI: secret `VITE_GOOGLE_CLIENT_ID` en `.github/workflows/deploy.yml`.
 | `access_denied` 403 | Usuario no tester | Añadir en OAuth consent screen |
 | «Copia en Google no configurada» en móvil | PWA con JS viejo | Forzar actualización / reinstalar PWA |
 | Token caducado (~1 h) | Sin refresh token (by design) | «Volver a conectar» (la recarga no desconecta si el token sigue válido) |
+| «Failed to fetch» en el paso 3 (Subiendo) | Fallo de red/CORS al hablar con `googleapis.com` (corte en subida grande, datos móviles, VPN/antipublicidad, o bloqueo del navegador) | La app reintenta 1 vez sola; si persiste muestra un mensaje en español con consejos. Revisar conexión, desactivar VPN/bloqueadores y reintentar. No es un error del formato de la copia ni de permisos |
 | Borrar copia da «Faltan permisos» (403) | Token sin `mail.google.com` (sesión anterior) | Volver a conectar (re-consent). Con `gmail.modify` la app mueve la copia a la papelera y avisa |
 
 ---
