@@ -1,5 +1,6 @@
 import { formatDateTime } from '../lib/dates'
 import type { AutoBackupBarState } from '../hooks/useAutoBackup'
+import { Ban, Clock, X } from 'lucide-react'
 import { ErrorDetail } from './ErrorDetail'
 
 const STAGE_TEXT: Record<string, string> = {
@@ -54,17 +55,35 @@ export function AutoBackupBar({ bar, onPostpone, onCancel, onClose }: Props) {
       <div className="auto-backup-bar-actions">
         {bar.kind === 'running' ? (
           <>
-            <button type="button" className="btn btn-sm btn-ghost" onClick={onPostpone}>
-              Postponer
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Aplazar la copia 1 hora"
+              title="Aplazar 1 hora"
+              onClick={onPostpone}
+            >
+              <Clock size={18} />
             </button>
-            <button type="button" className="btn btn-sm btn-ghost" onClick={onCancel}>
-              Cancelar
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Cancelar la copia"
+              title="Cancelar"
+              onClick={onCancel}
+            >
+              <Ban size={18} />
             </button>
           </>
         ) : null}
         {bar.kind !== 'running' ? (
-          <button type="button" className="btn btn-sm btn-ghost" onClick={onClose}>
-            Cerrar
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Cerrar aviso"
+            title="Cerrar"
+            onClick={onClose}
+          >
+            <X size={18} />
           </button>
         ) : null}
       </div>

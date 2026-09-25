@@ -5213,14 +5213,30 @@ label.bloque-select-option {
 .auto-backup-bar-text {
   margin: 0;
   min-width: 0;
-  flex: 1;
+  /* El texto ocupa al menos el 70 % del ancho de la franja; los botones de
+     acción son solo iconos compactos y no roban espacio al mensaje. */
+  flex: 1 1 70%;
 }
 
 .auto-backup-bar-actions {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  flex-shrink: 0;
+  gap: 0.2rem;
+  flex: 0 0 auto;
+}
+
+/* Botones de acción de la franja: solo icono (sin texto), con hover para
+   identificarlos al pasar el dedo/ratón. */
+.auto-backup-bar .icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--text-muted);
+}
+
+.auto-backup-bar .icon-btn:hover {
+  background: color-mix(in srgb, var(--text) 13%, transparent);
+  color: var(--text);
 }
 
 /* Flash constante y lento en el fondo del botón de AJUSTES cuando hay
