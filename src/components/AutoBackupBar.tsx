@@ -1,5 +1,6 @@
 import { formatDateTime } from '../lib/dates'
 import type { AutoBackupBarState } from '../hooks/useAutoBackup'
+import { ErrorDetail } from './ErrorDetail'
 
 const STAGE_TEXT: Record<string, string> = {
   collect: 'Recopilando los datos locales…',
@@ -43,7 +44,13 @@ export function AutoBackupBar({ bar, onPostpone, onCancel, onClose }: Props) {
 
   return (
     <div className={`auto-backup-bar ${tone}`} role="status">
-      <p className="auto-backup-bar-text">{text}</p>
+      {bar.kind === 'error' ? (
+        <p className="auto-backup-bar-text">
+          <ErrorDetail message={bar.message} />
+        </p>
+      ) : (
+        <p className="auto-backup-bar-text">{text}</p>
+      )}
       <div className="auto-backup-bar-actions">
         {bar.kind === 'running' ? (
           <>

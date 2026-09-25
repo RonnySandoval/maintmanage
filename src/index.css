@@ -3863,6 +3863,40 @@ a.table-row:focus-visible {
   padding: 0.75rem 0.85rem;
 }
 
+.error-detail-toggle {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 999px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.error-detail-toggle:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.error-detail-tech {
+  display: block;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
 .create-panel {
   border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
@@ -5273,6 +5307,7 @@ label.bloque-select-option {
   flex-direction: column;
   gap: 0.1rem;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .ajustes-backup-suggest-text span {
@@ -5284,9 +5319,9 @@ label.bloque-select-option {
   display: inline-flex;
   align-items: center;
   gap: 0.2rem;
-  margin-left: auto;
-  flex-shrink: 0;
-  font-size: 0.85rem;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--warning);
 }

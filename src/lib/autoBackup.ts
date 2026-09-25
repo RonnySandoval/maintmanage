@@ -69,7 +69,18 @@ export async function runAutoBackupNow(
 ): Promise<AutoBackupResult> {
   onProgress?.('collect')
 
-  const folder = await getUsableBackupFolder()
+  // En segundo plano no hay gesto de usuario: si la carpeta vinculada necesita
+  // renovar permisos, el navegador rechaza `requestPermission` ("User
+  // activation is required") en lugar de mostrarla. Para no tumbar la copia
+  // entera se cae al ZIP descargado y se avisa en el mensaje de cierre.
+  let folder: Awaited<ReturnType<typeof getUsableBackupFolder>> = undefined
+  let folderNeedsPermission = false
+  try {
+    folder = await getUsableBackupFolder()
+  } catch {
+    folder = undefined
+    folderNeedsPermission = true
+  }
   if (folder) {
     onProgress?.('pack')
     onProgress?.('save')
@@ -95,9 +106,12 @@ export async function runAutoBackupNow(
   onProgress?.('save')
   downloadBlob(blob, filename)
   await markBackupDone('download')
+  const note = folderNeedsPermission
+    ? ' La carpeta vinculada necesita permisos: ábrela en Ajustes → Copia local → Carpeta para renovarlos.'
+    : ''
   return {
     status: 'saved-download',
-    message: `Copia descargada como ZIP (${formatBytes(blob.size)}). Guárdala en un lugar seguro.`,
+    message: `Copia descargada como ZIP (${formatBytes(blob.size)}). Guárdala en un lugar seguro.${note}`,
   }
 }
 

@@ -56,7 +56,7 @@ describe('GmailClient frente a fallos de red', () => {
 
 describe('GmailClient subida reanudable', () => {
   it('sube por fragmentos y reinicia tras un 308', async () => {
-    const total = 8 * 1024 * 1024 + 10
+    const total = 2 * 1024 * 1024 + 10
     const mimeBytes = new Uint8Array(total)
     const putRanges: string[] = []
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
@@ -76,7 +76,7 @@ describe('GmailClient subida reanudable', () => {
       const range = new Headers(init?.headers).get('Content-Range') ?? ''
       putRanges.push(range)
       if (putRanges.length === 1) {
-        return new Response(null, { status: 308, headers: { Range: 'bytes=0-8388607' } })
+        return new Response(null, { status: 308, headers: { Range: 'bytes=0-2097151' } })
       }
       return new Response(JSON.stringify({ id: 'msgid-9' }), { status: 201 })
     })
@@ -85,8 +85,8 @@ describe('GmailClient subida reanudable', () => {
     const result = await client.insertRawMessageResumable('TWFpbA', mimeBytes)
     expect(result).toEqual({ id: 'msgid-9' })
     expect(putRanges).toEqual([
-      `bytes 0-8388607/${total}`,
-      `bytes 8388608-${total - 1}/${total}`,
+      `bytes 0-2097151/${total}`,
+      `bytes 2097152-${total - 1}/${total}`,
     ])
   })
 
@@ -132,5 +132,38 @@ describe('GmailClient subida reanudable', () => {
     await expect(
       client.insertRawMessageResumable('TWFpbA', new Uint8Array([1])),
     ).rejects.toBeInstanceOf(GmailApiError)
+  })
+
+  it('reintenta la sesión entera una vez si el arranque muere por red', async () => {
+    let sessionInitAttempts = 0
+    let uploadId = 0
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      const u = String(url)
+      if (u.includes('uploadType=resumable')) {
+        sessionInitAttempts += 1
+        // Primer intento de sesión: el init muere por red (2 fetches dentro de
+        // fetchWithRetry). El segundo intento arranca y sube bien.
+        if (sessionInitAttempts <= 2) throw new TypeError('Failed to fetch')
+        uploadId += 1
+        expect(init?.method).toBe('POST')
+        return new Response('{}', {
+          status: 200,
+          headers: {
+            Location: `https://www.googleapis.com/upload/gmail/v1/users/me/messages?upload_id=S${uploadId}`,
+          },
+        })
+      }
+      expect(init?.method).toBe('PUT')
+      return new Response(JSON.stringify({ id: 'msgid-2' }), { status: 201 })
+    })
+
+    const client = clientWith(fetchMock as unknown as typeof fetch)
+    const result = await client.insertRawMessageResumable(
+      'TWFpbA',
+      new Uint8Array([1, 2, 3]),
+    )
+    expect(result).toEqual({ id: 'msgid-2' })
+    expect(sessionInitAttempts).toBe(3)
+    expect(uploadId).toBe(1)
   })
 })

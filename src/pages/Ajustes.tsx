@@ -62,6 +62,7 @@ import {
 import { requestNotificaciones } from '../lib/notifications'
 import { DataProcessOverlay } from '../components/DataProcessOverlay'
 import { EntityCard } from '../components/EntityCard'
+import { ErrorDetail } from '../components/ErrorDetail'
 import { GoogleAccountPanel } from '../components/GoogleAccountPanel'
 import { ThemeModePicker } from '../components/ThemeQuickToggle'
 import { useDataProcess } from '../hooks/useDataProcess'
@@ -849,7 +850,11 @@ export function AjustesPage() {
               </div>
             ) : null}
 
-            {message && tab === 'copia' ? <div className="hint">{message}</div> : null}
+            {message && tab === 'copia' ? (
+              <div className="hint">
+                <ErrorDetail message={message} />
+              </div>
+            ) : null}
       </SettingsAccordion>
 
       <SettingsAccordion
@@ -983,7 +988,11 @@ export function AjustesPage() {
               </button>
             ) : null}
           </div>
-          {message && tab === 'avisos' ? <div className="hint">{message}</div> : null}
+          {message && tab === 'avisos' ? (
+            <div className="hint">
+              <ErrorDetail message={message} />
+            </div>
+          ) : null}
       </SettingsAccordion>
 
       <SettingsAccordion

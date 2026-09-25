@@ -188,7 +188,12 @@ sequenceDiagram
   Cloud->>Gmail: createBackup(blob, manifest)
   Gmail->>Gmail: buildBackupMimeMessage (multipart + base64url)
   Gmail->>Gmail: assessEncodedMessageSize (mensaje ≤ ~135 MB)
-  Gmail->>API: users.messages.insert /upload?uploadType=multipart (INBOX, sin enviar a terceros)
+  alt uploadType=resumable disponible (Location expuesta por CORS)
+    Gmail->>API: POST /upload?uploadType=resumable (inicia sesión)
+    Gmail->>API: PUT por fragmentos de 2 MiB (Content-Range), reintentos por fragmento y re-sesión si muere la red
+  else
+    Gmail->>API: users.messages.insert /upload?uploadType=multipart (INBOX, sin enviar a terceros)
+  end
   Gmail-->>Cloud: RemoteBackupRef
   Cloud->>Cloud: markBackupDone('gmail')
   Cloud-->>UI: ref
@@ -201,8 +206,14 @@ sequenceDiagram
 |------|-------------|
 | `preparing` | OAuth + lectura IndexedDB |
 | `compressing` | `packAndVerify` |
-| `uploading` | `messages.insert` (multipart `/upload`) |
+| `uploading` | `messages.insert` (`/upload`, preferiblemente `uploadType=resumable`) |
 | `done` / `error` | Fin (overlay muestra resultado) |
+
+### Robustez de la subida (`GmailClient.ts`)
+
+- **Resumable por defecto**: inicia una sesión de subida y envía el mensaje en `PUT` de **2 MiB** con `Content-Range`. Si un fragmento se corta por red, se reenvía solo ese fragmento (idempotente) hasta 4 intentos con backoff; si la sesión entera muere por un fallo de red, se **reintenta una vez con una sesión nueva**.
+- Si el navegador no expone `Location` (CORS) o la red no levanta la sesión, cae al **multipart** clásico.
+- Los fallos de red (`TypeError`/«Failed to fetch») siempre llevan el mensaje amable en español; el detalle técnico (mensajes del navegador, nombres de excepción, URLs) se oculta en la UI tras un botón **«Ver más»** (`components/ErrorDetail.tsx`).
 
 ### Mensaje en Gmail
 
@@ -281,8 +292,11 @@ sequenceDiagram
 4. Si no toca todavía (`now < nextBackupAt`) → `not-due` → nada.
 5. Si toca → `runAutoBackupNow()` en segundo plano, **sin preguntar**, usando los datos
    tal como están al arrancar («a partir del último cambio antes de empezar»):
-   - Con carpeta vinculada → `writeBackupToFolder` (silencioso).
-   - Sin carpeta → descarga automática del ZIP completo (`downloadBlob`) y `markBackupDone('download')`.
+   - Con carpeta vinculada y permiso vigente → `writeBackupToFolder` (silencioso).
+   - Sin carpeta, o con carpeta que exige renovar permisos (en segundo plano no hay
+     gesto de usuario y `requestPermission` lo rechaza) → descarga automática del ZIP
+     (`downloadBlob`) y `markBackupDone('download')`, con nota si la carpeta necesita
+     que la reabra el usuario en Ajustes.
 
 Criterio «toca copia»: `lastChangedAt > lastBackupAt` y `now >= nextBackupAt`.
 

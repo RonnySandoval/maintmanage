@@ -31,6 +31,7 @@ import { useGoogleAuth } from '../hooks/useGoogleAuth'
 import { useDataProcess } from '../hooks/useDataProcess'
 import { DataProcessOverlay } from './DataProcessOverlay'
 import { EntityCard } from './EntityCard'
+import { ErrorDetail } from './ErrorDetail'
 import { Modal } from './ui'
 
 function statusLabel(status: string, email: string | null): string {
@@ -472,7 +473,7 @@ export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } 
         ) : null}
         {localError || auth.error ? (
           <div className="hint" role="alert" style={{ marginTop: 8 }}>
-            {localError || auth.error}
+            <ErrorDetail message={localError || auth.error || ''} />
           </div>
         ) : null}
     </>

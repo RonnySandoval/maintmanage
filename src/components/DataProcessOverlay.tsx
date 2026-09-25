@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Check, CheckCircle2, Circle, Loader2, XCircle } from 'lucide-react'
 import { stepProgressBounds, type DataProcessSession } from '../lib/dataProcess'
 import { useSmoothProgress } from '../hooks/useSmoothProgress'
+import { ErrorDetail } from './ErrorDetail'
 
 export function DataProcessOverlay({
   session,
@@ -48,7 +49,7 @@ export function DataProcessOverlay({
             {session.title}
           </h2>
           <p id="data-process-outcome-message" className="data-process-outcome-message">
-            {session.message}
+            {success ? session.message : <ErrorDetail message={session.message} />}
           </p>
           {onDismiss ? (
             <button type="button" className="btn btn-primary data-process-outcome-btn" onClick={onDismiss}>

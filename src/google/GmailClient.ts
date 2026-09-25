@@ -26,10 +26,14 @@ export class GmailNetworkError extends Error {
 const NETWORK_RETRY_ATTEMPTS = 2
 const NETWORK_RETRY_DELAY_MS = 1200
 
-/** Tamaño de cada fragmento en la subida reanudable (8 MiB). */
-const RESUMABLE_CHUNK_SIZE = 8 * 1024 * 1024
+/**
+ * Tamaño de cada fragmento en la subida reanudable (2 MiB). Fragmentos más
+ * pequeños sobreviven mejor a conexiones móviles/WiFi inestables: cada `PUT`
+ * por rango tarda menos y se reenvía solo ese trozo, sin volver a empezar.
+ */
+const RESUMABLE_CHUNK_SIZE = 2 * 1024 * 1024
 /** Reintentos extra por fragmento (los PUT por rango son idempotentes). */
-const RESUMABLE_CHUNK_ATTEMPTS = 3
+const RESUMABLE_CHUNK_ATTEMPTS = 4
 
 function isNetworkError(err: unknown): boolean {
   return err instanceof TypeError || (err instanceof Error && err.name === 'TypeError')
@@ -208,14 +212,33 @@ export class GmailClient {
   /**
    * Subida reanudable por fragmentos (protocolo oficial de Google para
    * archivos grandes desde navegador): inicia una sesión de subida y envía el
-   * mensaje en `PUT` de 8 MiB. Si un fragmento se corta por red, se reenvía
-   * solo ese fragmento, sin volver a empezar.
+   * mensaje en `PUT` de 2 MiB. Si un fragmento se corta por red, se reenvía
+   * solo ese fragmento, sin volver a empezar. Si la sesión entera muere por
+   * un fallo de red, se reintenta una vez desde cero con una sesión nueva.
    *
    * Devuelve `null` si el flujo resumable no es usable (p. ej. el navegador no
    * puede leer la cabecera `Location` por CORS); el llamador cae entonces al
    * endpoint multipart clásico.
    */
   async insertRawMessageResumable(
+    rawBase64Url: string,
+    rawMimeBytes: Uint8Array,
+  ): Promise<{ id: string } | null> {
+    try {
+      return await this.resumableUploadOnce(rawBase64Url, rawMimeBytes)
+    } catch (err) {
+      // La red pudo cortar la sesión a mitad de camino. Con una sesión nueva
+      // (nuevo `upload_id`) los reintentos vuelven a empezar desde 0 y suelen
+      // completarse si el canal se estabilizó. Solo se reintenta el caso de red;
+      // los errores HTTP (respuesta ya recibida) se propagan tal cual.
+      if (err instanceof GmailNetworkError) {
+        return this.resumableUploadOnce(rawBase64Url, rawMimeBytes)
+      }
+      throw err
+    }
+  }
+
+  private async resumableUploadOnce(
     rawBase64Url: string,
     rawMimeBytes: Uint8Array,
   ): Promise<{ id: string } | null> {
