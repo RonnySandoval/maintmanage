@@ -18,7 +18,7 @@ import {
   type GmailMessage,
   type GmailMessagePart,
 } from './GmailClient'
-import { buildBackupMimeMessage, bytesToBase64Url } from './mime'
+import { buildBackupMimeMessage } from './mime'
 
 const META_MARKER = 'MAINTMANAGE_BACKUP_META'
 
@@ -245,22 +245,24 @@ export class GmailBackupProvider implements BackupProvider {
       )
     }
 
-    const raw = bytesToBase64Url(mimeBytes)
-
-    // Subida reanudable primero (fragmentos de 8 MiB; Google la recomienda
+    // Subida reanudable primero (fragmentos de 2 MiB; Google la recomienda
     // para subidas desde móvil y ante caídas de red). Si no está disponible
     // (cabecera Location no expuesta por CORS) o falla, se cae al multipart
-    // clásico para no empeorar el comportamiento anterior.
+    // clásico para no empeorar el comportamiento anterior. El mensaje viaja
+    // solo en el cuerpo del media (message/rfc822), sin duplicar `raw` en la
+    // metadata: incluir el base64 en el arranque del resumable o en la parte
+    // JSON del multipart duplicaba el tamaño de la petición y era lo que las
+    // redes móviles cortaban en el paso "Subiendo".
     let inserted: { id: string }
     let resumableAttempted = false
     try {
-      const resumable = await this.client.insertRawMessageResumable(raw, mimeBytes).catch(
+      const resumable = await this.client.insertRawMessageResumable(mimeBytes).catch(
         () => {
           resumableAttempted = true
           return null
         },
       )
-      inserted = resumable ?? (await this.client.insertRawMessageMultipart(raw, mimeBytes))
+      inserted = resumable ?? (await this.client.insertRawMessageMultipart(mimeBytes))
     } catch (err) {
       if (err instanceof GmailNetworkError) {
         const sizeHint =

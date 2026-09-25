@@ -513,29 +513,45 @@ export function AjustesPage() {
     <div className="stack ajustes-page">
       {suggest ? (
         <div className="ajustes-backup-suggest" role="status">
-          <button type="button" className="ajustes-backup-suggest-card" onClick={goToCreate}>
+          <div
+            className="ajustes-backup-suggest-card"
+            role="button"
+            tabIndex={0}
+            onClick={goToCreate}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                goToCreate()
+              }
+            }}
+          >
             <span className="ajustes-backup-suggest-flash" aria-hidden />
-            <span className="ajustes-backup-suggest-icon" aria-hidden>
-              <UploadCloud size={20} />
-            </span>
-            <span className="ajustes-backup-suggest-text">
-              <strong>Hay cambios sin copiar todavía.</strong>
-              <span>Haz una copia de respaldo segura ahora.</span>
-            </span>
+            <div className="ajustes-backup-suggest-row">
+              <span className="ajustes-backup-suggest-icon" aria-hidden>
+                <UploadCloud size={20} />
+              </span>
+              <span className="ajustes-backup-suggest-text">
+                <strong>Hay cambios sin copiar todavía.</strong>
+                <span>Haz una copia de respaldo segura ahora.</span>
+              </span>
+            </div>
             <span className="ajustes-backup-suggest-cta">
               Crear copia ahora
               <ChevronRight size={16} aria-hidden />
             </span>
-          </button>
-          <button
-            type="button"
-            className="icon-btn ajustes-backup-suggest-dismiss"
-            aria-label="Descartar sugerencia"
-            title="Descartar esta vez"
-            onClick={dismissSuggestion}
-          >
-            <X size={16} />
-          </button>
+            <button
+              type="button"
+              className="icon-btn ajustes-backup-suggest-dismiss"
+              aria-label="Descartar sugerencia"
+              title="Descartar esta vez"
+              onClick={(event) => {
+                event.stopPropagation()
+                dismissSuggestion()
+              }}
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
       ) : null}
       <EntityCard

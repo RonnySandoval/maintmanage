@@ -115,16 +115,19 @@ describe('GmailBackupProvider API (Fase 4)', () => {
       const contentType = new Headers(init?.headers).get('Content-Type') ?? ''
       expect(contentType).toContain('multipart/related; boundary=')
       const bodyText = await (init?.body as Blob).text()
-      // Parte JSON: raw base64url del mensaje RFC 822 completo + etiqueta INBOX.
-      const rawMatch = /"raw":"([^"]+)"/.exec(bodyText)
-      expect(rawMatch).not.toBeNull()
-      const decoded = new TextDecoder().decode(base64UrlToBytes(rawMatch![1]))
-      expect(decoded).toContain('[MAINTMANAGE_BACKUP]')
-      // El ZIP [1,2,3,4] dentro del MIME va en base64 clásico AQIDBA==.
-      expect(decoded).toContain('AQIDBA==')
-      expect(bodyText).toContain('"labelIds":["INBOX"]')
-      // Parte media con el mensaje message/rfc822.
-      expect(bodyText).toContain('message/rfc822')
+      // La metadata ya NO lleva `raw`: el mensaje viaja solo en la parte media
+      // (message/rfc822), para no duplicar el tamaño de la petición.
+      const boundary = contentType.split('boundary=')[1]
+      const segments = bodyText.split(`--${boundary}`)
+      const jsonPart = segments.find((s) => s.includes('application/json'))
+      expect(jsonPart).toContain('"labelIds":["INBOX"]')
+      expect(jsonPart).not.toContain('"raw"')
+      // Parte media con el mensaje message/rfc822 → el ZIP [1,2,3,4] en base64
+      // clásico AQIDBA==.
+      const mediaPart = segments.find((s) => s.includes('message/rfc822'))
+      expect(mediaPart).toBeDefined()
+      expect(mediaPart).toContain('[MAINTMANAGE_BACKUP]')
+      expect(mediaPart).toContain('AQIDBA==')
       return new Response(JSON.stringify({ id: 'msgid-1' }), { status: 200 })
     })
 

@@ -122,11 +122,13 @@ export class GmailClient {
    * (`/upload/...?uploadType=multipart`), que es el que respeta el límite
    * documentado de 150 MiB de `users.messages.insert`. El endpoint JSON simple
    * (`raw`) tiene topes menores no documentados y falla con copias grandes.
+   *
+   * La parte de metadata va SIN el campo `raw`: el mensaje completo viaja solo
+   * en la parte media (`message/rfc822`). Incluir `raw` en la metadata
+   * duplicaría el tamaño de la petición (base64 ≈ +33 %) y rompe la subida en
+   * redes que cortan peticiones grandes.
    */
-  async insertRawMessageMultipart(
-    rawBase64Url: string,
-    rawMimeBytes: Uint8Array,
-  ): Promise<{ id: string }> {
+  async insertRawMessageMultipart(rawMimeBytes: Uint8Array): Promise<{ id: string }> {
     const boundary = `maintmanage_boundary_${Date.now().toString(36)}_${Math.random()
       .toString(36)
       .slice(2)}`
@@ -136,7 +138,7 @@ export class GmailClient {
     const rawMimePart = rawMimeBytes as BlobPart
     const parts: BlobPart[] = [
       `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
-      JSON.stringify({ raw: rawBase64Url, labelIds: ['INBOX'] }),
+      JSON.stringify({ labelIds: ['INBOX'] }),
       `\r\n--${boundary}\r\nContent-Type: message/rfc822\r\n\r\n`,
       rawMimePart,
       `\r\n--${boundary}--\r\n`,
@@ -220,28 +222,22 @@ export class GmailClient {
    * puede leer la cabecera `Location` por CORS); el llamador cae entonces al
    * endpoint multipart clásico.
    */
-  async insertRawMessageResumable(
-    rawBase64Url: string,
-    rawMimeBytes: Uint8Array,
-  ): Promise<{ id: string } | null> {
+  async insertRawMessageResumable(rawMimeBytes: Uint8Array): Promise<{ id: string } | null> {
     try {
-      return await this.resumableUploadOnce(rawBase64Url, rawMimeBytes)
+      return await this.resumableUploadOnce(rawMimeBytes)
     } catch (err) {
       // La red pudo cortar la sesión a mitad de camino. Con una sesión nueva
       // (nuevo `upload_id`) los reintentos vuelven a empezar desde 0 y suelen
       // completarse si el canal se estabilizó. Solo se reintenta el caso de red;
       // los errores HTTP (respuesta ya recibida) se propagan tal cual.
       if (err instanceof GmailNetworkError) {
-        return this.resumableUploadOnce(rawBase64Url, rawMimeBytes)
+        return this.resumableUploadOnce(rawMimeBytes)
       }
       throw err
     }
   }
 
-  private async resumableUploadOnce(
-    rawBase64Url: string,
-    rawMimeBytes: Uint8Array,
-  ): Promise<{ id: string } | null> {
+  private async resumableUploadOnce(rawMimeBytes: Uint8Array): Promise<{ id: string } | null> {
     const initUrl =
       'https://www.googleapis.com/upload/gmail/v1/users/me/messages?uploadType=resumable'
     const init = await this.authorizedFetch(initUrl, {
@@ -251,7 +247,11 @@ export class GmailClient {
         'X-Upload-Content-Type': 'message/rfc822',
         'X-Upload-Content-Length': String(rawMimeBytes.length),
       },
-      body: JSON.stringify({ raw: rawBase64Url, labelIds: ['INBOX'] }),
+      // La guía de subidas de Gmail pide que el cuerpo del arranque vaya vacío
+      // o solo con metadata: el contenido real del mensaje viaja en los `PUT`
+      // posteriores. NO incluir `raw` aquí: duplica el tamaño de la petición
+      // (base64 ≈ +33 %) y ese POST gigante es lo que las redes móviles cortan.
+      body: JSON.stringify({ labelIds: ['INBOX'] }),
     })
     const initText = await init.text()
     if (!init.ok) {

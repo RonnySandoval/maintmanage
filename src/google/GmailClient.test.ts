@@ -5,7 +5,20 @@ function clientWith(fetchImpl: typeof fetch): GmailClient {
   return new GmailClient(async () => 'access-token', fetchImpl)
 }
 
-describe('GmailClient frente a fallos de red', () => {
+describe('GmailClient frente a fallos de red y subidas sin raw en metadata', () => {
+  it('sube el media sin incluir el raw base64 en la metadata', async () => {
+    const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) => {
+      const body = await (init?.body as Blob).text()
+      expect(body).not.toContain('"raw"')
+      expect(body).toContain('labelIds')
+      return new Response(JSON.stringify({ id: 'msgid-0' }), { status: 200 })
+    })
+
+    const client = clientWith(fetchMock as unknown as typeof fetch)
+    const result = await client.insertRawMessageMultipart(new Uint8Array([1, 2, 3]))
+    expect(result.id).toBe('msgid-0')
+  })
+
   it('reintenta una vez y tiene éxito si el fallo de fetch es transitorio', async () => {
     const fetchMock = vi
       .fn()
@@ -13,10 +26,7 @@ describe('GmailClient frente a fallos de red', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'msgid-1' }), { status: 200 }))
 
     const client = clientWith(fetchMock as unknown as typeof fetch)
-    const result = await client.insertRawMessageMultipart(
-      'TWFpbA',
-      new Uint8Array([1, 2, 3]),
-    )
+    const result = await client.insertRawMessageMultipart(new Uint8Array([1, 2, 3]))
 
     expect(result.id).toBe('msgid-1')
     expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -82,7 +92,7 @@ describe('GmailClient subida reanudable', () => {
     })
 
     const client = clientWith(fetchMock as unknown as typeof fetch)
-    const result = await client.insertRawMessageResumable('TWFpbA', mimeBytes)
+    const result = await client.insertRawMessageResumable(mimeBytes)
     expect(result).toEqual({ id: 'msgid-9' })
     expect(putRanges).toEqual([
       `bytes 0-2097151/${total}`,
@@ -95,7 +105,7 @@ describe('GmailClient subida reanudable', () => {
 
     const client = clientWith(fetchMock as unknown as typeof fetch)
     await expect(
-      client.insertRawMessageResumable('TWFpbA', new Uint8Array([1])),
+      client.insertRawMessageResumable(new Uint8Array([1])),
     ).resolves.toBeNull()
   })
 
@@ -120,7 +130,7 @@ describe('GmailClient subida reanudable', () => {
 
     const client = clientWith(fetchMock as unknown as typeof fetch)
     await expect(
-      client.insertRawMessageResumable('TWFpbA', new Uint8Array([1, 2])),
+      client.insertRawMessageResumable(new Uint8Array([1, 2])),
     ).resolves.toEqual({ id: 'msgid-1' })
     expect(calls).toBe(3)
   })
@@ -130,7 +140,7 @@ describe('GmailClient subida reanudable', () => {
 
     const client = clientWith(fetchMock as unknown as typeof fetch)
     await expect(
-      client.insertRawMessageResumable('TWFpbA', new Uint8Array([1])),
+      client.insertRawMessageResumable(new Uint8Array([1])),
     ).rejects.toBeInstanceOf(GmailApiError)
   })
 
@@ -159,7 +169,6 @@ describe('GmailClient subida reanudable', () => {
 
     const client = clientWith(fetchMock as unknown as typeof fetch)
     const result = await client.insertRawMessageResumable(
-      'TWFpbA',
       new Uint8Array([1, 2, 3]),
     )
     expect(result).toEqual({ id: 'msgid-2' })

@@ -5240,24 +5240,22 @@ label.bloque-select-option {
   }
 }
 
-/* Card de sugerencia dentro de Ajustes, con línea de flash arriba. */
+/* Card de sugerencia dentro de Ajustes, con línea de flash arriba. El layout
+   tiene dos filas: (icono + texto) y debajo el CTA. Así el texto ocupa más
+   del 70 % del ancho de la card en cualquier pantalla. La X de descartar va
+   dentro de la card, anclada arriba a la derecha. */
 .ajustes-backup-suggest {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.45rem;
   margin-bottom: 0.85rem;
 }
 
 .ajustes-backup-suggest-card {
   position: relative;
   overflow: hidden;
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
   width: 100%;
-  padding: 0.7rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0.8rem 0.7rem;
   text-align: left;
   color: var(--text);
   background: color-mix(in srgb, var(--warning) 10%, var(--bg-elev));
@@ -5269,6 +5267,19 @@ label.bloque-select-option {
 .ajustes-backup-suggest-card:hover {
   border-color: color-mix(in srgb, var(--warning) 55%, var(--border));
   box-shadow: var(--shadow-hover);
+}
+
+.ajustes-backup-suggest-card:focus-visible {
+  outline: 2px solid var(--warning);
+  outline-offset: 2px;
+}
+
+/* Fila 1: icono + texto. El texto consume todo el ancho restante (>70 %). */
+.ajustes-backup-suggest-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding-right: 1.7rem; /* deja hueco para la X dentro de la card */
 }
 
 .ajustes-backup-suggest-flash {
@@ -5319,28 +5330,26 @@ label.bloque-select-option {
   color: var(--text-muted);
 }
 
-/* El CTA se limita a menos de la mitad del ancho y, si no cabe, envuelve el
-   texto en dos líneas cortas en vez de empujar el texto de la sugerencia. */
+/* El CTA va en su propia fila, alineado a la izquierda bajo el texto. */
 .ajustes-backup-suggest-cta {
   display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 0.15rem;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 40%;
-  white-space: normal;
-  text-align: right;
+  align-self: flex-start;
+  white-space: nowrap;
   font-size: 0.75rem;
   line-height: 1.3;
   font-weight: 700;
   color: var(--warning);
 }
 
+/* La X de descartar vive DENTRO de la card, anclada arriba a la derecha. */
 .ajustes-backup-suggest-dismiss {
-  margin-top: 0.1rem;
+  position: absolute;
+  top: 0.45rem;
+  right: 0.4rem;
+  z-index: 1;
   color: var(--text-muted);
-  flex-shrink: 0;
 }
 
 /* Destello del botón «Crear copia ahora» al llegar desde la sugerencia. */

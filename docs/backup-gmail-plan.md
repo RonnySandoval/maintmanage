@@ -186,10 +186,10 @@ sequenceDiagram
     Cloud-->>UI: Error claro
   end
   Cloud->>Gmail: createBackup(blob, manifest)
-  Gmail->>Gmail: buildBackupMimeMessage (multipart + base64url)
+  Gmail->>Gmail: buildBackupMimeMessage (mensaje MIME + adjunto ZIP)
   Gmail->>Gmail: assessEncodedMessageSize (mensaje ≤ ~135 MB)
   alt uploadType=resumable disponible (Location expuesta por CORS)
-    Gmail->>API: POST /upload?uploadType=resumable (inicia sesión)
+    Gmail->>API: POST /upload?uploadType=resumable (inicia sesión; metadata {labelIds}, SIN raw: el mensaje va solo en el media)
     Gmail->>API: PUT por fragmentos de 2 MiB (Content-Range), reintentos por fragmento y re-sesión si muere la red
   else
     Gmail->>API: users.messages.insert /upload?uploadType=multipart (INBOX, sin enviar a terceros)
@@ -400,8 +400,8 @@ Ciclo de `run()`:
 | `config.ts` | Resolución Client ID (env → json → bundled) |
 | `bundledClientId.ts` | ID embebido para PWA cacheada en Pages |
 | `GoogleAuth.ts` | GIS Token model; access token en localStorage hasta caducar |
-| `GmailClient.ts` | Fetch wrapper Gmail REST v1 (insert multipart, list, attachments, delete/trash) |
-| `mime.ts` | Construcción MIME multipart (base64url `raw` + adjunto) para `/upload` |
+| `GmailClient.ts` | Fetch wrapper Gmail REST v1 (insert multipart/resumable sin `raw` en metadata, list, attachments, delete/trash) |
+| `mime.ts` | Construcción del mensaje MIME (adjunto ZIP) para `/upload`; no se envía `raw` duplicado en metadata |
 | `GmailBackupProvider.ts` | Implementación `BackupProvider` |
 
 ### `src/db/backup.ts`
