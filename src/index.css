@@ -5128,47 +5128,207 @@ label.bloque-select-option {
     var(--shadow);
 }
 
-.backup-banner {
-  background: var(--warning-soft);
-  color: var(--text);
-  border: 1px solid color-mix(in srgb, var(--warning) 28%, var(--border));
-  border-radius: var(--radius);
-  padding: 0.85rem 1rem;
-  margin-bottom: 1rem;
+/* Franja de copia automática bajo el header: a todo lo ancho, sin bordes
+   redondeados ni márgenes. Aparece mientras se ejecuta y al terminar. */
+.auto-backup-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+  width: 100%;
+  margin: 0;
+  padding: 0.55rem 1rem;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88rem;
+  animation: auto-backup-bar-in 0.35s var(--ease, ease);
 }
 
-/* Globo de copia pendiente en el header: flasheo lento. */
-.backup-bell {
+@keyframes auto-backup-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auto-backup-bar.is-running {
+  background: color-mix(in srgb, var(--accent) 13%, var(--bg-elev));
+  color: var(--text);
+}
+
+.auto-backup-bar.is-done {
+  background: color-mix(in srgb, var(--ok) 13%, var(--bg-elev));
+  color: var(--text);
+}
+
+.auto-backup-bar.is-warning {
+  background: color-mix(in srgb, var(--warning) 13%, var(--bg-elev));
+  color: var(--text);
+}
+
+.auto-backup-bar.is-error {
+  background: color-mix(in srgb, var(--danger) 13%, var(--bg-elev));
+  color: var(--text);
+}
+
+.auto-backup-bar-text {
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+}
+
+.auto-backup-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+/* Flash constante y lento en el fondo del botón de AJUSTES cuando hay
+   cambios sin copiar: recuerda hacer el respaldo manual. */
+.nav-item.is-backup-suggest {
+  color: var(--warning);
+  animation: nav-suggest-flash 3.2s ease-in-out infinite;
+}
+
+@keyframes nav-suggest-flash {
+  0%,
+  100% {
+    background: color-mix(in srgb, var(--warning) 0%, transparent);
+  }
+  50% {
+    background: color-mix(in srgb, var(--warning) 26%, transparent);
+  }
+}
+
+/* Card de sugerencia dentro de Ajustes, con línea de flash arriba. */
+.ajustes-backup-suggest {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-bottom: 0.85rem;
+}
+
+.ajustes-backup-suggest-card {
   position: relative;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  text-align: left;
+  color: var(--text);
+  background: color-mix(in srgb, var(--warning) 10%, var(--bg-elev));
+  border: 1px solid color-mix(in srgb, var(--warning) 32%, var(--border));
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.ajustes-backup-suggest-card:hover {
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border));
+  box-shadow: var(--shadow-hover);
+}
+
+.ajustes-backup-suggest-flash {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--warning), transparent);
+  animation: suggest-top-flash 2.6s ease-in-out infinite;
+}
+
+@keyframes suggest-top-flash {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.ajustes-backup-suggest-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+}
+
+.ajustes-backup-suggest-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.ajustes-backup-suggest-text span {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.ajustes-backup-suggest-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
   color: var(--warning);
 }
 
-.backup-bell-dot {
-  position: absolute;
-  top: 9px;
-  right: 9px;
-  width: 9px;
-  height: 9px;
-  border-radius: 99px;
-  background: var(--warning);
-  animation: backup-bell-pulse 2.6s ease-in-out infinite;
+.ajustes-backup-suggest-dismiss {
+  margin-top: 0.1rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
-@keyframes backup-bell-pulse {
+/* Destello del botón «Crear copia ahora» al llegar desde la sugerencia. */
+.gmail-create-btn.gmail-create-highlight {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  animation: gmail-create-pulse 0.85s ease-out 3;
+}
+
+@keyframes gmail-create-pulse {
   0%,
   100% {
-    opacity: 1;
-    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
   }
   50% {
-    opacity: 0.3;
-    transform: scale(0.75);
+    box-shadow: 0 0 0 10px transparent;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .backup-bell-dot {
+  .auto-backup-bar,
+  .ajustes-backup-suggest-card,
+  .gmail-create-btn.gmail-create-highlight {
     animation: none;
+  }
+
+  .nav-item.is-backup-suggest {
+    animation: none;
+    background: color-mix(in srgb, var(--warning) 16%, transparent);
+  }
+
+  .ajustes-backup-suggest-flash {
+    animation: none;
+    opacity: 0.6;
   }
 }
 
@@ -5312,11 +5472,6 @@ label.bloque-select-option {
   font-size: 0.68rem;
   font-weight: 750;
   line-height: 1;
-}
-
-.backup-banner p {
-  margin: 0 0 0.65rem;
-  font-size: 0.9rem;
 }
 
 .backup-status {

@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
@@ -6,7 +5,6 @@ import { actividadTitulo } from '../lib/actividades'
 import { fichaTitulo } from '../lib/fichas'
 import { monthLabel } from '../lib/dates'
 import {
-  Bell,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -23,8 +21,8 @@ import { SearchToggle, StatusWordsToggle } from './ui'
 import { AppLogo } from './AppLogo'
 import { FilterDrawerProvider } from '../hooks/useFilterDrawer'
 import { useAppHistory } from '../hooks/useAppHistory'
-import { useAutoBackup } from '../hooks/useAutoBackup'
-import { DataProcessOverlay } from './DataProcessOverlay'
+import { AutoBackupProvider, useAutoBackupContext } from '../hooks/useAutoBackup'
+import { AutoBackupBar } from './AutoBackupBar'
 
 const LINKS = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, end: true },
@@ -117,7 +115,7 @@ function PageHeading({ pathname, search }: { pathname: string; search: string })
   return titleFor(pathname, search)
 }
 
-function NavItems() {
+function NavItems({ suggest = false }: { suggest?: boolean }) {
   return (
     <>
       {LINKS.map((link) => {
@@ -128,7 +126,11 @@ function NavItems() {
             to={link.to}
             end={link.end}
             replace={link.to === '/'}
-            className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+            className={({ isActive }) =>
+              `nav-item${isActive ? ' active' : ''}${
+                suggest && link.to === '/ajustes' ? ' is-backup-suggest' : ''
+              }`
+            }
           >
             <Icon size={18} />
             {link.label}
@@ -142,7 +144,9 @@ function NavItems() {
 export function Layout() {
   return (
     <FilterDrawerProvider>
-      <LayoutShell />
+      <AutoBackupProvider>
+        <LayoutShell />
+      </AutoBackupProvider>
     </FilterDrawerProvider>
   )
 }
@@ -150,24 +154,17 @@ export function Layout() {
 function LayoutShell() {
   const location = useLocation()
   const { canBack, canForward, back, forward } = useAppHistory()
-  const { banner, busy, saveNow, dismiss, session, dismissProcess } = useAutoBackup()
-  /** La card de guardar copia queda oculta hasta pulsar el globo del header. */
-  const [backupOpen, setBackupOpen] = useState(false)
-
-  useEffect(() => {
-    if (!banner) setBackupOpen(false)
-  }, [banner])
+  const { suggest, bar, postpone, cancelRun, closeBar } = useAutoBackupContext()
 
   return (
     <div className="shell">
-      <DataProcessOverlay session={session} onDismiss={dismissProcess} />
       <aside className="sidebar">
         <Link className="brand" to="/" replace>
           <AppLogo className="brand-mark" />
           MaintManage
         </Link>
         <nav>
-          <NavItems />
+          <NavItems suggest={suggest} />
         </nav>
         <p className="muted" style={{ marginTop: 'auto', padding: '0.75rem', fontSize: '0.78rem' }}>
           Copia automática en Ajustes. Así no se pierden al borrar la app.
@@ -204,46 +201,21 @@ function LayoutShell() {
             </h1>
           </div>
           <div className="topbar-actions">
-            {banner ? (
-              <button
-                type="button"
-                className="icon-btn backup-bell"
-                aria-label="Guardar copia pendiente"
-                title={banner}
-                aria-expanded={backupOpen}
-                onClick={() => setBackupOpen((was) => !was)}
-              >
-                <Bell size={18} aria-hidden />
-                <span className="backup-bell-dot" aria-hidden />
-              </button>
-            ) : null}
             <StatusWordsToggle />
             <SearchToggle />
             <FilterDrawerToggle />
             <FontScaleToggle />
           </div>
         </header>
+        <AutoBackupBar bar={bar} onPostpone={() => void postpone()} onCancel={() => void cancelRun()} onClose={closeBar} />
         <main className="page">
-          {banner && backupOpen ? (
-            <div className="backup-banner" role="status">
-              <p>{banner}</p>
-              <div className="row" style={{ flexWrap: 'wrap' }}>
-                <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void saveNow()}>
-                  Guardar copia ahora
-                </button>
-                <button type="button" className="btn btn-ghost" disabled={busy} onClick={dismiss}>
-                  Más tarde
-                </button>
-              </div>
-            </div>
-          ) : null}
           <Outlet />
         </main>
         <NuevoFab />
         <FilterDrawer />
       </div>
       <nav className="bottom-nav" aria-label="Principal">
-        <NavItems />
+        <NavItems suggest={suggest} />
       </nav>
     </div>
   )

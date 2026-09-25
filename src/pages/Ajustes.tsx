@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import {
   Bell,
   ChevronDown,
+  ChevronRight,
   CircleHelp,
   Clock,
   Cloud,
@@ -18,6 +19,8 @@ import {
   Smartphone,
   Type,
   Upload,
+  UploadCloud,
+  X,
   type LucideIcon,
 } from 'lucide-react'
 import { db } from '../db'
@@ -63,6 +66,7 @@ import { GoogleAccountPanel } from '../components/GoogleAccountPanel'
 import { ThemeModePicker } from '../components/ThemeQuickToggle'
 import { useDataProcess } from '../hooks/useDataProcess'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
+import { useAutoBackupContext } from '../hooks/useAutoBackup'
 import {
   EXPORT_STEPS,
   FOLDER_RESTORE_STEPS,
@@ -122,6 +126,7 @@ export function AjustesPage() {
   const pendingChanges =
     !!ajustes?.lastChangedAt &&
     (!ajustes.lastBackupAt || ajustes.lastChangedAt > ajustes.lastBackupAt)
+  const { suggest, dismissSuggestion } = useAutoBackupContext()
   const hasFolder = Boolean(ajustes?.backupFolderName)
   const caminoActivo = copiaCamino === 'carpeta' && !folderOk ? 'zip' : copiaCamino
   const dataStamp = ajustes?.lastChangedAt ?? 0
@@ -487,10 +492,51 @@ export function AjustesPage() {
     setMessage('')
   }
 
+  /** Desde la card de sugerencia: abre «Copia en Google» y señala «Crear copia ahora». */
+  function goToCreate() {
+    setTab('gmail')
+    setMessage('')
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = document.getElementById('gmail-crear-copia-btn')
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el?.classList.add('gmail-create-highlight')
+        setTimeout(() => el?.classList.remove('gmail-create-highlight'), 2600)
+      })
+    })
+  }
+
   return (
     <>
     <DataProcessOverlay session={processSession} onDismiss={dismissProcess} />
     <div className="stack ajustes-page">
+      {suggest ? (
+        <div className="ajustes-backup-suggest" role="status">
+          <button type="button" className="ajustes-backup-suggest-card" onClick={goToCreate}>
+            <span className="ajustes-backup-suggest-flash" aria-hidden />
+            <span className="ajustes-backup-suggest-icon" aria-hidden>
+              <UploadCloud size={20} />
+            </span>
+            <span className="ajustes-backup-suggest-text">
+              <strong>Hay cambios sin copiar todavía.</strong>
+              <span>Haz una copia de respaldo segura ahora.</span>
+            </span>
+            <span className="ajustes-backup-suggest-cta">
+              Crear copia ahora
+              <ChevronRight size={16} aria-hidden />
+            </span>
+          </button>
+          <button
+            type="button"
+            className="icon-btn ajustes-backup-suggest-dismiss"
+            aria-label="Descartar sugerencia"
+            title="Descartar esta vez"
+            onClick={dismissSuggestion}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      ) : null}
       <EntityCard
         className="ajustes-apariencia is-inline"
         compact

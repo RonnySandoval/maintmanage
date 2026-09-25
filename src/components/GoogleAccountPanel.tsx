@@ -265,7 +265,8 @@ export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } 
             <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
               <button
                 type="button"
-                className="btn"
+                id="gmail-crear-copia-btn"
+                className="btn gmail-create-btn"
                 disabled={working}
                 onClick={() => void onCreateBackup()}
               >

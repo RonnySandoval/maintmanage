@@ -273,14 +273,32 @@ sequenceDiagram
 
 ## Flujo 6 — Copia automática al abrir
 
-**Código:** `src/lib/autoBackup.ts` + banner en `Layout.tsx`
+**Código:** `src/lib/autoBackup.ts` + `AutoBackupProvider` (contexto global) + `AutoBackupBar` en `Layout.tsx`
 
-1. Al montar layout y al volver `visibilityState === 'visible'`: `runAutoBackupIfDue()`.
-2. Si `autoBackup === false` o no hay datos → skip.
-3. Si hay carpeta vinculada y toca copia → `writeBackupToFolder`.
-4. Si no hay carpeta → banner «Guarda una copia ahora» (ZIP manual).
+1. Al montar `AutoBackupProvider` y al volver `visibilityState === 'visible'`: `checkAutoBackup()`.
+2. Si `autoBackup === false` o no hay datos → `disabled`/`no-data` → nada.
+3. Si no hay cambios desde la última copia → `fresh` → nada.
+4. Si no toca todavía (`now < nextBackupAt`) → `not-due` → nada.
+5. Si toca → `runAutoBackupNow()` en segundo plano, **sin preguntar**, usando los datos
+   tal como están al arrancar («a partir del último cambio antes de empezar»):
+   - Con carpeta vinculada → `writeBackupToFolder` (silencioso).
+   - Sin carpeta → descarga automática del ZIP completo (`downloadBlob`) y `markBackupDone('download')`.
 
 Criterio «toca copia»: `lastChangedAt > lastBackupAt` y `now >= nextBackupAt`.
+
+**UI de la barra** (`AutoBackupBar`, bajo el header, a todo lo ancho, sin bordes redondeados):
+- En proceso: «Haciendo copia de seguridad en segundo plano: …» con botones **Postponer** y **Cancelar**.
+- Terminada: mensaje con tamaño y botón **Cerrar**.
+- **Postponer** / **Cancelar**: silencian la barra y empujan `nextBackupAt` a `now + 1 h`
+  (la barra muestra «Copia aplazada/cancelada … dentro de 1 hora (HH:MM)»).
+- Error: mensaje accionable con botón **Cerrar**.
+
+**Sugerencia de copia manual** (recordatorio de cambios sin copiar):
+- Mientras `lastChangedAt > lastBackupAt` el botón **Ajustes** (barra inferior y sidebar)
+  parpadea lento en su fondo (clase `is-backup-suggest`).
+- Al abrir **Ajustes** aparece una card con línea de flash arriba («Hay cambios sin copiar
+  todavía») que al pulsarla abre «Copia en Google» y desplaza+destella el botón
+  «Crear copia ahora» (`gmail-crear-copia-btn`).
 
 ---
 
@@ -466,7 +484,7 @@ CI: secret `VITE_GOOGLE_CLIENT_ID` en `.github/workflows/deploy.yml`.
 
 ### Añadir backup automático Gmail (Fase 6)
 
-1. En `runAutoBackupIfDue`, si conectado a Google y hay cambios → `uploadBackupToGmail`.
+1. En `runAutoBackupNow` (o un segundo proveedor), si conectado a Google y hay cambios → `uploadBackupToGmail`.
 2. Comparar `dataVersion` / checksum con última copia para skip si idéntica.
 3. Respetar token OAuth (gesto si expirado).
 
