@@ -20,6 +20,7 @@ import { FontScaleToggle } from './FontScaleToggle'
 import { SearchToggle, StatusWordsToggle } from './ui'
 import { AppLogo } from './AppLogo'
 import { FilterDrawerProvider } from '../hooks/useFilterDrawer'
+import { FabActionProvider } from '../hooks/useFabAction'
 import { useAppHistory } from '../hooks/useAppHistory'
 import { AutoBackupProvider, useAutoBackupContext } from '../hooks/useAutoBackup'
 import { AutoBackupBar } from './AutoBackupBar'
@@ -144,9 +145,11 @@ function NavItems({ suggest = false }: { suggest?: boolean }) {
 export function Layout() {
   return (
     <FilterDrawerProvider>
-      <AutoBackupProvider>
-        <LayoutShell />
-      </AutoBackupProvider>
+      <FabActionProvider>
+        <AutoBackupProvider>
+          <LayoutShell />
+        </AutoBackupProvider>
+      </FabActionProvider>
     </FilterDrawerProvider>
   )
 }

@@ -30,6 +30,7 @@ import { MultiCheckDropdown } from '../components/MultiCheckDropdown'
 import { ShareMenu } from '../components/ShareMenu'
 import { TagTextarea } from '../components/TagTextarea'
 import { StatusBadge, EmptyState } from '../components/ui'
+import { FabActionSlot, type FabAction } from '../hooks/useFabAction'
 
 function initialTemplate(): string {
   try {
@@ -126,6 +127,7 @@ export function MensajesSeccion() {
   const [copiedAllFor, setCopiedAllFor] = useState('')
   const [copiedKey, setCopiedKey] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const generarRef = useRef<() => void>(() => {})
 
   const fichas = useLiveQuery(() => db.fichas.toArray()) ?? []
   const encargados = useLiveQuery(() => db.encargados.orderBy('nombre').toArray()) ?? []
@@ -303,8 +305,18 @@ export function MensajesSeccion() {
     })
   }
 
+  // El FAB flotante «Generar mensajes» llama siempre a la versión reciente de generar().
+  useEffect(() => {
+    generarRef.current = generar
+  })
+  const fabAction = useMemo<FabAction | null>(
+    () => ({ label: 'Generar mensajes', icon: Sparkles, onClick: () => generarRef.current() }),
+    [],
+  )
+
   return (
     <div className="stack">
+      <FabActionSlot action={fabAction} />
       <EntityCard
         title={
           <div className="row-spread">

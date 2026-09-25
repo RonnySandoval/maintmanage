@@ -56,7 +56,13 @@ export const TagTextarea = forwardRef<
           {parts.map((part, i) =>
             part.tag ? (
               <span key={i} className={`tag-token${part.known ? '' : ' unknown'}`}>
-                {part.text}
+                <span className="tag-token-brace" aria-hidden>
+                  {'{{'}
+                </span>
+                {part.text.slice(2, -2)}
+                <span className="tag-token-brace" aria-hidden>
+                  {'}}'}
+                </span>
               </span>
             ) : (
               <span key={i}>{part.text}</span>

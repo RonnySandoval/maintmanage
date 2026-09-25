@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ClipboardCheck, ClipboardList, FileText, NotebookPen, Plus, Users, Wrench } from 'lucide-react'
 import { useOverlayPresence } from '../hooks/useOverlayPresence'
+import { useFabAction } from '../hooks/useFabAction'
 
 type FabMenu = 'root' | 'inspeccion' | 'documento'
 
@@ -22,6 +23,7 @@ export function NuevoFab() {
   const timerRef = useRef<number>(0)
   const rootRef = useRef<HTMLDivElement>(null)
   const { mounted: menuMounted, shown: menuShown, onTransitionEnd } = useOverlayPresence(open)
+  const fabAction = useFabAction()
   openRef.current = open
 
   const onFormPage = /\/(nueva|editar)(\/|$)/.test(location.pathname)
@@ -99,6 +101,22 @@ export function NuevoFab() {
         className={`nuevo-fab${visible || open || menuMounted ? '' : ' is-hidden'}`}
         aria-hidden={!visible && !open && !menuMounted}
       >
+        {fabAction && !open ? (
+          <button
+            type="button"
+            className="nuevo-fab-action"
+            title={fabAction.label}
+            aria-label={fabAction.label}
+            onClick={() => {
+              fabAction.onClick()
+              reveal()
+              setOpen(false)
+            }}
+          >
+            <fabAction.icon size={17} aria-hidden />
+            <span>{fabAction.label}</span>
+          </button>
+        ) : null}
         {menuMounted ? (
           <div
             className={`nuevo-fab-menu${menuShown ? ' is-open' : ''}`}

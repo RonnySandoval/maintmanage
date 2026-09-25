@@ -750,6 +750,38 @@ button.nuevo-fab-item {
   box-shadow: var(--metal-shine), var(--focus-ring);
 }
 
+/* Acción rápida de la vista actual (Generar / Guardar): flota sobre el FAB «+». */
+.nuevo-fab-action {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 42px;
+  padding: 0 1rem;
+  border: 1px solid color-mix(in srgb, #0b1016 40%, transparent);
+  border-radius: 999px;
+  background: var(--metal-ok-grad);
+  color: var(--metal-ink);
+  font-weight: 750;
+  font-size: 0.8rem;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: var(--metal-shine), var(--metal-shadow);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.22);
+}
+
+.nuevo-fab-action:hover {
+  background: var(--metal-ok-grad-hover);
+}
+
+.nuevo-fab-action:focus-visible {
+  outline: none;
+  box-shadow: var(--metal-shine), var(--focus-ring);
+}
+
 .bottom-nav {
   position: fixed;
   left: 0;
@@ -1107,7 +1139,8 @@ button.nuevo-fab-item {
 .btn-primary > *,
 .btn-add > *,
 .btn-share > *,
-.nuevo-fab-btn > * {
+.nuevo-fab-btn > *,
+.nuevo-fab-action > * {
   position: relative;
   z-index: 1;
 }
@@ -4431,6 +4464,11 @@ label.bloque-select-option {
   background: transparent;
   color: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 65%, transparent);
+}
+
+/* Las llaves dobles de {{etiqueta}} no se dibujan: la píldora solo muestra el nombre. */
+.tag-token .tag-token-brace {
+  color: transparent;
 }
 
 .textarea.compact {

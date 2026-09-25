@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
@@ -10,6 +10,7 @@ import {
   Pin,
   PinOff,
   Plus,
+  Save,
   Search,
   Trash2,
 } from 'lucide-react'
@@ -24,6 +25,7 @@ import { EntityCard } from '../components/EntityCard'
 import { ActividadTitle } from '../components/ActividadTitle'
 import { FichaTitle } from '../components/FichaTitle'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
+import { FabActionSlot, type FabAction } from '../hooks/useFabAction'
 import { EmptyState, Modal } from '../components/ui'
 import { MensajesSeccion } from './Mensajes'
 
@@ -76,6 +78,7 @@ export function NotasPage() {
   const [mesFiltro, setMesFiltro] = useState('')
   const formRef = useRef<HTMLDivElement>(null)
   const tituloRef = useRef<HTMLInputElement>(null)
+  const saveRef = useRef<() => void>(() => {})
 
   const fichaMap = useMemo(() => Object.fromEntries(fichas.map((f) => [f.id, f])), [fichas])
   const fichasOrdenadas = useMemo(() => fichas.slice().sort(compareFichasByNumero), [fichas])
@@ -202,8 +205,7 @@ export function NotasPage() {
     setEtiquetasText(next.join(', '))
   }
 
-  async function save(e: FormEvent) {
-    e.preventDefault()
+  async function save() {
     setError('')
     if (!titulo.trim() && !cuerpo.trim()) {
       setError('Escribe un título o un texto.')
@@ -256,6 +258,18 @@ export function NotasPage() {
     }
     setFormOpen(false)
   }
+
+  // El FAB flotante «Guardar» llama siempre a la versión reciente de save().
+  useEffect(() => {
+    saveRef.current = () => void save()
+  })
+  const fabAction = useMemo<FabAction | null>(
+    () =>
+      tab === 'notas' && formOpen
+        ? { label: 'Guardar', icon: Save, onClick: () => saveRef.current() }
+        : null,
+    [tab, formOpen],
+  )
 
   async function toggleFijada(nota: Nota) {
     await db.notas.update(nota.id, { fijada: !nota.fijada, updatedAt: Date.now() })
@@ -433,6 +447,7 @@ export function NotasPage() {
       </div>
       {tab === 'notas' ? (
       <>
+      <FabActionSlot action={fabAction} />
       <div className="page-head">
         <p className="muted" style={{ margin: 0 }}>
           {notas.filter((n) => !n.archivada).length} activa
@@ -495,7 +510,12 @@ export function NotasPage() {
             </h3>
           }
         >
-          <form onSubmit={(e) => void save(e)}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              void save()
+            }}
+          >
             <div className="field">
               <label htmlFor="nota-titulo">Título</label>
               <input
