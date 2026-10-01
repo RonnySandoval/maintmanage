@@ -14,11 +14,13 @@ import { getGoogleAuth } from '../google/GoogleAuth'
 
 export type SaveBackupProgress = 'collect' | 'pack' | 'save'
 
-export type AutoBackupRunStatus = 'saved-gmail' | 'saved-folder' | 'saved-download' | 'error'
+export type AutoBackupRunStatus = 'saved-gmail' | 'saved-folder' | 'saved-zip-pending' | 'error'
 
 export interface AutoBackupResult {
   status: AutoBackupRunStatus
   message?: string
+  zipBlob?: Blob
+  zipFilename?: string
 }
 
 /** Resultado del chequeo previo: si la copia automática debe ejecutarse ahora. */
@@ -126,18 +128,18 @@ export async function runAutoBackupNow(
     }
   }
 
-  // 3) Último recurso: ZIP descargado, siempre disponible.
+  // 3) Último recurso: ZIP preparado. No se descarga automáticamente: se
+  //    devuelve al usuario para que haga clic en «Descargar ahora».
   onProgress?.('pack')
   const { blob, filename } = await exportBackupZip()
   onProgress?.('save')
-  downloadBlob(blob, filename)
   await markBackupDone('download')
 
   const notes: string[] = []
   if (gmailFailed) {
-    notes.push('Gmail rechazó la subida (¿red inestable?); se descargó el ZIP como respaldo.')
+    notes.push('Gmail rechazó la subida (¿red inestable?); la copia está preparada como respaldo.')
   } else if (!googleConnected) {
-    notes.push('Gmail no está conectado en esta sesión; la copia se descargó como ZIP.')
+    notes.push('Gmail no está conectado en esta sesión; la copia está preparada como archivo descargable.')
   }
   if (folderNeedsPermission) {
     notes.push(
@@ -146,8 +148,10 @@ export async function runAutoBackupNow(
   }
   const note = notes.length ? ` ${notes.join(' ')}` : ''
   return {
-    status: 'saved-download',
-    message: `Copia descargada como ZIP (${formatBytes(blob.size)}). Guárdala en un lugar seguro.${note}`,
+    status: 'saved-zip-pending',
+    message: `Copia preparada (${formatBytes(blob.size)}). Pulsa para descargar el ZIP.${note}`,
+    zipBlob: blob,
+    zipFilename: filename,
   }
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, List, Search, SlidersHorizontal } from 'lucide-react'
+import { CalendarDays, LayoutGrid, List, Search, SlidersHorizontal } from 'lucide-react'
 import { db } from '../db'
 import {
   ESTADOS,
@@ -27,7 +27,7 @@ import { FichaTitle } from '../components/FichaTitle'
 import { ActividadTitle } from '../components/ActividadTitle'
 import { FilterDrawerSlot, type FilterTool } from '../hooks/useFilterDrawer'
 import { useTiposActividad } from '../hooks/useTiposActividad'
-import { InboxAlert } from '../components/InboxAlert'
+import { YearSelector } from '../components/YearSelector'
 
 type ListaItem =
   | { kind: 'occ'; id: string; fecha: string; occId: string; fichaId: string }
@@ -160,24 +160,6 @@ export function CronogramaPage() {
     }
     if (estado && estadoAgendaCorrectiva(a) !== estado) return false
     if (fecha && a.fechaObjetivo !== fecha) return false
-    return true
-  })
-
-  const correctivasSinProgramar = acciones.filter((a) => {
-    if (tipoAccionOf(a) !== 'correctiva' || a.fechaObjetivo || a.estado === 'ejecutada') return false
-    const ficha = a.fichaId ? fichaMap[a.fichaId] : undefined
-    const act = a.actividadId ? actividadMap[a.actividadId] : undefined
-    if (encargadoId) {
-      const enc = act?.encargadoId ?? ficha?.encargadoId
-      if (enc !== encargadoId) return false
-    }
-    if (tipoId && (!act || act.tipo !== tipoId)) return false
-    if (q) {
-      const hay = `${accionSearchText(a)} ${ficha ? `${ficha.numero} ${ficha.nombre}` : ''} ${act?.titulo ?? ''}`.toLowerCase()
-      if (!hay.includes(qLower)) return false
-    }
-    if (estado && estadoAgendaCorrectiva(a) !== estado) return false
-    if (fecha) return false
     return true
   })
 
@@ -422,23 +404,7 @@ export function CronogramaPage() {
         </div>
         {vista === 'grilla' ? (
           <div className="year-stepper">
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="Año anterior"
-              onClick={() => set('anio', String(year - 1))}
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <strong>{year}</strong>
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="Año siguiente"
-              onClick={() => set('anio', String(year + 1))}
-            >
-              <ChevronRight size={18} />
-            </button>
+            <YearSelector year={year} onChange={(y) => set('anio', String(y))} />
           </div>
         ) : null}
       </div>
@@ -482,10 +448,6 @@ export function CronogramaPage() {
         />
       </label>
 
-      {correctivasSinProgramar.length > 0 ? (
-        <InboxAlert count={correctivasSinProgramar.length} label="sin programar · fuera de grilla" />
-      ) : null}
-
       {vista === 'grilla' ? (
         <GrillaAnual
           year={year}
@@ -506,8 +468,8 @@ export function CronogramaPage() {
           }
           acciones={ambito === 'actividades' ? correctivasFechadas : acciones}
           showBloque={showBloque}
-          onToggleBloque={
-            ambito === 'fichas' ? () => set('verBloque', showBloque ? '0' : '') : undefined
+          onSetShowBloque={
+            ambito === 'fichas' ? (show: boolean) => set('verBloque', show ? '' : '0') : undefined
           }
         />
       ) : (
@@ -531,18 +493,6 @@ export function CronogramaPage() {
             </div>
           ) : (
             <div className="table-card">
-              {ambito === 'fichas' ? (
-                <div className="row" style={{ justifyContent: 'flex-end', margin: '0.35rem 0.5rem' }}>
-                  <button
-                    type="button"
-                    className={`chip compact${showBloque ? ' active' : ''}`}
-                    onClick={() => set('verBloque', showBloque ? '0' : '')}
-                    aria-pressed={showBloque}
-                  >
-                    Bloque
-                  </button>
-                </div>
-              ) : null}
               <div
                 className={`table-head table-cols-crono${
                   ambito === 'fichas' && showBloque ? '' : ' no-bloque'

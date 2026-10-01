@@ -757,9 +757,9 @@ button.nuevo-fab-item {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  min-width: 42px;
   min-height: 42px;
-  padding: 0 1rem;
+  padding: 0 0.6rem;
   border: 1px solid color-mix(in srgb, #0b1016 40%, transparent);
   border-radius: 999px;
   background: var(--metal-ok-grad);
@@ -789,7 +789,7 @@ button.nuevo-fab-item {
   bottom: 0;
   z-index: 30;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: var(--bg-elev);
   border-top: 1px solid var(--border);
   padding-bottom: env(safe-area-inset-bottom);
@@ -1469,17 +1469,111 @@ html[data-busqueda='oculta'] .search-field {
   gap: 0.35rem;
 }
 
-.year-stepper strong {
-  min-width: 3.4rem;
-  text-align: center;
-  font-size: 1.25rem;
-  letter-spacing: 0.01em;
-  font-variant-numeric: tabular-nums;
+.year-selector {
+  position: relative;
 }
 
-.year-stepper .icon-btn {
-  width: 30px;
-  height: 30px;
+.year-selector-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  color: var(--text);
+}
+
+.year-selector-btn:hover strong {
+  color: var(--accent);
+}
+
+.year-selector-popover {
+  position: absolute;
+  top: 110%;
+  left: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  min-width: 160px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgb(15 28 39 / 0.15);
+}
+
+.year-selector-decade-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.year-selector-decade-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  min-width: 24px;
+}
+
+.year-selector-decade-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.year-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.2rem;
+}
+
+.year-selector-year {
+  border: 0;
+  background: transparent;
+  padding: 0.3rem 0.2rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: center;
+  position: relative;
+  color: var(--text);
+}
+
+.year-selector-year:hover {
+  background: var(--bg-elev);
+}
+
+.year-selector-year.is-selected {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.year-selector-year.is-today {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.year-selector-check {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+}
+
+@media (min-width: 860px) {
+  .year-selector-popover {
+    left: 0;
+  }
 }
 
 .chip-row.compact {
@@ -5687,6 +5781,14 @@ label.bloque-select-option {
 /* Gmail backup list (Ajustes → Cuenta Google) */
 .gmail-backup-list-wrap {
   margin-top: 1rem;
+}
+
+.gmail-backup-warning {
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 0.7rem;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .gmail-backup-list {

@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
@@ -24,6 +25,7 @@ import { FabActionProvider } from '../hooks/useFabAction'
 import { useAppHistory } from '../hooks/useAppHistory'
 import { AutoBackupProvider, useAutoBackupContext } from '../hooks/useAutoBackup'
 import { AutoBackupBar } from './AutoBackupBar'
+import { useSwipeNavigation } from '../hooks/useSwipeNavigation'
 
 const LINKS = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, end: true },
@@ -116,10 +118,10 @@ function PageHeading({ pathname, search }: { pathname: string; search: string })
   return titleFor(pathname, search)
 }
 
-function NavItems({ suggest = false }: { suggest?: boolean }) {
+function NavItems({ suggest = false, excludeInicio = false }: { suggest?: boolean; excludeInicio?: boolean }) {
   return (
     <>
-      {LINKS.map((link) => {
+      {LINKS.filter((link) => !filterIsExcluded(link, excludeInicio)).map((link) => {
         const Icon = link.icon
         return (
           <NavLink
@@ -142,6 +144,10 @@ function NavItems({ suggest = false }: { suggest?: boolean }) {
   )
 }
 
+function filterIsExcluded(link: { to: string }, excludeInicio: boolean) {
+  return excludeInicio && link.to === '/'
+}
+
 export function Layout() {
   return (
     <FilterDrawerProvider>
@@ -155,12 +161,18 @@ export function Layout() {
 }
 
 function LayoutShell() {
+  const shellRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
   const { canBack, canForward, back, forward } = useAppHistory()
   const { suggest, bar, postpone, cancelRun, closeBar } = useAutoBackupContext()
 
-  return (
-    <div className="shell">
+  const onMainPane = ['/', '/cronograma', '/fichas', '/historicos', '/notas', '/ajustes'].some(
+    (p) => location.pathname === p,
+  )
+  useSwipeNavigation(shellRef, { enabled: onMainPane })
+
+   return (
+    <div className="shell" ref={shellRef}>
       <aside className="sidebar">
         <Link className="brand" to="/" replace>
           <AppLogo className="brand-mark" />
@@ -210,7 +222,22 @@ function LayoutShell() {
             <FontScaleToggle />
           </div>
         </header>
-        <AutoBackupBar bar={bar} onPostpone={() => void postpone()} onCancel={() => void cancelRun()} onClose={closeBar} />
+         <AutoBackupBar
+           bar={bar}
+           onPostpone={() => void postpone()}
+           onCancel={() => void cancelRun()}
+           onClose={closeBar}
+           onDownload={bar.kind === 'done' && bar.downloadUrl ? () => {
+             const a = document.createElement('a')
+             a.href = bar.downloadUrl!
+             a.download = bar.downloadName ?? 'backup.zip'
+             a.style.display = 'none'
+             document.body.appendChild(a)
+             a.click()
+             document.body.removeChild(a)
+             URL.revokeObjectURL(bar.downloadUrl!)
+           } : undefined}
+         />
         <main className="page">
           <Outlet />
         </main>
@@ -218,7 +245,7 @@ function LayoutShell() {
         <FilterDrawer />
       </div>
       <nav className="bottom-nav" aria-label="Principal">
-        <NavItems suggest={suggest} />
+        <NavItems suggest={suggest} excludeInicio />
       </nav>
     </div>
   )

@@ -114,7 +114,6 @@ export function NuevoFab() {
             }}
           >
             <fabAction.icon size={17} aria-hidden />
-            <span>{fabAction.label}</span>
           </button>
         ) : null}
         {menuMounted ? (

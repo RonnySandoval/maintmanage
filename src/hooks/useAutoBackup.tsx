@@ -21,7 +21,7 @@ const DISMISS_KEY = 'mm-backup-suggest-dismissed'
 export type AutoBackupBarState =
   | { kind: 'none' }
   | { kind: 'running'; stage: SaveBackupProgress }
-  | { kind: 'done'; message: string }
+  | { kind: 'done'; message: string; downloadUrl?: string; downloadName?: string }
   | { kind: 'postponed'; at: number }
   | { kind: 'cancelled'; at: number }
   | { kind: 'error'; message: string }
@@ -77,12 +77,20 @@ export function AutoBackupProvider({ children }: { children: ReactNode }) {
         if (!interrupted.current) setBar({ kind: 'running', stage: step })
       })
       if (interrupted.current) return
-      if (
+       if (
         result.status === 'saved-gmail' ||
         result.status === 'saved-folder' ||
-        result.status === 'saved-download'
+        result.status === 'saved-zip-pending'
       ) {
-        setBar({ kind: 'done', message: result.message ?? 'Copia de seguridad actualizada.' })
+        const downloadUrl = result.zipBlob
+          ? URL.createObjectURL(result.zipBlob)
+          : undefined
+        setBar({
+          kind: 'done',
+          message: result.message ?? 'Copia de seguridad actualizada.',
+          downloadUrl,
+          downloadName: result.zipFilename,
+        })
       } else {
         setBar({ kind: 'error', message: result.message ?? 'No se pudo completar la copia automática.' })
       }

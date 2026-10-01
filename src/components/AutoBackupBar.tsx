@@ -1,6 +1,6 @@
 import { formatDateTime } from '../lib/dates'
 import type { AutoBackupBarState } from '../hooks/useAutoBackup'
-import { Ban, Clock, X } from 'lucide-react'
+import { Download, Ban, Clock, X } from 'lucide-react'
 import { ErrorDetail } from './ErrorDetail'
 
 const STAGE_TEXT: Record<string, string> = {
@@ -14,13 +14,14 @@ type Props = {
   onPostpone: () => void
   onCancel: () => void
   onClose: () => void
+  onDownload?: () => void
 }
 
 /**
  * Aviso de copia automática en segundo plano: una franja pegada bajo el header,
  * a todo lo ancho, sin bordes redondeados ni márgenes (pantalla completa).
  */
-export function AutoBackupBar({ bar, onPostpone, onCancel, onClose }: Props) {
+export function AutoBackupBar({ bar, onPostpone, onCancel, onClose, onDownload }: Props) {
   if (bar.kind === 'none') return null
 
   const tone =
@@ -75,7 +76,7 @@ export function AutoBackupBar({ bar, onPostpone, onCancel, onClose }: Props) {
             </button>
           </>
         ) : null}
-        {bar.kind !== 'running' ? (
+      {bar.kind !== 'running' ? (
           <button
             type="button"
             className="icon-btn"
@@ -85,6 +86,18 @@ export function AutoBackupBar({ bar, onPostpone, onCancel, onClose }: Props) {
           >
             <X size={18} />
           </button>
+        ) : null}
+        {bar.kind === 'done' && bar.downloadUrl ? (
+          <a
+            href={bar.downloadUrl}
+            download={bar.downloadName}
+            className="icon-btn"
+            aria-label="Descargar ZIP"
+            title="Descargar ZIP"
+            onClick={() => onDownload?.()}
+          >
+            <Download size={18} />
+          </a>
         ) : null}
       </div>
     </div>

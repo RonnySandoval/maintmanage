@@ -78,7 +78,7 @@ export function GrillaAnual({
   eventos = [],
   acciones,
   showBloque = true,
-  onToggleBloque,
+  onSetShowBloque,
 }: {
   year: number
   modo?: 'fichas' | 'actividades'
@@ -90,7 +90,7 @@ export function GrillaAnual({
   eventos?: Evento[]
   acciones: AccionCorrectiva[]
   showBloque?: boolean
-  onToggleBloque?: () => void
+  onSetShowBloque?: (show: boolean) => void
 }) {
   const autoSpan = useGridSpan()
   const [manualZoom, setManualZoom] = useState<ZoomLevel | null>(null)
@@ -148,11 +148,19 @@ export function GrillaAnual({
   }
 
   function detailIn() {
-    setDetail((current) => Math.min(DETAIL_MAX, current + 1) as DetailLevel)
+    setDetail((current) => {
+      const next = Math.min(DETAIL_MAX, current + 1) as DetailLevel
+      if (current === 0 && next === 1 && onSetShowBloque) onSetShowBloque(true)
+      return next
+    })
   }
 
   function detailOut() {
-    setDetail((current) => Math.max(0, current - 1) as DetailLevel)
+    setDetail((current) => {
+      const next = Math.max(0, current - 1) as DetailLevel
+      if (current === 1 && next === 0 && onSetShowBloque) onSetShowBloque(false)
+      return next
+    })
   }
 
   useEffect(() => {
@@ -479,40 +487,27 @@ export function GrillaAnual({
                   <Plus size={14} />
                 </button>
               </div>
-              <div className="zoom-controls" role="group" aria-label="Detalle de ficha">
+              <div className="zoom-controls" role="group" aria-label="Detalle y bloques">
                 <button
                   type="button"
                   className="btn"
                   disabled={detail === 0}
                   onClick={detailOut}
-                  aria-label="Menos detalle de ficha"
+                  aria-label="Menos detalle"
                 >
                   <Minus size={14} />
                 </button>
-                <span className="zoom-label">Ficha</span>
+                <span className="zoom-label">Ver</span>
                 <button
                   type="button"
                   className="btn"
                   disabled={detail === DETAIL_MAX}
                   onClick={detailIn}
-                  aria-label="Más detalle de ficha"
+                  aria-label="Más detalle"
                 >
                   <Plus size={14} />
                 </button>
               </div>
-              {onToggleBloque ? (
-                <div className="zoom-controls">
-                  <button
-                    type="button"
-                    className={`zoom-toggle${showBloque ? ' is-on' : ''}`}
-                    onClick={onToggleBloque}
-                    aria-pressed={showBloque}
-                    title={showBloque ? 'Ocultar nombre del bloque' : 'Mostrar nombre del bloque'}
-                  >
-                    Bloque
-                  </button>
-                </div>
-              ) : null}
             </div>
           </div>
           <div

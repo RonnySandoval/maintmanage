@@ -401,6 +401,14 @@ export function GoogleAccountPanel({ embedded = false }: { embedded?: boolean } 
 
             {backups && backups.length > 0 ? (
               <div className="gmail-backup-list-wrap">
+                {backups.length > 3 ? (
+                  <div className="gmail-backup-warning" role="status">
+                    <span className="muted">
+                      <strong>Hay {backups.length} copias</strong> en este Gmail. Se recomienda
+                      conservar solo las más recientes.
+                    </span>
+                  </div>
+                ) : null}
                 <p className="backup-step-label">Copias disponibles</p>
                 <ul className="gmail-backup-list">
                   {backups.slice(0, 10).map((b) => {

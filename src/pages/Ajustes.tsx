@@ -90,7 +90,6 @@ function tabFromParam(value: string | null): AjustesTab | null {
   ) {
     return value
   }
-  // Sin parámetro (o 'none'): todos los acordeones cerrados por defecto.
   return null
 }
 
@@ -132,7 +131,6 @@ export function AjustesPage() {
   const caminoActivo = copiaCamino === 'carpeta' && !folderOk ? 'zip' : copiaCamino
   const dataStamp = ajustes?.lastChangedAt ?? 0
 
-  // Prepara el blob en segundo plano; el File se crea en el click (Android).
   useEffect(() => {
     if (tab !== 'copia' || copiaPaso !== 'guardar' || caminoActivo !== 'zip') return
 
@@ -175,9 +173,8 @@ export function AjustesPage() {
       return
     }
 
-    // Sin awaits previos al share: File se crea dentro de sharePreparedBackupZip.
-    const outcome = await sharePreparedBackupZip(prepared)
-    const result = outcome.status
+  const outcome = await sharePreparedBackupZip(prepared)
+  const result = outcome.status
 
     if (result === 'cancelled') {
       setMessage('')
@@ -571,7 +568,6 @@ export function AjustesPage() {
       <SettingsAccordion
         title="Copia en Google"
         icon={Cloud}
-        summary="Gmail entre dispositivos"
         open={tab === 'gmail'}
         onToggle={() => toggleSection('gmail')}
       >
@@ -581,7 +577,6 @@ export function AjustesPage() {
       <SettingsAccordion
         title="Copia local"
         icon={DatabaseBackup}
-        summary="Carpeta, ZIP o JSON"
         open={tab === 'copia'}
         onToggle={() => toggleSection('copia')}
       >
@@ -876,7 +871,6 @@ export function AjustesPage() {
       <SettingsAccordion
         title="Programación automática"
         icon={Clock}
-        summary="Intervalo y próxima copia"
         open={tab === 'programa'}
         onToggle={() => toggleSection('programa')}
       >
@@ -932,7 +926,6 @@ export function AjustesPage() {
       <SettingsAccordion
         title="Nombres en la app"
         icon={Type}
-        summary="Etiquetas y textos"
         open={tab === 'nombres'}
         onToggle={() => toggleSection('nombres')}
       >
@@ -976,7 +969,6 @@ export function AjustesPage() {
       <SettingsAccordion
         title="Avisos e instalación"
         icon={Bell}
-        summary="Notificaciones y PWA"
         open={tab === 'avisos'}
         onToggle={() => toggleSection('avisos')}
       >
@@ -1014,7 +1006,6 @@ export function AjustesPage() {
       <SettingsAccordion
         title="Estados de la ficha"
         icon={CircleHelp}
-        summary="Pendiente, vencida…"
         open={tab === 'estados'}
         onToggle={() => toggleSection('estados')}
       >
@@ -1042,7 +1033,6 @@ export function AjustesPage() {
       <SettingsAccordion
         title="Acerca de"
         icon={Info}
-        summary="Cómo funciona la app"
         open={tab === 'acerca'}
         onToggle={() => toggleSection('acerca')}
       >
@@ -1061,14 +1051,12 @@ export function AjustesPage() {
 function SettingsAccordion({
   title,
   icon: Icon,
-  summary,
   open,
   onToggle,
   children,
 }: {
   title: string
   icon?: LucideIcon
-  summary?: string
   open: boolean
   onToggle: () => void
   children: ReactNode
@@ -1085,15 +1073,7 @@ function SettingsAccordion({
         >
           <span className="accordion-label">
             {Icon ? <Icon size={16} /> : null}
-            <span>
-              {title}
-              {!open && summary ? (
-                <span className="muted" style={{ fontWeight: 500 }}>
-                  {' · '}
-                  {summary}
-                </span>
-              ) : null}
-            </span>
+            <span>{title}</span>
           </span>
           <ChevronDown size={18} className={open ? 'is-open' : ''} />
         </button>
