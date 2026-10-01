@@ -161,7 +161,7 @@ export function Layout() {
 }
 
 function LayoutShell() {
-  const shellRef = useRef<HTMLDivElement>(null)
+  const pageRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
   const { canBack, canForward, back, forward } = useAppHistory()
   const { suggest, bar, postpone, cancelRun, closeBar } = useAutoBackupContext()
@@ -169,10 +169,10 @@ function LayoutShell() {
   const onMainPane = ['/', '/cronograma', '/fichas', '/historicos', '/notas', '/ajustes'].some(
     (p) => location.pathname === p,
   )
-  useSwipeNavigation(shellRef, { enabled: onMainPane })
+  useSwipeNavigation(pageRef, { enabled: onMainPane })
 
    return (
-    <div className="shell" ref={shellRef}>
+     <div className="shell">
       <aside className="sidebar">
         <Link className="brand" to="/" replace>
           <AppLogo className="brand-mark" />
@@ -238,7 +238,7 @@ function LayoutShell() {
              URL.revokeObjectURL(bar.downloadUrl!)
            } : undefined}
          />
-        <main className="page">
+        <main className="page" ref={pageRef}>
           <Outlet />
         </main>
         <NuevoFab />

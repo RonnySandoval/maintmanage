@@ -584,6 +584,7 @@ p {
   min-width: 0;
   margin: 0 auto;
   overflow-x: clip;
+  transition: transform 0.28s ease-out, opacity 0.28s ease-out;
 }
 
 .page-head {
