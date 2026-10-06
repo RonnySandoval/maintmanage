@@ -158,6 +158,8 @@ export interface Adjunto {
   tipo: TipoAdjunto
   /** Etiquetas libres creadas por el usuario (formato, instructivo…). */
   etiquetas?: string[]
+  /** Nombre visible alternativo definido por el usuario. */
+  alias?: string
   createdAt: number
 }
 

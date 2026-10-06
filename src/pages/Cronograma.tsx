@@ -12,7 +12,7 @@ import {
   type EstadoOcurrencia,
 } from '../db/types'
 import { bloqueColorVar, kindActividadVar } from '../lib/colors'
-import { formatFechaProgramada, formatDateLong } from '../lib/dates'
+import { formatDateLong } from '../lib/dates'
 import { compareFichasByNumero, fichaTitulo } from '../lib/fichas'
 import { accionHref, accionSearchText, estadoAgendaCorrectiva } from '../lib/acciones'
 import { compareActividadesByTitulo } from '../lib/actividades'
@@ -35,6 +35,21 @@ type ListaItem =
   | { kind: 'acc'; id: string; fecha: string; accionId: string; fichaId?: string; actividadId?: string }
 
 type Ambito = 'fichas' | 'actividades'
+
+function formatMes(fechaMes: string): string {
+  const [year, month] = fechaMes.split('-').map(Number)
+  const d = new Date(year, month - 1)
+  return d.toLocaleString('es', { month: 'long', year: 'numeric' })
+}
+
+function formatFechaCorta(fecha: string): string {
+  if (!fecha) return ''
+  const [year, month, day] = fecha.split('-').map(Number)
+  const d = new Date(year, month - 1, day)
+  const dayStr = String(day).padStart(2, '0')
+  const monthStr = d.toLocaleString('es', { month: 'long' }).toLowerCase()
+  return `${dayStr}/${monthStr}/${year}`
+}
 
 export function CronogramaPage() {
   const [params, setParams] = useSearchParams()
@@ -292,38 +307,42 @@ export function CronogramaPage() {
           })),
         ]
 
-  const grouped = new Map<string, ListaItem[]>()
-  for (const item of listaItems) {
-    const list = grouped.get(item.fecha) ?? []
-    list.push(item)
-    grouped.set(item.fecha, list)
-  }
-  for (const list of grouped.values()) {
-    list.sort((a, b) => {
-      if (a.kind !== b.kind) return a.kind === 'occ' ? -1 : 1
-      if (a.kind === 'occ' && b.kind === 'occ') {
-        return compareFichasByNumero(fichaMap[a.fichaId], fichaMap[b.fichaId])
-      }
-      if (a.kind === 'evt' && b.kind === 'evt') {
-        return compareActividadesByTitulo(actividadMap[a.actividadId], actividadMap[b.actividadId])
-      }
-      if (a.kind === 'acc' && b.kind === 'acc') {
-        if (a.actividadId || b.actividadId) {
-          return compareActividadesByTitulo(
-            a.actividadId ? actividadMap[a.actividadId] : undefined,
-            b.actividadId ? actividadMap[b.actividadId] : undefined,
+  const grouped = useMemo(() => {
+    const map = new Map<string, ListaItem[]>()
+    for (const item of listaItems) {
+      const mes = item.fecha.slice(0, 7)
+      const list = map.get(mes) ?? []
+      list.push(item)
+      map.set(mes, list)
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => {
+        if (a.kind !== b.kind) return a.kind === 'occ' ? -1 : 1
+        if (a.kind === 'occ' && b.kind === 'occ') {
+          return compareFichasByNumero(fichaMap[a.fichaId], fichaMap[b.fichaId])
+        }
+        if (a.kind === 'evt' && b.kind === 'evt') {
+          return compareActividadesByTitulo(actividadMap[a.actividadId], actividadMap[b.actividadId])
+        }
+        if (a.kind === 'acc' && b.kind === 'acc') {
+          if (a.actividadId || b.actividadId) {
+            return compareActividadesByTitulo(
+              a.actividadId ? actividadMap[a.actividadId] : undefined,
+              b.actividadId ? actividadMap[b.actividadId] : undefined,
+            )
+          }
+          return compareFichasByNumero(
+            a.fichaId ? fichaMap[a.fichaId] : undefined,
+            b.fichaId ? fichaMap[b.fichaId] : undefined,
           )
         }
-        return compareFichasByNumero(
-          a.fichaId ? fichaMap[a.fichaId] : undefined,
-          b.fichaId ? fichaMap[b.fichaId] : undefined,
-        )
-      }
-      if (a.kind === 'evt') return -1
-      if (b.kind === 'evt') return 1
-      return 0
-    })
-  }
+        if (a.kind === 'evt') return -1
+        if (b.kind === 'evt') return 1
+        return 0
+      })
+    }
+    return map
+  }, [listaItems, fichaMap, actividadMap])
 
   const sinDatos =
     !fichas.length && !actividades.length && !acciones.some((a) => tipoAccionOf(a) === 'correctiva' && a.fechaObjetivo)
@@ -511,19 +530,10 @@ export function CronogramaPage() {
                 <span className="col-md">Encargado</span>
                 <span>Estado</span>
               </div>
-              {[...grouped.entries()].map(([day, items]) => {
-                const firstOcc = items.find((i) => i.kind === 'occ')
-                const firstEvt = items.find((i) => i.kind === 'evt')
-                const firstAcc = items.find((i) => i.kind === 'acc')
-                const precision =
-                  (firstOcc && fichaMap[firstOcc.fichaId]?.fechaPrecision === 'dia') ||
-                  (firstEvt && actividadMap[firstEvt.actividadId]?.fechaPrecision === 'dia') ||
-                  firstAcc
-                    ? 'dia'
-                    : 'mes'
-                return (
-                  <section key={day}>
-                    <div className="table-section">{formatFechaProgramada(day, precision)}</div>
+                {[...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([mes, items]) => {
+                  return (
+                  <section key={mes}>
+                    <div className="table-section">{formatMes(mes)}</div>
                     {items.map((item) => {
                       if (item.kind === 'occ') {
                         const occ = filteredOcc.find((o) => o.id === item.occId)
@@ -547,15 +557,15 @@ export function CronogramaPage() {
                                 {esExtraordinaria(occ) ? <ExtraBadge /> : null}
                               </span>
                               <span className="muted col-sm-only">
-                                {showBloque && bloque?.nombre
-                                  ? `${bloque.nombre}${encargado ? ` · ${encargado.nombre}` : ''}`
-                                  : (encargado?.nombre ?? '')}
+                                {formatFechaCorta(item.fecha)}
+                                {showBloque && bloque?.nombre ? ` · ${bloque.nombre}` : null}
+                                {encargado ? ` · ${encargado.nombre}` : null}
                               </span>
                             </span>
-                            {showBloque ? (
-                              <span className="col-md muted">{bloque?.nombre ?? '—'}</span>
-                            ) : null}
-                            <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
+                             {showBloque ? (
+                               <span className="col-md muted">{bloque?.nombre ?? '—'}</span>
+                             ) : null}
+                             <span className="col-md muted">{formatFechaCorta(item.fecha)} · {encargado?.nombre ?? '—'}</span>
                             <span className="table-nowrap">
                               <StatusBadge estado={occ.estado} />
                             </span>
@@ -585,10 +595,10 @@ export function CronogramaPage() {
                                 <ActividadTitle actividad={act} hideIcon />
                                 {esExtraordinaria(evt) ? <ExtraBadge /> : null}
                               </span>
-                              <span className="muted col-sm-only">{encargado?.nombre ?? ''}</span>
+                               <span className="muted col-sm-only">{formatFechaCorta(item.fecha)} · {encargado?.nombre ?? ''}</span>
                             </span>
-                            <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
-                            <span className="table-nowrap crono-estado">
+                             <span className="col-md muted">{formatFechaCorta(item.fecha)} · {encargado?.nombre ?? '—'}</span>
+                             <span className="table-nowrap crono-estado">
                               <StatusBadge estado={evt.estado} />
                             </span>
                           </Link>
@@ -641,15 +651,16 @@ export function CronogramaPage() {
                                 maxChars={100}
                               />
                             ) : null}
-                            <span className="muted col-sm-only">
-                              {parent}
-                            </span>
+                             <span className="muted col-sm-only">
+                               {formatFechaCorta(item.fecha)}
+                               {parent ? ` · ${parent}` : ''}
+                             </span>
                           </span>
                           {ambito === 'fichas' && showBloque ? (
                             <span className="col-md muted">{bloque?.nombre ?? '—'}</span>
                           ) : null}
-                          <span className="col-md muted">{encargado?.nombre ?? '—'}</span>
-                          <span className="table-nowrap crono-estado">
+                           <span className="col-md muted">{formatFechaCorta(item.fecha)} · {encargado?.nombre ?? '—'}</span>
+                           <span className="table-nowrap crono-estado">
                             <StatusBadge estado={estadoAgendaCorrectiva(accion)} />
                           </span>
                         </Link>

@@ -58,6 +58,7 @@ export async function uploadBackupToGmail(
       id: adjunto.id,
       mimeType: adjunto.mimeType,
       nombre: adjunto.nombre,
+      alias: adjunto.alias,
       fichaId: adjunto.fichaId,
       actividadId: adjunto.actividadId,
       ejecucionId: adjunto.ejecucionId,

@@ -224,6 +224,11 @@ export function GrillaAnual({
     [start, visible],
   )
 
+  const encargadoMap = Object.fromEntries(encargados.map((e) => [e.id, e]))
+  const bloqueMap = Object.fromEntries(bloques.map((b) => [b.id, b]))
+  const fichasOrdenadas = [...fichas].sort(compareFichasByNumero)
+  const actividadesOrdenadas = [...actividades].sort(compareActividadesByTitulo)
+
   const byFichaMonth = new Map<string, Ocurrencia[]>()
   for (const o of ocurrencias) {
     if (!o.fechaProgramada.startsWith(String(year))) continue
@@ -273,11 +278,6 @@ export function GrillaAnual({
     })
   const fichaById = Object.fromEntries(fichas.map((f) => [f.id, f]))
   const actividadById = Object.fromEntries(actividades.map((a) => [a.id, a]))
-
-  const encargadoMap = Object.fromEntries(encargados.map((e) => [e.id, e]))
-  const bloqueMap = Object.fromEntries(bloques.map((b) => [b.id, b]))
-  const fichasOrdenadas = [...fichas].sort(compareFichasByNumero)
-  const actividadesOrdenadas = [...actividades].sort(compareActividadesByTitulo)
 
   const visibleTrimestres = TRIMESTRES.map((t) => ({
     ...t,
@@ -338,10 +338,58 @@ export function GrillaAnual({
     }
   }
 
+  const trimestreMeses = useMemo(() => new Set(monthIndexes), [monthIndexes])
+
+  const fichaIdsEnTrimestre = useMemo(() => {
+    const ids = new Set<string>()
+    for (const o of ocurrencias) {
+      if (!o.fechaProgramada.startsWith(String(year))) continue
+      const month = Number(o.fechaProgramada.slice(5, 7)) - 1
+      if (!trimestreMeses.has(month)) continue
+      ids.add(o.fichaId)
+    }
+    return ids
+  }, [ocurrencias, year, trimestreMeses])
+
+  const actividadIdsEnTrimestre = useMemo(() => {
+    const ids = new Set<string>()
+    for (const e of eventos) {
+      if (!e.fechaProgramada.startsWith(String(year))) continue
+      const month = Number(e.fechaProgramada.slice(5, 7)) - 1
+      if (!trimestreMeses.has(month)) continue
+      ids.add(e.actividadId)
+    }
+    return ids
+  }, [eventos, year, trimestreMeses])
+
+  const accionIdsEnTrimestre = useMemo(() => {
+    const ids = new Set<string>()
+    for (const a of correctivasFechadas) {
+      if (!a.fechaObjetivo?.startsWith(String(year))) continue
+      const month = Number(a.fechaObjetivo.slice(5, 7)) - 1
+      if (!trimestreMeses.has(month)) continue
+      ids.add(a.id)
+    }
+    return ids
+  }, [correctivasFechadas, year, trimestreMeses])
+
+  const fichasFiltradas = useMemo(
+    () => fichasOrdenadas.filter((f) => fichaIdsEnTrimestre.has(f.id)),
+    [fichasOrdenadas, fichaIdsEnTrimestre],
+  )
+  const actividadesFiltradas = useMemo(
+    () => actividadesOrdenadas.filter((a) => actividadIdsEnTrimestre.has(a.id)),
+    [actividadesOrdenadas, actividadIdsEnTrimestre],
+  )
+  const correctivasFiltradas = useMemo(
+    () => correctivasFechadas.filter((a) => accionIdsEnTrimestre.has(a.id)),
+    [correctivasFechadas, accionIdsEnTrimestre],
+  )
+
   const vacia =
     modo === 'fichas'
-      ? !fichas.length
-      : !actividades.length && !correctivasFechadas.length
+      ? !fichasFiltradas.length
+      : !actividadesFiltradas.length && !correctivasFiltradas.length
 
   useEffect(() => {
     if (vacia) return
@@ -528,7 +576,7 @@ export function GrillaAnual({
           <table className={`${gridClass} year-grid-body`} style={gridStyle}>
             <tbody>
               {modo === 'fichas'
-                ? fichasOrdenadas.map((ficha) => {
+                ? fichasFiltradas.map((ficha) => {
                     const bloque = bloqueMap[ficha.grupoId] ?? {
                       id: ficha.grupoId,
                       nombre: 'Sin bloque',
@@ -556,7 +604,7 @@ export function GrillaAnual({
                   })
                 : null}
               {modo === 'actividades'
-                ? actividadesOrdenadas.map((actividad) => (
+                ? actividadesFiltradas.map((actividad) => (
                     <ActividadRow
                       key={actividad.id}
                       actividad={actividad}
@@ -573,7 +621,7 @@ export function GrillaAnual({
                   ))
                 : null}
               {modo === 'actividades'
-                ? correctivasFechadas.map((accion) => (
+                ? correctivasFiltradas.map((accion) => (
                     <CorrectivaRow
                       key={accion.id}
                       accion={accion}

@@ -48,11 +48,18 @@ function AdjuntoCard({
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
   const [error, setError] = useState('')
+  const [useAlias, setUseAlias] = useState(Boolean(adjunto.alias?.trim()))
   const kind = fileKind(adjunto.mimeType, adjunto.nombre)
   const shareFiles = useMemo(() => adjuntoShareFiles([adjunto]), [adjunto])
   const shareText = adjuntoShareText(meta, adjunto.nombre)
   const shareTitle = meta.parentLabel || adjunto.nombre
   const showFichaSelect = Boolean(fichas)
+  const displayName = useAlias && adjunto.alias?.trim() ? adjunto.alias.trim() : adjunto.nombre
+  const aliasToggleLabel = useAlias && adjunto.alias?.trim() ? 'Ver nombre original' : 'Ver alias'
+
+  useEffect(() => {
+    setUseAlias(Boolean(adjunto.alias?.trim()))
+  }, [adjunto.alias])
 
   const available = useMemo(() => {
     const assigned = new Set(tags.map((t) => t.toLowerCase()))
@@ -105,9 +112,22 @@ function AdjuntoCard({
           )}
         </button>
         <div className="adjunto-card-main">
-          <button type="button" className="adjunto-name" onClick={open}>
-            {adjunto.nombre}
-          </button>
+          <div className="adjunto-name-row">
+            <button type="button" className="adjunto-name" onClick={open}>
+              {displayName}
+            </button>
+            {adjunto.alias?.trim() ? (
+              <button
+                type="button"
+                className="adjunto-alias-toggle"
+                onClick={() => setUseAlias((v) => !v)}
+                title={aliasToggleLabel}
+                aria-label={aliasToggleLabel}
+              >
+                {useAlias ? 'original' : 'alias'}
+              </button>
+            ) : null}
+          </div>
           {meta.header ? <p className="muted adjunto-card-meta">{meta.header}</p> : null}
           {showFichaSelect && fichas ? (
             <label className="adjunto-ficha-field">

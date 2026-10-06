@@ -267,7 +267,7 @@ export class MaintDB extends Dexie {
             }
           })
       })
-    this.version(13).stores({
+    this.version(14).stores({
       encargados: 'id, nombre',
       grupos: 'id, nombre',
       fichas: 'id, grupoId, encargadoId, nombre, numero',
@@ -275,7 +275,7 @@ export class MaintDB extends Dexie {
       ejecuciones: 'id, ocurrenciaId, eventoId, accionId',
       accionesCorrectivas:
         'id, fichaId, ocurrenciaId, actividadId, eventoId, estado, tipo, prioridad',
-      adjuntos: 'id, fichaId, ejecucionId, tipo, actividadId',
+      adjuntos: 'id, fichaId, ejecucionId, tipo, actividadId, alias',
       ajustes: 'id',
       actividades: 'id, tipo, encargadoId, titulo',
       eventos: 'id, actividadId, fechaProgramada, estado, origen, [actividadId+fechaProgramada]',
