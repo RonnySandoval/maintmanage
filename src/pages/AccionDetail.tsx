@@ -269,7 +269,12 @@ export function AccionDetailPage() {
         </EntityCard>
       ) : null}
 
-      {soloNotas ? null : <NotasVinculadas accionId={current.id} />}
+      {soloNotas ? null : (
+        <NotasVinculadas
+          fichaId={current.fichaId}
+          actividadId={current.actividadId}
+        />
+      )}
     </div>
   )
 }

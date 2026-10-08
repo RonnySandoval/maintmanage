@@ -129,11 +129,6 @@ export function GrillaAnual({
     setStart((current) => Math.min(Math.max(0, Math.floor(current / 3) * 3), maxStart))
   }, [maxStart])
 
-  const updateWrapWidth = (el: HTMLDivElement | null) => {
-    if (!el) return
-    setWrapWidth(el.clientWidth)
-  }
-
   function setZoom(next: ZoomLevel) {
     setManualZoom(next)
   }
@@ -438,6 +433,17 @@ export function GrillaAnual({
       setStart(best)
     }
   }, [vacia, year, modo, ocurrencias, eventos, correctivasFechadas, start, maxStart, visible])
+
+  useEffect(() => {
+    if (!vacia) return
+    const el = wrapRef.current
+    if (!el) return
+    const update = () => setWrapWidth(el.clientWidth)
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [vacia, setWrapWidth])
 
   function syncHeadFromBody() {
     const head = headScrollRef.current
