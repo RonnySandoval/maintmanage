@@ -4688,7 +4688,7 @@ label.bloque-select-option {
 }
 
 .grid-window {
-  gap: 0.12rem;
+  gap: 0;
 }
 
 .grid-window strong {
@@ -4709,13 +4709,22 @@ label.bloque-select-option {
 }
 
 .grid-nav-btn {
-  min-height: 36px;
-  width: 36px;
+  min-height: 44px;
+  width: 44px;
   padding: 0;
-  border-top: 0;
-  border-bottom: 0;
+  border: 0;
   border-radius: 0;
   flex-shrink: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.grid-nav-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-elev));
+}
+
+.grid-nav-btn:disabled {
+  opacity: 0.28;
 }
 
 .ficha-num {
