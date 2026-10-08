@@ -129,6 +129,11 @@ export function GrillaAnual({
     setStart((current) => Math.min(Math.max(0, Math.floor(current / 3) * 3), maxStart))
   }, [maxStart])
 
+  const updateWrapWidth = (el: HTMLDivElement | null) => {
+    if (!el) return
+    setWrapWidth(el.clientWidth)
+  }
+
   function setZoom(next: ZoomLevel) {
     setManualZoom(next)
   }
