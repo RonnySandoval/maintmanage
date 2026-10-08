@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { CircleCheck, Pencil, Trash2 } from 'lucide-react'
+import { CircleCheck, NotebookPen, Pencil, Trash2 } from 'lucide-react'
 import { db } from '../db'
 import { esExtraordinaria, esOcurrenciaProgramada } from '../db/types'
 import { formatFechaProgramada, monthLabel } from '../lib/dates'
@@ -53,8 +52,9 @@ export function OcurrenciaDetailPage() {
       [occ?.fichaId],
     ) ?? []
 
-  const [removing, setRemoving] = useState(false)
-  const [ejecOpen, setEjecOpen] = useState(false)
+   const [removing, setRemoving] = useState(false)
+   const [ejecOpen, setEjecOpen] = useState(false)
+   const [soloNotas, setSoloNotas] = useState(false)
 
   if (!id) return null
   if (occ === undefined) return <p className="muted">Cargando…</p>
@@ -137,8 +137,17 @@ export function OcurrenciaDetailPage() {
                     ? 'Editar ejecución'
                     : 'Registrar ejecución'}
               </button>
-              <ShareMenu title={fichaTitulo(currentFicha)} text={shareText} files={shareFiles} />
-            </div>
+               <ShareMenu title={fichaTitulo(currentFicha)} text={shareText} files={shareFiles} />
+               <button
+                 type="button"
+                 className={`icon-btn${soloNotas ? ' is-active' : ''}`}
+                 onClick={() => setSoloNotas((v) => !v)}
+                 title="Solo notas"
+                 aria-label="Mostrar solo notas"
+               >
+                 <NotebookPen size={16} />
+               </button>
+             </div>
             <button
               type="button"
               className="icon-btn icon-btn-delete"
@@ -175,11 +184,16 @@ export function OcurrenciaDetailPage() {
             {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
           </p>
         ) : null}
-      </EntityCard>
+       </EntityCard>
 
-      <AccionesPanel fichaId={currentFicha.id} ocurrenciaId={ocurrencia.id} />
-
-      <NotasVinculadas fichaId={currentFicha.id} ocurrenciaId={ocurrencia.id} />
-    </div>
+       {soloNotas ? (
+         <NotasVinculadas fichaId={currentFicha.id} ocurrenciaId={ocurrencia.id} />
+       ) : (
+         <>
+           <AccionesPanel fichaId={currentFicha.id} ocurrenciaId={ocurrencia.id} />
+           <NotasVinculadas fichaId={currentFicha.id} ocurrenciaId={ocurrencia.id} />
+         </>
+       )}
+     </div>
   )
 }

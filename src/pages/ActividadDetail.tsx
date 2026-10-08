@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CalendarPlus, CalendarRange, CircleCheck, Pencil, Trash2 } from 'lucide-react'
+import { CalendarPlus, CalendarRange, CircleCheck, NotebookPen, Pencil, Trash2 } from 'lucide-react'
 import { db } from '../db'
 import {
   ESTADOS,
@@ -62,7 +62,8 @@ export function ActividadDetailPage() {
   const [desdeModo, setDesdeModo] = useState<'fijar' | 'eliminar'>('fijar')
   const [desdeEstado, setDesdeEstado] = useState<EstadoOcurrencia>('pendiente')
   const [desdeError, setDesdeError] = useState('')
-  const [desdeSaving, setDesdeSaving] = useState(false)
+   const [desdeSaving, setDesdeSaving] = useState(false)
+   const [soloNotas, setSoloNotas] = useState(false)
 
   if (!id) return null
   if (actividad === undefined) return <p className="muted">Cargando…</p>
@@ -195,16 +196,25 @@ export function ActividadDetailPage() {
               >
                 <Pencil size={16} />
               </Link>
-              <button
-                type="button"
-                className="icon-btn icon-btn-delete"
-                aria-label="Eliminar"
-                title="Eliminar"
-                onClick={() => void remove()}
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
+               <button
+                 type="button"
+                 className="icon-btn icon-btn-delete"
+                 aria-label="Eliminar"
+                 title="Eliminar"
+                 onClick={() => void remove()}
+               >
+                 <Trash2 size={16} />
+               </button>
+               <button
+                 type="button"
+                 className={`icon-btn${soloNotas ? ' is-active' : ''}`}
+                 onClick={() => setSoloNotas((v) => !v)}
+                 title="Solo notas"
+                 aria-label="Mostrar solo notas"
+               >
+                 <NotebookPen size={16} />
+               </button>
+             </div>
           </>
         }
       >
@@ -272,11 +282,11 @@ export function ActividadDetailPage() {
             ))
           )}
         </div>
-      </EntityCard>
+       </EntityCard>
 
-      <AccionesPanel actividadId={actividad.id} />
+       {soloNotas ? null : <AccionesPanel actividadId={actividad.id} />}
 
-      <NotasVinculadas actividadId={actividad.id} />
+       <NotasVinculadas actividadId={actividad.id} />
 
       <Modal open={modal === 'extra'} title="Añadir evento" onClose={() => setModal(null)}>
         <form onSubmit={(e) => void submitExtra(e)}>

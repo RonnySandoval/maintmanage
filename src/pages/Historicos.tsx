@@ -57,6 +57,7 @@ import { etiquetasOf } from '../lib/etiquetasAdjuntos'
 type AccGroup = 'lista' | 'fecha' | 'prioridad' | 'estado' | 'ficha'
 type AccSort = 'fecha' | 'prioridad' | 'reciente' | 'estado'
 type EjecVista = 'ejecuciones' | 'evidencias'
+type EvidSort = 'reciente' | 'antiguo'
 
 function sortAcciones(rows: AccionCorrectiva[], sort: AccSort): AccionCorrectiva[] {
   return [...rows].sort((a, b) => {
@@ -140,6 +141,8 @@ export function HistoricosPage() {
   const tab: 'ocurrencias' | 'acciones' | 'recomendaciones' =
     tabParam === 'acciones' || tabParam === 'recomendaciones' ? tabParam : 'ocurrencias'
   const ejecVista: EjecVista = params.get('vista') === 'evidencias' ? 'evidencias' : 'ejecuciones'
+  const evidSortRaw = params.get('evidorden')
+  const evidSort: EvidSort = evidSortRaw === 'antiguo' ? 'antiguo' : 'reciente'
   const q = params.get('q') ?? ''
   const bloqueId = params.get('bloque') ?? ''
   const encargadoId = params.get('encargado') ?? ''
@@ -204,6 +207,10 @@ export function HistoricosPage() {
     setParam('vista', next === 'evidencias' ? 'evidencias' : '')
   }
 
+  function setEvidSort(next: EvidSort) {
+    setParam('evidorden', next === 'reciente' ? '' : next)
+  }
+
   useEffect(() => {
     setSearchText(q)
   }, [q])
@@ -217,7 +224,7 @@ export function HistoricosPage() {
     setParams(
       (current) => {
         const next = new URLSearchParams(current)
-        for (const key of ['q', 'bloque', 'encargado', 'fecha', 'estado', 'agrupar', 'ordenar', 'vista']) {
+         for (const key of ['q', 'bloque', 'encargado', 'fecha', 'estado', 'agrupar', 'ordenar', 'vista', 'evidorden']) {
           next.delete(key)
         }
         return next
@@ -624,7 +631,12 @@ export function HistoricosPage() {
         adjuntos: rows,
       })
     }
-    return groups
+    const sortedGroups = [...groups].sort((a, b) => {
+      const aDate = a.adjuntos[0]?.createdAt ?? 0
+      const bDate = b.adjuntos[0]?.createdAt ?? 0
+      return evidSort === 'reciente' ? bDate - aDate : aDate - bDate
+    })
+    return sortedGroups
   }, [
     adjuntosEjecucion,
     ejecucionById,
@@ -636,8 +648,9 @@ export function HistoricosPage() {
     actividadMap,
     bloqueMap,
     encargadoMap,
-    q,
-  ])
+     q,
+     evidSort,
+   ])
 
   function toggleOcc(id: string) {
     setOpenOcc((current) => (current === id ? null : id))
@@ -896,32 +909,61 @@ export function HistoricosPage() {
         active: ejecVista === 'evidencias',
         onClick: () => setEjecVista('evidencias'),
       },
-      ...(ejecVista === 'evidencias'
-        ? []
-        : ([
-            {
-              id: 'ficha',
-              label: 'Por ficha',
-              icon: FolderTree,
-              active: groupBy === 'ficha',
-              onClick: () => setGroupBy('ficha'),
-            },
-            {
-              id: 'bloque',
-              label: 'Por bloque',
-              icon: Boxes,
-              active: groupBy === 'bloque',
-              onClick: () => setGroupBy('bloque'),
-            },
-            {
-              id: 'fecha',
-              label: 'Por fecha',
-              icon: CalendarDays,
-              active: groupBy === 'fecha',
-              onClick: () => setGroupBy('fecha'),
-            },
-          ] as FilterTool[])),
-    ]
+       ...(ejecVista === 'evidencias'
+         ? []
+         : ([
+             {
+               id: 'ficha',
+               label: 'Por ficha',
+               icon: FolderTree,
+               active: groupBy === 'ficha',
+               onClick: () => setGroupBy('ficha'),
+             },
+             {
+               id: 'bloque',
+               label: 'Por bloque',
+               icon: Boxes,
+               active: groupBy === 'bloque',
+               onClick: () => setGroupBy('bloque'),
+             },
+             {
+               id: 'fecha',
+               label: 'Por fecha',
+               icon: CalendarDays,
+               active: groupBy === 'fecha',
+               onClick: () => setGroupBy('fecha'),
+             },
+           ] as FilterTool[])),
+       ...(ejecVista === 'evidencias'
+         ? ([
+             {
+               id: 'evidordenar',
+               label: 'Ordenar',
+               icon: ArrowUpDown,
+               active: evidSort !== 'reciente',
+               content: (
+                 <div className="chip-row tight" role="tablist" aria-label="Ordenar evidencias">
+                   {(
+                     [
+                       ['reciente', 'Más recientes'],
+                       ['antiguo', 'Más antiguas'],
+                     ] as const
+                   ).map(([id, label]) => (
+                     <button
+                       key={id}
+                       type="button"
+                       className={`chip compact${evidSort === id ? ' active' : ''}`}
+                       onClick={() => setEvidSort(id)}
+                     >
+                       {label}
+                     </button>
+                   ))}
+                 </div>
+               ),
+             },
+           ] as FilterTool[])
+         : []),
+     ]
   }, [
     tab,
     estadoAcc,
@@ -933,8 +975,9 @@ export function HistoricosPage() {
     encargadoId,
     bloques,
     encargados,
-    ejecVista,
-  ])
+     ejecVista,
+     evidSort,
+   ])
 
   if (!ocurrencias.length && !eventos.length && !acciones.length && !recomendaciones.length) {
     return (
@@ -957,12 +1000,13 @@ export function HistoricosPage() {
               : 'Ejecutadas'
         }
         tools={filterTools}
-        canClear={
-          Boolean(q || bloqueId || encargadoId || fechaFiltro || estadoAcc || ejecVista === 'evidencias') ||
-          groupAcc !== 'lista' ||
-          sortAcc !== 'fecha' ||
-          groupBy !== 'ficha'
-        }
+         canClear={
+           Boolean(q || bloqueId || encargadoId || fechaFiltro || estadoAcc || ejecVista === 'evidencias') ||
+           groupAcc !== 'lista' ||
+           sortAcc !== 'fecha' ||
+           groupBy !== 'ficha' ||
+           evidSort !== 'reciente'
+         }
         onClear={clearFilters}
       />
       <div className="hist-toolbar">

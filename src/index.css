@@ -4708,6 +4708,16 @@ label.bloque-select-option {
   flex-shrink: 0;
 }
 
+.grid-nav-btn {
+  min-height: 36px;
+  width: 36px;
+  padding: 0;
+  border-top: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  flex-shrink: 0;
+}
+
 .ficha-num {
   font-variant-numeric: tabular-nums;
   color: var(--accent);

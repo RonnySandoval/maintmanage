@@ -70,8 +70,9 @@ export function FichasPage() {
   const [docUploadError, setDocUploadError] = useState('')
   const [assignIds, setAssignIds] = useState<string[]>([])
   const [assignDefaultFichaId, setAssignDefaultFichaId] = useState('')
-  const [assignRequireFicha, setAssignRequireFicha] = useState(false)
-  const docsUploadRef = useRef<HTMLDivElement>(null)
+   const [assignRequireFicha, setAssignRequireFicha] = useState(false)
+   const docsUploadRef = useRef<HTMLDivElement>(null)
+   const [docTagFilter, setDocTagFilter] = useState('')
   const groupBy = groupFromParam(params.get('agrupar'))
   const sortCol = sortColFromParam(params.get('col'))
   const sortDir = sortDirFromParam(params.get('dir'))
@@ -96,10 +97,19 @@ export function FichasPage() {
     [encargados],
   )
   const fichaMap = useMemo(() => Object.fromEntries(fichas.map((f) => [f.id, f])), [fichas])
-  const fichasOrdenadas = useMemo(
-    () => fichas.slice().sort(compareFichasByNumero),
-    [fichas],
-  )
+   const fichasOrdenadas = useMemo(
+     () => fichas.slice().sort(compareFichasByNumero),
+     [fichas],
+   )
+   const docTags = useMemo(() => {
+     const tags = new Set<string>()
+     for (const adj of adjuntos) {
+       for (const tag of etiquetasOf(adj.etiquetas)) {
+         tags.add(tag)
+       }
+     }
+     return [...tags].sort((a, b) => a.localeCompare(b, 'es'))
+   }, [adjuntos])
 
   useEffect(() => {
     if (tab !== 'documentos' || !openNuevoDoc) return
@@ -194,21 +204,25 @@ export function FichasPage() {
     })
   }, [fichas, bloqueId, encargadoId, q, adjuntoCounts.searchFicha])
 
-  const documentosGrupos = useMemo(() => {
-    const qLower = q.trim().toLowerCase()
-    const byFicha = new Map<string, Adjunto[]>()
-    const libres: Adjunto[] = []
-    const filtroBloqueOEncargado = Boolean(bloqueId || encargadoId)
+   const documentosGrupos = useMemo(() => {
+     const qLower = q.trim().toLowerCase()
+     const byFicha = new Map<string, Adjunto[]>()
+     const libres: Adjunto[] = []
+     const filtroBloqueOEncargado = Boolean(bloqueId || encargadoId)
 
-    for (const adj of adjuntos) {
-      if (!adjuntoMatchesQuery(adj, qLower)) continue
+     for (const adj of adjuntos) {
+       if (!adjuntoMatchesQuery(adj, qLower)) continue
+       if (docTagFilter) {
+         const tags = etiquetasOf(adj.etiquetas)
+         if (!tags.some((t) => t.toLowerCase() === docTagFilter.toLowerCase())) continue
+       }
 
-      if (!adj.fichaId || !fichaMap[adj.fichaId]) {
-        // Documentos sin ficha: no aplican filtros de bloque/encargado.
-        if (filtroBloqueOEncargado) continue
-        libres.push(adj)
-        continue
-      }
+       if (!adj.fichaId || !fichaMap[adj.fichaId]) {
+         // Documentos sin ficha: no aplican filtros de bloque/encargado.
+         if (filtroBloqueOEncargado) continue
+         libres.push(adj)
+         continue
+       }
 
       const ficha = fichaMap[adj.fichaId]
       if (bloqueId && ficha.grupoId !== bloqueId) continue
@@ -252,7 +266,7 @@ export function FichasPage() {
       })
     }
     return groups
-  }, [adjuntos, fichaMap, bloqueMap, encargadoMap, bloqueId, encargadoId, q])
+   }, [adjuntos, fichaMap, bloqueMap, encargadoMap, bloqueId, encargadoId, q, docTagFilter])
 
   const docsCount = documentosGrupos.reduce((n, g) => n + g.adjuntos.length, 0)
   const docsLibresCount =
@@ -378,43 +392,74 @@ export function FichasPage() {
           </div>
         ),
       },
-      ...(tab === 'documentos'
-        ? []
-        : [
-            {
-              id: 'agrupar',
-              label: 'Agrupar',
-              icon: Layers,
-              active: groupBy !== 'bloque',
-              content: (
-                <div className="chip-row tight" role="tablist" aria-label="Agrupar">
-                  <button
-                    type="button"
-                    className={`chip compact${groupBy === 'bloque' ? ' active' : ''}`}
-                    onClick={() => setGroup('bloque')}
-                  >
-                    Bloque
-                  </button>
-                  <button
-                    type="button"
-                    className={`chip compact${groupBy === 'encargado' ? ' active' : ''}`}
-                    onClick={() => setGroup('encargado')}
-                  >
-                    Encargado
-                  </button>
-                  <button
-                    type="button"
-                    className={`chip compact${groupBy === 'congregacion' ? ' active' : ''}`}
-                    onClick={() => setGroup('congregacion')}
-                  >
-                    Congregación
-                  </button>
-                </div>
-              ),
-            } satisfies FilterTool,
-          ]),
-    ]
-  }, [tab, bloqueId, encargadoId, groupBy, bloques, encargados])
+       ...(tab === 'documentos'
+         ? []
+         : [
+             {
+               id: 'agrupar',
+               label: 'Agrupar',
+               icon: Layers,
+               active: groupBy !== 'bloque',
+               content: (
+                 <div className="chip-row tight" role="tablist" aria-label="Agrupar">
+                   <button
+                     type="button"
+                     className={`chip compact${groupBy === 'bloque' ? ' active' : ''}`}
+                     onClick={() => setGroup('bloque')}
+                   >
+                     Bloque
+                   </button>
+                   <button
+                     type="button"
+                     className={`chip compact${groupBy === 'encargado' ? ' active' : ''}`}
+                     onClick={() => setGroup('encargado')}
+                   >
+                     Encargado
+                   </button>
+                   <button
+                     type="button"
+                     className={`chip compact${groupBy === 'congregacion' ? ' active' : ''}`}
+                     onClick={() => setGroup('congregacion')}
+                   >
+                     Congregación
+                   </button>
+                 </div>
+               ),
+             } satisfies FilterTool,
+           ]),
+       ...(tab === 'documentos'
+         ? ([
+             {
+               id: 'etiqueta',
+               label: 'Etiqueta',
+               icon: Paperclip,
+               active: docTagFilter !== '',
+               content: (
+                 <div className="chip-row tight" role="tablist" aria-label="Filtrar por etiqueta">
+                   <button
+                     type="button"
+                     className={`chip compact${docTagFilter === '' ? ' active' : ''}`}
+                     onClick={() => setDocTagFilter('')}
+                   >
+                     Todas
+                   </button>
+                   {docTags.map((tag) => (
+                     <button
+                       key={tag}
+                       type="button"
+                       className={`chip compact${docTagFilter === tag ? ' active' : ''}`}
+                       onClick={() => setDocTagFilter(docTagFilter === tag ? '' : tag)}
+                     >
+                       {tag}
+                     </button>
+                   ))}
+                 </div>
+               ),
+             },
+           ] as FilterTool[])
+         : []),
+     ]
+   }, [tab, bloqueId, encargadoId, groupBy, bloques, encargados, docTagFilter, docTags])
 
   return (
     <div>
@@ -422,16 +467,17 @@ export function FichasPage() {
         <FilterDrawerSlot
           title={tab === 'documentos' ? 'Documentos' : 'Fichas'}
           tools={filterTools}
-          canClear={Boolean(q || bloqueId || encargadoId || (tab === 'fichas' && groupBy !== 'bloque'))}
-          onClear={() => {
-            setSearchText('')
-            patch({
-              q: undefined,
-              bloque: undefined,
-              encargado: undefined,
-              agrupar: undefined,
-            })
-          }}
+           canClear={Boolean(q || bloqueId || encargadoId || docTagFilter || (tab === 'fichas' && groupBy !== 'bloque'))}
+           onClear={() => {
+             setSearchText('')
+             setDocTagFilter('')
+             patch({
+               q: undefined,
+               bloque: undefined,
+               encargado: undefined,
+               agrupar: undefined,
+             })
+           }}
         />
       ) : null}
       <div

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowRight, CalendarClock, CircleCheck, Pencil, Trash2, Wrench } from 'lucide-react'
+import { ArrowRight, CalendarClock, CircleCheck, NotebookPen, Pencil, Trash2, Wrench } from 'lucide-react'
 import { db } from '../db'
 import { prioridadOf, tipoAccionLabel, tipoAccionOf } from '../db/types'
 import {
@@ -23,6 +23,7 @@ import { PrioridadMark } from '../components/PrioridadMark'
 import { ExpandableText } from '../components/ExpandableText'
 import { AccionFechaLabel, StatusBadge } from '../components/ui'
 import { EntityCard } from '../components/EntityCard'
+import { NotasVinculadas } from '../components/NotasVinculadas'
 
 export function AccionDetailPage() {
   const { id } = useParams()
@@ -48,10 +49,11 @@ export function AccionDetailPage() {
     () => (id ? db.ejecuciones.where('accionId').equals(id).first() : undefined),
     [id],
   )
-  const [ejecOpen, setEjecOpen] = useState(false)
-  const [removing, setRemoving] = useState(false)
-  const [converting, setConverting] = useState(false)
-  const [panel, setPanel] = useState<'none' | 'edit' | 'schedule'>('none')
+   const [ejecOpen, setEjecOpen] = useState(false)
+   const [removing, setRemoving] = useState(false)
+   const [converting, setConverting] = useState(false)
+   const [panel, setPanel] = useState<'none' | 'edit' | 'schedule'>('none')
+   const [soloNotas, setSoloNotas] = useState(false)
 
   if (!id) return null
   if (accion === undefined) return <p className="muted">Cargando…</p>
@@ -97,164 +99,177 @@ export function AccionDetailPage() {
 
   return (
     <div className="stack">
-      <EntityCard
-        leading={
-          tipo === 'correctiva' ? (
-            <PrioridadMark prioridad={prioridadOf(current)} iconOnly />
-          ) : undefined
-        }
-        title={<ExpandableText as="h2" className="title-sm" text={accionTitulo(current)} maxLines={4} maxChars={220} />}
-        badge={<StatusBadge estado={estadoAgendaCorrectiva(current)} />}
-        footer={
-          <div className="row accion-card-actions">
-            {needsSchedule ? (
+      {!soloNotas ? (
+        <EntityCard
+          leading={
+            tipo === 'correctiva' ? (
+              <PrioridadMark prioridad={prioridadOf(current)} iconOnly />
+            ) : undefined
+          }
+          title={<ExpandableText as="h2" className="title-sm" text={accionTitulo(current)} maxLines={4} maxChars={220} />}
+          badge={<StatusBadge estado={estadoAgendaCorrectiva(current)} />}
+          footer={
+            <div className="row accion-card-actions">
+              {needsSchedule ? (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-schedule"
+                  onClick={() => setPanel((was) => (was === 'schedule' ? 'none' : 'schedule'))}
+                >
+                  <CalendarClock size={16} />
+                  {panel === 'schedule' ? 'Ocultar fecha' : 'Programar fecha'}
+                </button>
+              ) : canExecute ? (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-schedule"
+                  onClick={() => {
+                    setPanel('none')
+                    setEjecOpen((was) => !was)
+                  }}
+                >
+                  {ejecucion ? <Pencil size={16} /> : <CircleCheck size={16} />}
+                  {ejecOpen
+                    ? 'Ocultar'
+                    : ejecucion
+                      ? 'Editar ejecución'
+                      : 'Registrar ejecución'}
+                </button>
+              ) : null}
+              {tipo === 'correctiva' ? (
+                <Link
+                  className="icon-btn"
+                  to={convertirAccionHref(current)}
+                  aria-label="Convertir en actividad"
+                  title="Convertir en actividad"
+                >
+                  <Wrench size={16} />
+                </Link>
+              ) : current.convertidaEnId ? (
+                <Link
+                  className="icon-btn"
+                  to={accionHref({ id: current.convertidaEnId })}
+                  aria-label="Ver acción correctiva"
+                  title="Ver acción correctiva"
+                >
+                  <ArrowRight size={16} />
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label="Convertir en acción correctiva"
+                  title="Convertir en acción correctiva"
+                  disabled={converting}
+                  onClick={() => {
+                    setConverting(true)
+                    convertirRecomendacionACorrectiva(current).finally(() =>
+                      setConverting(false),
+                    )
+                  }}
+                >
+                  <ArrowRight size={16} />
+                </button>
+              )}
               <button
                 type="button"
-                className="btn btn-primary btn-schedule"
-                onClick={() => setPanel((was) => (was === 'schedule' ? 'none' : 'schedule'))}
+                className="icon-btn icon-btn-edit"
+                aria-label={panel === 'edit' ? 'Ocultar edición' : 'Editar'}
+                title={panel === 'edit' ? 'Ocultar edición' : 'Editar'}
+                onClick={() => setPanel((was) => (was === 'edit' ? 'none' : 'edit'))}
               >
-                <CalendarClock size={16} />
-                {panel === 'schedule' ? 'Ocultar fecha' : 'Programar fecha'}
+                <Pencil size={16} />
               </button>
-            ) : canExecute ? (
               <button
                 type="button"
-                className="btn btn-primary btn-schedule"
-                onClick={() => {
-                  setPanel('none')
-                  setEjecOpen((was) => !was)
-                }}
+                className="icon-btn icon-btn-delete"
+                aria-label={removing ? 'Eliminando…' : 'Eliminar acción'}
+                title="Eliminar acción"
+                onClick={() => void removeAccion()}
+                disabled={removing}
               >
-                {ejecucion ? <Pencil size={16} /> : <CircleCheck size={16} />}
-                {ejecOpen
-                  ? 'Ocultar'
-                  : ejecucion
-                    ? 'Editar ejecución'
-                    : 'Registrar ejecución'}
+                <Trash2 size={16} />
               </button>
-            ) : null}
-            {tipo === 'correctiva' ? (
-              <Link
-                className="icon-btn"
-                to={convertirAccionHref(current)}
-                aria-label="Convertir en actividad"
-                title="Convertir en actividad"
-              >
-                <Wrench size={16} />
-              </Link>
-            ) : current.convertidaEnId ? (
-              <Link
-                className="icon-btn"
-                to={accionHref({ id: current.convertidaEnId })}
-                aria-label="Ver acción correctiva"
-                title="Ver acción correctiva"
-              >
-                <ArrowRight size={16} />
-              </Link>
-            ) : (
               <button
                 type="button"
-                className="icon-btn"
-                aria-label="Convertir en acción correctiva"
-                title="Convertir en acción correctiva"
-                disabled={converting}
-                onClick={() => {
-                  setConverting(true)
-                  convertirRecomendacionACorrectiva(current).finally(() =>
-                    setConverting(false),
-                  )
-                }}
+                className={`icon-btn${soloNotas ? ' is-active' : ''}`}
+                onClick={() => setSoloNotas((v) => !v)}
+                title="Solo notas"
+                aria-label="Mostrar solo notas"
               >
-                <ArrowRight size={16} />
+                <NotebookPen size={16} />
               </button>
-            )}
-            <button
-              type="button"
-              className="icon-btn icon-btn-edit"
-              aria-label={panel === 'edit' ? 'Ocultar edición' : 'Editar'}
-              title={panel === 'edit' ? 'Ocultar edición' : 'Editar'}
-              onClick={() => setPanel((was) => (was === 'edit' ? 'none' : 'edit'))}
-            >
-              <Pencil size={16} />
-            </button>
-            <button
-              type="button"
-              className="icon-btn icon-btn-delete"
-              aria-label={removing ? 'Eliminando…' : 'Eliminar acción'}
-              title="Eliminar acción"
-              onClick={() => void removeAccion()}
-              disabled={removing}
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        }
-      >
-        {detalleTxt ? (
-          <ExpandableText text={detalleTxt} className="accion-detalle" maxLines={6} maxChars={320} />
-        ) : null}
-        <p className="muted occ-meta">
-          <span>{tipoAccionLabel(tipo, aliases)}</span>
-          {tipo === 'correctiva' ? (
-            <AccionFechaLabel fechaObjetivo={current.fechaObjetivo} />
+            </div>
+          }
+        >
+          {detalleTxt ? (
+            <ExpandableText text={detalleTxt} className="accion-detalle" maxLines={6} maxChars={320} />
           ) : null}
-        </p>
-        {tipo === 'recomendacion' && current.convertidaEnId ? (
-          <p className="muted">
-            Convertida en correctiva:{' '}
-            <Link to={accionHref({ id: current.convertidaEnId })}>ver</Link>
+          <p className="muted occ-meta">
+            <span>{tipoAccionLabel(tipo, aliases)}</span>
+            {tipo === 'correctiva' ? (
+              <AccionFechaLabel fechaObjetivo={current.fechaObjetivo} />
+            ) : null}
           </p>
-        ) : null}
-        {tipo === 'correctiva' && current.origenId ? (
-          <p className="muted">
-            Proviene de recomendación:{' '}
-            <Link to={accionHref({ id: current.origenId })}>ver</Link>
-          </p>
-        ) : null}
-        <p className="muted">
-          Origen:{' '}
-          <Link to={origenHref}>
-            {actividad ? (
-              <ActividadTitle actividad={actividad} />
-            ) : ficha ? (
-              <FichaTitle ficha={ficha} color={bloque?.color} />
-            ) : (
-              'Ver origen'
-            )}
-          </Link>
-          <span> · Estado propio, independiente del origen</span>
-        </p>
-        {panel === 'edit' ? (
-          <AccionEditor
-            accion={current}
-            onlyCorrectiva={tipo === 'correctiva'}
-            onDone={() => setPanel('none')}
-          />
-        ) : null}
-        {panel === 'schedule' ? (
-          <ProgramarFechaForm accion={current} onDone={() => setPanel('none')} />
-        ) : null}
-        {panel === 'none' && canExecute ? (
-          ejecOpen ? (
-            <EjecucionForm
-              accionId={current.id}
-              fichaId={current.fichaId}
-              actividadId={current.actividadId}
-              onSaved={() => setEjecOpen(false)}
-            />
-          ) : ejecucion ? (
+          {tipo === 'recomendacion' && current.convertidaEnId ? (
             <p className="muted">
-              Realizada el {formatDate(ejecucion.fechaReal)}
-              {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
+              Convertida en correctiva:{' '}
+              <Link to={accionHref({ id: current.convertidaEnId })}>ver</Link>
             </p>
-          ) : null
-        ) : null}
-        {panel === 'none' && !canExecute && !needsSchedule && tipo === 'correctiva' ? (
+          ) : null}
+          {tipo === 'correctiva' && current.origenId ? (
+            <p className="muted">
+              Proviene de recomendación:{' '}
+              <Link to={accionHref({ id: current.origenId })}>ver</Link>
+            </p>
+          ) : null}
           <p className="muted">
-            Añade una fecha programada para poder ejecutar esta {accionLabel(tipo, aliases).toLowerCase()}.
+            Origen:{' '}
+            <Link to={origenHref}>
+              {actividad ? (
+                <ActividadTitle actividad={actividad} />
+              ) : ficha ? (
+                <FichaTitle ficha={ficha} color={bloque?.color} />
+              ) : (
+                'Ver origen'
+              )}
+            </Link>
+            <span> · Estado propio, independiente del origen</span>
           </p>
-        ) : null}
-      </EntityCard>
+          {panel === 'edit' ? (
+            <AccionEditor
+              accion={current}
+              onlyCorrectiva={tipo === 'correctiva'}
+              onDone={() => setPanel('none')}
+            />
+          ) : null}
+          {panel === 'schedule' ? (
+            <ProgramarFechaForm accion={current} onDone={() => setPanel('none')} />
+          ) : null}
+          {panel === 'none' && canExecute ? (
+            ejecOpen ? (
+              <EjecucionForm
+                accionId={current.id}
+                fichaId={current.fichaId}
+                actividadId={current.actividadId}
+                onSaved={() => setEjecOpen(false)}
+              />
+            ) : ejecucion ? (
+              <p className="muted">
+                Realizada el {formatDate(ejecucion.fechaReal)}
+                {ejecucion.realizadoPor ? ` · ${ejecucion.realizadoPor}` : ''}
+              </p>
+            ) : null
+          ) : null}
+          {panel === 'none' && !canExecute && !needsSchedule && tipo === 'correctiva' ? (
+            <p className="muted">
+              Añade una fecha programada para poder ejecutar esta {accionLabel(tipo, aliases).toLowerCase()}.
+            </p>
+          ) : null}
+        </EntityCard>
+      ) : null}
+
+      <NotasVinculadas accionId={current.id} />
     </div>
   )
 }
